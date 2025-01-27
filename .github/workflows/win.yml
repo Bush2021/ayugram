@@ -184,18 +184,38 @@ jobs:
           -D DESKTOP_APP_NO_PDB=ON ^
           %TDESKTOP_BUILD_DEFINE%
 
-          cmake --build ..\out --config Debug --parallel
+          cmake --build ..\out --config RelWithDebInfo --parallel
 
-      - name: Move artifact.
+      - name: Move artifacts
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         run: |
-          set OUT=%TBUILD%\%REPO_NAME%\out\Debug
-          mkdir artifact
-          move %OUT%\Telegram.exe artifact/
+          set OUT=%TBUILD%\%REPO_NAME%\out\RelWithDebInfo
+          mkdir artifact artifact-pdb
+          move %OUT%\AyuGram.exe artifact/
           move %OUT%\Updater.exe artifact/
-      - uses: actions/upload-artifact@v4
-        name: Upload artifact.
+          if exist "%OUT%\*.pdb" move %OUT%\*.pdb artifact-pdb/
+      
+      - name: Upload main artifacts
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: artifact\
+      
+      - name: Upload PDB files
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-pdb
+          path: artifact-pdb\
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "nightly"
+          name: "Nightly Build"
+          body: "Automated nightly build"
+          draft: false
+          prerelease: true
+          files: |
+            artifact/AyuGram.exe
+            artifact/Updater.exe
