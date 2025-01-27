@@ -189,7 +189,7 @@ jobs:
       - name: Move artifacts
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         run: |
-          set OUT=%TBUILD%\%REPO_NAME%\out\RelWithDebInfo
+          set OUT=%TBUILD%\%REPO_NAME%\out\Debug
           mkdir artifact artifact-pdb
           move %OUT%\AyuGram.exe artifact/
           move %OUT%\Updater.exe artifact/

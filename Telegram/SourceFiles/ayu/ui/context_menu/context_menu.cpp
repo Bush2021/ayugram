@@ -204,6 +204,12 @@ void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	if (!item) {
 		return;
 	}
+	const auto settings = &AyuSettings::getInstance();
+
+	if (!settings->blg_repeater) {
+		return;
+	}
+
 	const auto itemId = item->fullId();
 	const auto _history = item->history();
 	if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
