@@ -38,6 +38,10 @@
 #include "history/view/history_view_element.h"
 #include "window/window_session_controller.h"
 
+// Repeater
+#include "main/session/send_as_peers.h"
+#include "api/api_sending.h"
+#include "history/history_widget.h"
 
 namespace AyuUi {
 
@@ -190,9 +194,14 @@ void AddUserMessagesAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	}
 }
 
-void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, const ContextMenuRequest &request, not_null<ListWidget *> list) {
-	const auto item = request.item;
-	if (!request.selectedItems.empty() || !item) {
+
+Api::SendAction prepareSendAction(auto _history, Api::SendOptions options) {
+	auto result = Api::SendAction(_history, options);
+	return result;
+}
+
+void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+	if (!item) {
 		return;
 	}
 	const auto itemId = item->fullId();
@@ -224,7 +233,7 @@ void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, const ContextMenuRequest 
 					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = MessageIdsList(1, itemId)});
 
 					api->forwardMessages(
-						std::move(resolved), action, [] { Ui::Toast::Show(tr::lng_share_done(tr::now)); });
+						std::move(resolved), action, [] {});
 				},
 				&st::menuIconDiscussion);
 		} else if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
@@ -280,7 +289,7 @@ void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, const ContextMenuRequest 
 							.ids = MessageIdsList(1, itemId), .options = Data::ForwardOptions::NoSenderNames});
 
 						api->forwardMessages(
-							std::move(resolved), action, [] { Ui::Toast::Show(tr::lng_share_done(tr::now)); });
+							std::move(resolved), action, [] { });
 					},
 					&st::menuIconDiscussion);
 			} else {
@@ -314,6 +323,8 @@ void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, const ContextMenuRequest 
 
 
 void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+	AddRepeaterAction(menu, item);
+
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showMessageDetailsInContextMenu)) {
 		return;
