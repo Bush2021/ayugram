@@ -174,6 +174,9 @@ public:
 	void set_stickerConfirmation(bool val);
 	void set_gifConfirmation(bool val);
 	void set_voiceConfirmation(bool val);
+
+	bool blg_repeater = true;
+	bool blg_remove_repies = true;
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
@@ -235,7 +238,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showMessageShot,
 	stickerConfirmation,
 	gifConfirmation,
-	voiceConfirmation
+	voiceConfirmation,
+
+	blg_repeater,
+	blg_remove_repies
 );
 
 AyuGramSettings &getInstance();

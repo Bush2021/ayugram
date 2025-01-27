@@ -3,6 +3,7 @@
 #
 # For license and copyright information please follow this link:
 # https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (APPLE)
     # target_precompile_headers with COMPILE_LANGUAGE restriction.

@@ -463,6 +463,20 @@ void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
 
 	std::vector checkboxes{
 		NestedEntry{
+			"复读姬 (+1 功能)", !settings->blg_repeater, [=](bool enabled)
+			{
+				settings->blg_repeater = !enabled;
+				AyuSettings::save();
+			}
+		},
+		NestedEntry{
+			"关闭 Replies", !settings->blg_repeater, [=](bool enabled)
+			{
+				settings->blg_remove_repies = !enabled;
+				AyuSettings::save();
+			}
+		},
+		NestedEntry{
 			tr::ayu_DontReadMessages(tr::now), !settings->sendReadMessages, [=](bool enabled)
 			{
 				settings->set_sendReadMessages(!enabled);

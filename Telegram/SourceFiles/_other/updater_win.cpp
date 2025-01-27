@@ -377,7 +377,7 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 				exeName = args[i];
 				for (int j = 0, l = exeName.size(); j < l; ++j) {
 					if (exeName[j] == L'/' || exeName[j] == L'\\') {
-						exeName = L"AyuGram.exe";
+						exeName = L"BlockGram.exe";
 						break;
 					}
 				}
