@@ -6269,6 +6269,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_IconNothing" = "无";
 "ayu_IconBard" = "Google Bard";
 "ayu_IconYaPlus" = "Yandex Plus";
+"ayu_WALMode" = "启用 WAL 模式";
 "ayu_PushNotificationCount" = "FCM 通知已接收";
 "ayu_ClearAyuDatabase" = "清除消息数据库";
 "ayu_ClearAyuAttachmentsNotification" = "BlockGram 附件文件夹已清除";
