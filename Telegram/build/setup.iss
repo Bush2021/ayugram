@@ -1,5 +1,5 @@
-#define MyAppShortName "AyuGram"
-#define MyAppName "AyuGram Desktop"
+#define MyAppShortName "BlockGram"
+#define MyAppName "BlockGram Desktop"
 #define MyAppPublisher "Radolyn Labs"
 #define MyAppURL "https://github.com/AyuGram"
 #define MyAppExeName "AyuGram.exe"

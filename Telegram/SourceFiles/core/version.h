@@ -19,9 +19,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // used in Updater.cpp and Setup.iss for Windows
 constexpr auto AppId = "{53F49750-6209-4FBF-9CA8-7A333C87D666}"_cs;
-constexpr auto AppNameOld = "AyuGram for Windows"_cs;
-constexpr auto AppName = "AyuGram Desktop"_cs;
-constexpr auto AppFile = "AyuGram"_cs;
+constexpr auto AppNameOld = "BlockGram for Windows"_cs;
+constexpr auto AppName = "BlockGram Desktop"_cs;
+constexpr auto AppFile = "BlockGram"_cs;
 constexpr auto AppVersion = 5010003;
 constexpr auto AppVersionStr = "5.10.3";
 constexpr auto AppBetaVersion = false;
