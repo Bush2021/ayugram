@@ -1,5 +1,5 @@
 name: Windows.
-
+permissions: all
 on:
   push:
     paths-ignore:
