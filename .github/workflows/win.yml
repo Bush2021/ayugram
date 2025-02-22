@@ -1,5 +1,5 @@
 name: Windows.
-permissions: all
+permissions: write-all
 on:
   push:
     paths-ignore:
