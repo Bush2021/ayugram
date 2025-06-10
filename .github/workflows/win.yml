@@ -1,6 +1,7 @@
 name: Windows.
 permissions: write-all
 on:
+  workflow_dispatch:
   push:
     paths-ignore:
       - 'docs/**'
