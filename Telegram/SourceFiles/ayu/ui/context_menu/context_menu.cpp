@@ -34,6 +34,7 @@
 #include "data/data_user.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
 // Repeater
