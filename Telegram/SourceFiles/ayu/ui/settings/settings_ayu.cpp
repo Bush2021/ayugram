@@ -933,6 +933,19 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 			AyuSettings::set_showMessageDetailsInContextMenu(index);
 			AyuSettings::save();
 		});
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings.showRepeaterInContextMenu,
+		options,
+		QString("+1 / Repeater"),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconDiscussion,
+		[=](int index)
+		{
+			AyuSettings::set_showRepeaterInContextMenu(index);
+			AyuSettings::save();
+		});
 
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());
