@@ -1064,6 +1064,7 @@ void AddMessageActions(
 		AyuUi::AddHideMessageAction(menu, request.item);
 		AyuUi::AddUserMessagesAction(menu, request.item);
 		AyuUi::AddMessageDetailsAction(menu, request.item);
+		AyuUi::AddRepeaterAction(menu, request.item);
 	}
 
 	AddPostLinkAction(menu, request);
