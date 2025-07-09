@@ -42,6 +42,10 @@
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
+#include "main/session/send_as_peers.h"
+#include "api/api_sending.h"
+#include "history/history_widget.h"
+
 namespace AyuUi {
 
 namespace {
@@ -629,6 +633,132 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			}
 		},
 	});
+}
+
+Api::SendAction prepareSendAction(auto _history, Api::SendOptions options) {
+	auto result = Api::SendAction(_history, options);
+	return result;
+}
+
+void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+	const auto settings = &AyuSettings::getInstance();
+	if (!needToShowItem(settings->showRepeaterInContextMenu)) {
+		return;
+	}
+
+	if (!item) {
+		return;
+	}
+
+	const auto itemId = item->fullId();
+	const auto _history = item->history();
+	if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
+		if (item->allowsForward()) {
+			menu->addAction(
+				tr::ayu_Repeater(tr::now),
+				[=] {
+					if (item->id <= 0) return;
+					const auto api = &item->history()->peer->session().api();
+					auto action = Api::SendAction(
+						item->history()->peer->owner().history(item->history()->peer),
+						Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
+					action.clearDraft = false;
+					if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+						action.options.sendAs = nullptr;
+					}
+
+					if (item->topic()) {
+						action.replyTo = FullReplyTo{
+							.messageId = item->fullId(),
+							.topicRootId = item->topicRootId(),
+						};
+					}
+
+					const auto history = item->history()->peer->owner().history(item->history()->peer);
+					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = MessageIdsList(1, itemId)});
+
+					api->forwardMessages(
+						std::move(resolved), action, [] {});
+				},
+				&st::menuIconDiscussion);
+		} else if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
+			menu->addAction(
+				tr::ayu_Repeater(tr::now),
+				[=] {
+					if (item->id <= 0) return;
+					const auto api = &item->history()->peer->session().api();
+					auto message = ApiWrap::MessageToSend(prepareSendAction(
+						_history->peer->owner().history(item->history()->peer),
+						Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
+					message.textWithTags = {item->originalText().text,
+											TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities)};
+					if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+						message.action.options.sendAs = nullptr;
+					}
+					if (item->topic()) {
+						message.action.replyTo = FullReplyTo{
+							.messageId = item->fullId(),
+							.topicRootId = item->topicRootId(),
+						};
+					}
+					api->sendMessage(std::move(message));
+				},
+				&st::menuIconDiscussion);
+		} else if (!item->isService() && item->media()->document() != nullptr &&
+				   item->media()->document()->sticker() != nullptr) {
+			if (item->allowsForward()) {
+				menu->addAction(
+					tr::ayu_Repeater(tr::now),
+					[=] {
+						if (item->id <= 0) return;
+						const auto api = &item->history()->peer->session().api();
+						auto action = Api::SendAction(
+							item->history()->peer->owner().history(item->history()->peer),
+							Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
+						action.clearDraft = false;
+						if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+							action.options.sendAs = nullptr;
+						}
+						if (item->topic()) {
+							action.replyTo = FullReplyTo{
+								.messageId = item->fullId(),
+								.topicRootId = item->topicRootId(),
+							};
+						}
+
+						const auto history = item->history()->peer->owner().history(item->history()->peer);
+						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{
+							.ids = MessageIdsList(1, itemId), .options = Data::ForwardOptions::NoSenderNames});
+
+						api->forwardMessages(
+							std::move(resolved), action, [] {});
+					},
+					&st::menuIconDiscussion);
+			} else {
+				menu->addAction(
+					tr::ayu_Repeater(tr::now),
+					[=] {
+						if (item->id <= 0) return;
+						const auto document = item->media()->document();
+						const auto history = item->history()->peer->owner().history(item->history()->peer);
+						auto message = ApiWrap::MessageToSend(prepareSendAction(
+							history,
+							Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
+						if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
+							message.action.options.sendAs = nullptr;
+						}
+						if (item->topic()) {
+							message.action.replyTo = FullReplyTo{
+								.messageId = item->fullId(),
+								.topicRootId = item->topicRootId(),
+							};
+						}
+						Api::SendExistingDocument(std::move(message), document);
+					},
+					&st::menuIconDiscussion);
+			}
+		}
+	}
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
