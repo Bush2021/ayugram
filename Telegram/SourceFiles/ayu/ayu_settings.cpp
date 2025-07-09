@@ -257,6 +257,7 @@ AyuGramSettings::AyuGramSettings() {
 	showHideMessageInContextMenu = 0;
 	showUserMessagesInContextMenu = 2;
 	showMessageDetailsInContextMenu = 2;
+	showRepeaterInContextMenu = 1;
 
 	showAttachButtonInMessageField = true;
 	showCommandsButtonInMessageField = true;
@@ -471,6 +472,10 @@ void set_showUserMessagesInContextMenu(int val) {
 
 void set_showMessageDetailsInContextMenu(int val) {
 	settings->showMessageDetailsInContextMenu = val;
+}
+
+void set_showRepeaterInContextMenu(int val) {
+	settings->showRepeaterInContextMenu = val;
 }
 
 void set_showAttachButtonInMessageField(bool val) {
