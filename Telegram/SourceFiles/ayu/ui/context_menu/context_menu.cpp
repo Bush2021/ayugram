@@ -13,6 +13,7 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
+#include "ayu/features/forward/ayu_forward.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history_item_components.h"
@@ -635,130 +636,75 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	});
 }
 
-Api::SendAction prepareSendAction(auto _history, Api::SendOptions options) {
-	auto result = Api::SendAction(_history, options);
-	return result;
-}
-
 void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showRepeaterInContextMenu)) {
 		return;
 	}
 
-	if (!item) {
+	if (!item || item->isService() || item->id <= 0) {
+		return;
+	}
+
+	const auto peer = item->history()->peer;
+	if (!peer->isUser() && !peer->isChat() && !peer->isMegagroup()) {
+		return;
+	}
+
+	const auto canRepeat = item->allowsForward() || 
+		(!item->emptyText() && !item->isDeleted()) ||
+		(item->media() && (item->media()->document() || item->media()->photo()));
+
+	if (!canRepeat) {
 		return;
 	}
 
 	const auto itemId = item->fullId();
-	const auto _history = item->history();
-	if ((item->history()->peer->isMegagroup() || item->history()->peer->isChat() || item->history()->peer->isUser())) {
-		if (item->allowsForward()) {
-			menu->addAction(
-				tr::ayu_Repeater(tr::now),
-				[=] {
-					if (item->id <= 0) return;
-					const auto api = &item->history()->peer->session().api();
-					auto action = Api::SendAction(
-						item->history()->peer->owner().history(item->history()->peer),
-						Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
-					action.clearDraft = false;
-					if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
-						action.options.sendAs = nullptr;
-					}
+	const auto history = item->history();
+	const auto session = &history->session();
 
-					if (item->topic()) {
-						action.replyTo = FullReplyTo{
-							.messageId = item->fullId(),
-							.topicRootId = item->topicRootId(),
-						};
-					}
-
-					const auto history = item->history()->peer->owner().history(item->history()->peer);
-					auto resolved = history->resolveForwardDraft(Data::ForwardDraft{.ids = MessageIdsList(1, itemId)});
-
-					api->forwardMessages(
-						std::move(resolved), action, [] {});
-				},
-				&st::menuIconDiscussion);
-		} else if (!item->isService() && !item->emptyText() && item->media() == nullptr) {
-			menu->addAction(
-				tr::ayu_Repeater(tr::now),
-				[=] {
-					if (item->id <= 0) return;
-					const auto api = &item->history()->peer->session().api();
-					auto message = ApiWrap::MessageToSend(prepareSendAction(
-						_history->peer->owner().history(item->history()->peer),
-						Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
-					message.textWithTags = {item->originalText().text,
-											TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities)};
-					if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
-						message.action.options.sendAs = nullptr;
-					}
-					if (item->topic()) {
-						message.action.replyTo = FullReplyTo{
-							.messageId = item->fullId(),
-							.topicRootId = item->topicRootId(),
-						};
-					}
-					api->sendMessage(std::move(message));
-				},
-				&st::menuIconDiscussion);
-		} else if (!item->isService() && item->media()->document() != nullptr &&
-				   item->media()->document()->sticker() != nullptr) {
-			if (item->allowsForward()) {
-				menu->addAction(
-					tr::ayu_Repeater(tr::now),
-					[=] {
-						if (item->id <= 0) return;
-						const auto api = &item->history()->peer->session().api();
-						auto action = Api::SendAction(
-							item->history()->peer->owner().history(item->history()->peer),
-							Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)});
-						action.clearDraft = false;
-						if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
-							action.options.sendAs = nullptr;
-						}
-						if (item->topic()) {
-							action.replyTo = FullReplyTo{
-								.messageId = item->fullId(),
-								.topicRootId = item->topicRootId(),
-							};
-						}
-
-						const auto history = item->history()->peer->owner().history(item->history()->peer);
-						auto resolved = history->resolveForwardDraft(Data::ForwardDraft{
-							.ids = MessageIdsList(1, itemId), .options = Data::ForwardOptions::NoSenderNames});
-
-						api->forwardMessages(
-							std::move(resolved), action, [] {});
-					},
-					&st::menuIconDiscussion);
-			} else {
-				menu->addAction(
-					tr::ayu_Repeater(tr::now),
-					[=] {
-						if (item->id <= 0) return;
-						const auto document = item->media()->document();
-						const auto history = item->history()->peer->owner().history(item->history()->peer);
-						auto message = ApiWrap::MessageToSend(prepareSendAction(
-							history,
-							Api::SendOptions{.sendAs = _history->session().sendAsPeers().resolveChosen(_history->peer)}));
-						if (item->history()->peer->isUser() || item->history()->peer->isChat()) {
-							message.action.options.sendAs = nullptr;
-						}
-						if (item->topic()) {
-							message.action.replyTo = FullReplyTo{
-								.messageId = item->fullId(),
-								.topicRootId = item->topicRootId(),
-							};
-						}
-						Api::SendExistingDocument(std::move(message), document);
-					},
-					&st::menuIconDiscussion);
+	menu->addAction(
+		tr::ayu_Repeater(tr::now),
+		[=] {
+			auto sendOptions = Api::SendOptions{
+				.sendAs = session->sendAsPeers().resolveChosen(peer)
+			};
+			
+			if (peer->isUser() || peer->isChat()) {
+				sendOptions.sendAs = nullptr;
 			}
-		}
-	}
+
+			auto action = Api::SendAction(history, sendOptions);
+			action.clearDraft = false;
+
+			if (item->topic()) {
+				action.replyTo = FullReplyTo{
+					.messageId = itemId,
+					.topicRootId = item->topicRootId(),
+				};
+			}
+
+			auto forwardDraft = Data::ForwardDraft{
+				.ids = MessageIdsList(1, itemId),
+				.options = Data::ForwardOptions::PreserveInfo
+			};
+			auto resolved = history->resolveForwardDraft(forwardDraft);
+			const auto needsFullAyuForward = AyuForward::isFullAyuForwardNeeded(item);
+			const auto needsAyuForward = AyuForward::isAyuForwardNeeded(item);
+
+			if (needsFullAyuForward) {
+				crl::async([=] {
+					AyuForward::forwardMessages(session, action, false, resolved);
+				});
+			} else if (needsAyuForward) {
+				crl::async([=] {
+					AyuForward::intelligentForward(session, action, resolved);
+				});
+			} else {
+				session->api().forwardMessages(std::move(resolved), action, [] {});
+			}
+		},
+		&st::menuIconDiscussion);
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
