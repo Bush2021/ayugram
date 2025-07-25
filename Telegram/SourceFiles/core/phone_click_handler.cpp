@@ -127,7 +127,7 @@ ResolvePhoneAction::ResolvePhoneAction(
 					return;
 				}
 
-				const auto weak = Ui::MakeWeak(this);
+				const auto weak = base::make_weak(this);
 				const auto session = &controller->session();
 
 				searchById(
@@ -139,7 +139,7 @@ ResolvePhoneAction::ResolvePhoneAction(
 							return;
 						}
 
-						const auto strong = weak.data();
+						const auto strong = weak.get();
 						if (!strong) {
 							return;
 						}

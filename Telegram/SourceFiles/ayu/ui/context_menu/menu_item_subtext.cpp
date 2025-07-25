@@ -219,7 +219,7 @@ ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu*> menu,
 
 void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 	const auto session = _session;
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 
 	searchById(
 		authorId,
@@ -231,9 +231,9 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 				return;
 			}
 
-			const auto strong = weak.data();
+			const auto strong = weak.get();
 			if (!strong) {
-				LOG(("ContextActionStickerAuthor: weak.data() returned null"));
+				LOG(("ContextActionStickerAuthor: weak.get() returned null"));
 				return;
 			}
 
@@ -253,7 +253,7 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 				crl::on_main(
 					[weak]
 					{
-						if (const auto strongInner = weak.data()) {
+						if (const auto strongInner = weak.get()) {
 							strongInner->update();
 						}
 					});
@@ -279,7 +279,7 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 			crl::on_main(
 				[weak]
 				{
-					if (const auto strongInner = weak.data()) {
+					if (const auto strongInner = weak.get()) {
 						strongInner->update();
 					}
 				});

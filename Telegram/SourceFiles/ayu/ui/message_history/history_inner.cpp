@@ -1489,11 +1489,8 @@ void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton but
 							 {
 								 button,
 								 QVariant::fromValue(ClickHandlerContext{
-									 .elementDelegate = [weak = Ui::MakeWeak(this)]
-									 {
-										 return weak
-													? (ElementDelegate*) weak
-													: nullptr;
+									 .elementDelegate = [weak = base::make_weak(this)]() -> ElementDelegate* {
+										 return weak.get();
 									 },
 									 .sessionWindow = base::make_weak(_controller),
 								 })
