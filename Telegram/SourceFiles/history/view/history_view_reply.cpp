@@ -111,6 +111,7 @@ constexpr auto kNonExpandedLinesLimit = 5;
 		not_null<Main::Session*> session) {
 	return Ui::Text::SingleCustomEmoji(
 		session->data().customEmojiManager().registerInternalEmoji(
+			u"task_done_reply_preview"_q,
 			MakeTaskDoneImage(),
 			QMargins(0, st::lineWidth, st::lineWidth, 0)));
 }
@@ -118,6 +119,7 @@ constexpr auto kNonExpandedLinesLimit = 5;
 [[nodiscard]] TextWithEntities TaskIcon(not_null<Main::Session*> session) {
 	return Ui::Text::SingleCustomEmoji(
 		session->data().customEmojiManager().registerInternalEmoji(
+			u"task_not_done_reply_preview"_q,
 			MakeTaskImage(),
 			QMargins(0, st::lineWidth, st::lineWidth, 0)));
 }

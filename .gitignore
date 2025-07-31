@@ -56,3 +56,13 @@ cmake-build-debug/
 
 # Project specific
 Telegram/SourceFiles/_other/packer_private.h
+# Local configuration files
+settings.local.json
+*.local.json
+.env
+.env.local
+.env.*.local
+
+# Cursor IDE local settings (but keep .cursor/rules/)
+.cursor/*
+!.cursor/rules/
