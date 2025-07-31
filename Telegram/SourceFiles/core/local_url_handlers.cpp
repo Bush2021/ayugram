@@ -1665,6 +1665,8 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^ayu/?(.+)?(#|$)"_q,
 			AyuUrlHandlers::HandleAyu
+		},
+		{
 			u"^ton/?(^\\?.*)?(#|$)"_q,
 			ResolveTonSettings
 		},
