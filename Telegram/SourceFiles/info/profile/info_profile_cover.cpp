@@ -599,7 +599,7 @@ Cover::Cover(
 , _botVerify(
 	std::make_unique<Badge>(
 		this,
-		st::infoPeerBadge,
+		st::infoBotVerifyBadge,
 		&peer->session(),
 		BotVerifyBadgeForPeer(peer),
 		nullptr,
@@ -667,10 +667,12 @@ Cover::Cover(
 , _starsRating(_peer->isUser()
 	? std::make_unique<Ui::StarsRating>(
 		this,
-		st::infoStarsRating,
 		_controller->uiShow(),
 		_peer->isSelf() ? QString() : _peer->shortName(),
-		Data::StarsRatingValue(_peer))
+		Data::StarsRatingValue(_peer),
+		(_peer->isSelf()
+			? [=] { return _peer->owner().pendingStarsRating(); }
+			: Fn<Data::StarsRatingPending()>()))
 	: nullptr)
 , _status(this, _st.status)
 , _showLastSeen(this, tr::lng_status_lastseen_when(), _st.showLastSeen)
@@ -686,7 +688,7 @@ Cover::Cover(
 	if (!_peer->isMegagroup()) {
 		_status->setAttribute(Qt::WA_TransparentForMouseEvents);
 		if (const auto rating = _starsRating.get()) {
-			_statusShift = rating->collapsedWidthValue();
+			_statusShift = rating->widthValue();
 			_statusShift.changes() | rpl::start_with_next([=] {
 				refreshStatusGeometry(width());
 			}, _status->lifetime());
