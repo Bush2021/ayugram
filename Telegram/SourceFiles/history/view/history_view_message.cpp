@@ -599,15 +599,9 @@ void Message::refreshRightBadge() {
 		_rightBadgeHasBoosts = 1;
 
 		const auto many = (boosts > 1);
-		const auto &icon = many
-			? st::boostsMessageIcon
-			: st::boostMessageIcon;
-		const auto padding = many
-			? st::boostsMessageIconPadding
-			: st::boostMessageIconPadding;
-		const auto owner = &item->history()->owner();
-		auto added = Ui::Text::SingleCustomEmoji(
-			owner->customEmojiManager().registerInternalEmoji(icon, padding)
+		auto added = Ui::Text::IconEmoji(many
+			? &st::boostsMessageIcon
+			: &st::boostMessageIcon
 		).append(many ? QString::number(boosts) : QString());
 		badge.append(' ').append(Ui::Text::Colorized(added, 1));
 	}
@@ -618,15 +612,10 @@ void Message::refreshRightBadge() {
 	if (badge.empty()) {
 		_rightBadge.clear();
 	} else {
-		const auto context = Core::TextContext({
-			.session = &item->history()->session(),
-			.customEmojiLoopLimit = 1,
-		});
 		_rightBadge.setMarkedText(
 			st::defaultTextStyle,
 			badge,
-			Ui::NameTextOptions(),
-			context);
+			Ui::NameTextOptions());
 	}
 }
 

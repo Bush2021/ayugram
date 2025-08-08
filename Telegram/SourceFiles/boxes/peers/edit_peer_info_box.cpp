@@ -1255,7 +1255,7 @@ void Controller::fillAutoTranslateButton() {
 				_navigation->uiShow(),
 				_peer,
 				[=](int level) {
-					if (const auto strong = weak.get()) {
+					if (weak.get()) {
 						state->isLocked = (level < requiredLevel);
 					}
 					return (level < requiredLevel)
