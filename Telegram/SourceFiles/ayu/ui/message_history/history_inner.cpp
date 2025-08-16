@@ -784,7 +784,7 @@ void InnerWidget::itemsAdded(Direction direction, int addedCount) {
 }
 
 void InnerWidget::updateSize() {
-	TWidget::resizeToWidth(width());
+	resizeToWidth(width(), _minHeight);
 	restoreScrollPosition();
 	updateVisibleTopItem();
 	checkPreloadMore();
@@ -1361,7 +1361,7 @@ void InnerWidget::mouseReleaseEvent(QMouseEvent *e) {
 
 void InnerWidget::enterEventHook(QEnterEvent *e) {
 	mouseActionUpdate(QCursor::pos());
-	return TWidget::enterEventHook(e);
+	return Ui::RpWidget::enterEventHook(e);
 }
 
 void InnerWidget::leaveEventHook(QEvent *e) {
@@ -1375,7 +1375,7 @@ void InnerWidget::leaveEventHook(QEvent *e) {
 		_cursor = style::cur_default;
 		setCursor(_cursor);
 	}
-	return TWidget::leaveEventHook(e);
+	return Ui::RpWidget::leaveEventHook(e);
 }
 
 void InnerWidget::mouseActionStart(const QPoint &screenPos, Qt::MouseButton button) {

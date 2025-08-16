@@ -6,6 +6,12 @@
 // Copyright @Radolyn, 2025
 #include "ayu/ui/message_history/history_section.h"
 
+#include <QtCore/QTimer>
+#include <QtGui/QMouseEvent>
+#include <QtGui/QPaintEvent>
+#include <QtGui/QPainter>
+#include <QtWidgets/QWidget>
+
 #include "apiwrap.h"
 #include "ayu/ui/message_history/history_inner.h"
 #include "base/timer.h"
@@ -21,13 +27,14 @@
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/shadow.h"
+#include "ui/rp_widget.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
 #include "window/themes/window_theme.h"
 
 namespace MessageHistory {
 
-class FixedBar final : public TWidget
+class FixedBar final : public Ui::RpWidget
 {
 public:
 	FixedBar(
@@ -42,8 +49,8 @@ public:
 	void goBack();
 
 protected:
-	void mousePressEvent(QMouseEvent *e) override;
-	void paintEvent(QPaintEvent *e) override;
+	void mousePressEvent(QMouseEvent *e);
+	void paintEvent(QPaintEvent *e);
 	int resizeGetHeight(int newWidth) override;
 
 private:
@@ -72,7 +79,7 @@ FixedBar::FixedBar(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer)
-	: TWidget(parent), _controller(controller), _peer(peer), _backButton(
+	: Ui::RpWidget(parent), _controller(controller), _peer(peer), _backButton(
 		  this,
 		  &controller->session(),
 		  tr::lng_terms_back(tr::now),
@@ -134,7 +141,7 @@ void FixedBar::mousePressEvent(QMouseEvent *e) {
 	if (e->button() == Qt::LeftButton) {
 		goBack();
 	} else {
-		TWidget::mousePressEvent(e);
+		Ui::RpWidget::mousePressEvent(e);
 	}
 }
 
@@ -146,15 +153,13 @@ Widget::Widget(
 	ID topicId)
 	: Window::SectionWidget(parent, controller, rpl::single<PeerData*>(peer)),
 	  _scroll(this, st::historyScroll, false),
-	  _fixedBar(this, controller, peer),
-	  _fixedBarShadow(this),
-	  _item(item),
-	  _topicId(topicId) {
-	_fixedBar->move(0, 0);
+	_fixedBar(this, controller, peer),
+	_fixedBarShadow(this),
+	_item(item),
+	_topicId(topicId) {
+	_fixedBar->moveToLeft(0, 0);
 	_fixedBar->resizeToWidth(width());
-	_fixedBar->show();
-
-	_fixedBarShadow->raise();
+	_fixedBar->show();	_fixedBarShadow->raise();
 
 	controller->adaptive().value(
 	) | rpl::start_with_next([=]
