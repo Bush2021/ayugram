@@ -7,7 +7,7 @@
 
 ## Prepare folder
 
-The build is done in **Visual Studio 2022** with **10.0.22000.0** SDK version. 
+The build is done in **Visual Studio 2022** with **10.0.26100.0** SDK version.
 
 Choose an empty folder for the future build, for example **D:\\TBuild**. It will be named ***BuildPath*** in the rest of this document. Create two folders there, ***BuildPath*\\ThirdParty** and ***BuildPath*\\Libraries**.
 
@@ -22,11 +22,9 @@ All commands (if not stated otherwise) will be launched from **x64 Native Tools 
 
 Open **x64 Native Tools Command Prompt for VS 2022.bat**, go to ***BuildPath*** and run
 
-    set WindowsSDKVersion=10.0.22000.0\
+    set WindowsSDKVersion=10.0.26100.0\
     git clone --recursive https://github.com/Bush2021/ayugram.git tdesktop
     tdesktop\Telegram\build\prepare\win.bat
-
-You may encounter an error saying that your IP is not allowed - simply turn on VPN.
 
 ## Build the project
 

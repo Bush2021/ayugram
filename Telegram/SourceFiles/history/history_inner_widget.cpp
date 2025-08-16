@@ -3808,7 +3808,7 @@ void HistoryInner::setShownPinned(HistoryItem *item) {
 void HistoryInner::enterEventHook(QEnterEvent *e) {
 	_mouseActive = true;
 	mouseActionUpdate(QCursor::pos());
-	return TWidget::enterEventHook(e);
+	return RpWidget::enterEventHook(e);
 }
 
 void HistoryInner::leaveEventHook(QEvent *e) {
@@ -3824,7 +3824,7 @@ void HistoryInner::leaveEventHook(QEvent *e) {
 		setCursor(_cursor);
 	}
 	_mouseActive = false;
-	return TWidget::leaveEventHook(e);
+	return RpWidget::leaveEventHook(e);
 }
 
 HistoryInner::~HistoryInner() {
@@ -3846,7 +3846,7 @@ HistoryInner::~HistoryInner() {
 
 bool HistoryInner::focusNextPrevChild(bool next) {
 	if (_selected.empty()) {
-		return TWidget::focusNextPrevChild(next);
+		return RpWidget::focusNextPrevChild(next);
 	} else {
 		clearSelected();
 		return true;

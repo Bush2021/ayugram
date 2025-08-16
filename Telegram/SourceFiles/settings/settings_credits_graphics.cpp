@@ -853,8 +853,7 @@ void BoostCreditsBox(
 	AddCreditsBoostTable(controller->uiShow(), content, {}, b);
 	Ui::AddSkip(content);
 
-	box->addRow(object_ptr<Ui::CenterWrap<>>(
-		box,
+	box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
 			tr::lng_credits_box_out_about(
@@ -863,7 +862,9 @@ void BoostCreditsBox(
 				) | Ui::Text::ToLink(
 					tr::lng_credits_box_out_about_link(tr::now)),
 				Ui::Text::WithEntities),
-			st::creditsBoxAboutDivider)));
+			st::creditsBoxAboutDivider),
+		st::boxRowPadding,
+		style::al_top);
 	Ui::AddSkip(content);
 
 	const auto button = box->addButton(tr::lng_box_ok(), [=] {
@@ -1282,7 +1283,10 @@ void GenericCreditsEntryBox(
 		content->add(object_ptr<Ui::CenterWrap<>>(
 			content,
 			GenericEntryPhoto(content, callback, stUser.photoSize)));
-	} else if (peer && !e.gift && !e.premiumMonthsForStars) {
+	} else if (peer
+		&& !e.gift
+		&& !e.premiumMonthsForStars
+		&& !e.postsSearch) {
 		if (e.subscriptionUntil.isNull() && s.until.isNull()) {
 			content->add(object_ptr<Ui::CenterWrap<>>(
 				content,
@@ -1368,7 +1372,7 @@ void GenericCreditsEntryBox(
 				? st::creditsHistoryEntryStarGiftSkip
 				: st::creditsHistoryEntryGiftStickerSkip);
 		}, icon->lifetime());
-	} else {
+	} else if (!e.postsSearch) {
 		const auto widget = content->add(
 			object_ptr<Ui::CenterWrap<>>(
 				content,
@@ -1388,8 +1392,7 @@ void GenericCreditsEntryBox(
 		Ui::AddSkip(content);
 		Ui::AddSkip(content);
 
-		box->addRow(object_ptr<Ui::CenterWrap<>>(
-			box,
+		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				rpl::single(!s.title.isEmpty()
@@ -1405,6 +1408,8 @@ void GenericCreditsEntryBox(
 						tr::now,
 						lt_count,
 						e.paidMessagesCount)
+					: e.postsSearch
+					? tr::lng_credits_box_history_entry_posts_search(tr::now)
 					: e.premiumMonthsForStars
 					? tr::lng_premium_summary_title(tr::now)
 					: !e.title.isEmpty()
@@ -1429,7 +1434,9 @@ void GenericCreditsEntryBox(
 					: (peer && !e.reaction)
 					? peer->name()
 					: Ui::GenerateEntryName(e).text),
-				st::creditsBoxAboutTitle)));
+				st::creditsBoxAboutTitle),
+			st::boxRowPadding,
+			style::al_top);
 
 		Ui::AddSkip(content);
 	}
@@ -1602,68 +1609,69 @@ void GenericCreditsEntryBox(
 
 	if (!isStarGift && !e.description.empty()) {
 		Ui::AddSkip(content);
-		box->addRow(object_ptr<Ui::CenterWrap<>>(
-			box,
+		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				rpl::single(e.description),
-				st::creditsBoxAbout)));
+				st::creditsBoxAbout),
+			st::boxRowPadding,
+			style::al_top);
 	}
 
 	const auto arrow = Ui::Text::IconEmoji(&st::textMoreIconEmoji);
 	if (!uniqueGift && (starGiftCanManage || e.converted)) {
 		Ui::AddSkip(content);
 		const auto about = box->addRow(
-			object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+			object_ptr<Ui::FlatLabel>(
 				box,
-				object_ptr<Ui::FlatLabel>(
-					box,
-					(e.giftRefunded
-						? tr::lng_action_gift_refunded(
-							Ui::Text::RichLangValue)
-						: e.starsUpgradedBySender
-						? tr::lng_action_gift_got_upgradable_text(
-							Ui::Text::RichLangValue)
-						: (e.starsToUpgrade
-							&& giftToSelf
-							&& !e.giftTransferred)
-						? tr::lng_action_gift_self_about_unique(
-							Ui::Text::WithEntities)
-						: (e.starsToUpgrade
-							&& giftToChannelCanManage
-							&& !e.giftTransferred)
-						? tr::lng_action_gift_channel_about_unique(
-							Ui::Text::WithEntities)
-						: ((canConvert || e.converted)
-							? rpl::combine(
-								(canConvert
-									? (giftToSelf
-										? tr::lng_action_gift_self_about
-										: giftToChannelCanTransfer
-										? tr::lng_action_gift_channel_about
-										: tr::lng_action_gift_got_stars_text)
-									: (giftToChannel
-										? tr::lng_gift_channel_got
-										: tr::lng_gift_got_stars))(
-										lt_count,
-										rpl::single(e.starsConverted * 1.),
-										Ui::Text::RichLangValue),
-								tr::lng_paid_about_link()
-							) | rpl::map([](
-									TextWithEntities text,
-									QString link) {
-								return text.append(' ').append(
-									Ui::Text::Link(link));
-							})
-							: (e.savedToProfile
-								? (giftToChannel
-									? tr::lng_action_gift_can_remove_channel
-									: tr::lng_action_gift_can_remove_text)
+				(e.giftRefunded
+					? tr::lng_action_gift_refunded(
+						Ui::Text::RichLangValue)
+					: e.starsUpgradedBySender
+					? tr::lng_action_gift_got_upgradable_text(
+						Ui::Text::RichLangValue)
+					: (e.starsToUpgrade
+						&& giftToSelf
+						&& !e.giftTransferred)
+					? tr::lng_action_gift_self_about_unique(
+						Ui::Text::WithEntities)
+					: (e.starsToUpgrade
+						&& giftToChannelCanManage
+						&& !e.giftTransferred)
+					? tr::lng_action_gift_channel_about_unique(
+						Ui::Text::WithEntities)
+					: ((canConvert || e.converted)
+						? rpl::combine(
+							(canConvert
+								? (giftToSelf
+									? tr::lng_action_gift_self_about
+									: giftToChannelCanTransfer
+									? tr::lng_action_gift_channel_about
+									: tr::lng_action_gift_got_stars_text)
 								: (giftToChannel
-									? tr::lng_action_gift_got_gift_channel
-									: tr::lng_action_gift_got_gift_text))(
-										Ui::Text::WithEntities))),
-					st::creditsBoxAbout)))->entity();
+									? tr::lng_gift_channel_got
+									: tr::lng_gift_got_stars))(
+									lt_count,
+									rpl::single(e.starsConverted * 1.),
+									Ui::Text::RichLangValue),
+							tr::lng_paid_about_link()
+						) | rpl::map([](
+								TextWithEntities text,
+								QString link) {
+							return text.append(' ').append(
+								Ui::Text::Link(link));
+						})
+						: (e.savedToProfile
+							? (giftToChannel
+								? tr::lng_action_gift_can_remove_channel
+								: tr::lng_action_gift_can_remove_text)
+							: (giftToChannel
+								? tr::lng_action_gift_got_gift_channel
+								: tr::lng_action_gift_got_gift_text))(
+									Ui::Text::WithEntities))),
+				st::creditsBoxAbout),
+			st::boxRowPadding,
+			style::al_top);
 		about->setClickHandlerFilter([=](const auto &...) {
 			Core::App().iv().openWithIvPreferred(
 				session,
@@ -1685,8 +1693,7 @@ void GenericCreditsEntryBox(
 				std::move(text),
 				u"internal:stars_examples"_q);
 		});
-		box->addRow(object_ptr<Ui::CenterWrap<>>(
-			box,
+		box->addRow(
 			Ui::CreateLabelWithCustomEmoji(
 				box,
 				(!e.in && peer)
@@ -1701,7 +1708,9 @@ void GenericCreditsEntryBox(
 						std::move(link),
 						Ui::Text::RichLangValue),
 				Core::TextContext({ .session = session }),
-				st::creditsBoxAbout)));
+				st::creditsBoxAbout),
+			st::boxRowPadding,
+			style::al_top);
 	} else if (e.paidMessagesCommission && e.barePeerId) {
 		Ui::AddSkip(content);
 		auto link = tr::lng_credits_paid_messages_fee_about_link(
@@ -1714,8 +1723,7 @@ void GenericCreditsEntryBox(
 				u"internal:edit_paid_messages_fee/"_q + QString::number(id));
 		});
 		const auto percent = 100. - (e.paidMessagesCommission / 10.);
-		box->addRow(object_ptr<Ui::CenterWrap<>>(
-			box,
+		box->addRow(
 			Ui::CreateLabelWithCustomEmoji(
 				box,
 				tr::lng_credits_paid_messages_fee_about(
@@ -1726,7 +1734,9 @@ void GenericCreditsEntryBox(
 					std::move(link),
 					Ui::Text::RichLangValue),
 				Core::TextContext({ .session = session }),
-				st::creditsBoxAbout)));
+				st::creditsBoxAbout),
+			st::boxRowPadding,
+			style::al_top);
 	}
 
 	Ui::AddSkip(content);
@@ -1859,8 +1869,7 @@ void GenericCreditsEntryBox(
 	Ui::AddSkip(content);
 
 	if (!isStarGift && e.credits.stars()) {
-		box->addRow(object_ptr<Ui::CenterWrap<>>(
-			box,
+		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				tr::lng_credits_box_out_about(
@@ -1869,7 +1878,9 @@ void GenericCreditsEntryBox(
 					) | Ui::Text::ToLink(
 						tr::lng_credits_box_out_about_link(tr::now)),
 					Ui::Text::WithEntities),
-				st::creditsBoxAboutDivider)));
+				st::creditsBoxAboutDivider),
+			st::boxRowPadding,
+			style::al_top);
 	} else if (starGiftCanManage) {
 		const auto hiddenPhrase = giftToChannelCanManage
 			? tr::lng_gift_hidden_hint_channel
@@ -1879,14 +1890,29 @@ void GenericCreditsEntryBox(
 		const auto visiblePhrase = giftToChannelCanManage
 			? tr::lng_gift_visible_hint_channel
 			: tr::lng_gift_visible_hint;
-		auto withHide = rpl::combine(
-			visiblePhrase(),
-			tr::lng_gift_visible_hide()
-		) | rpl::map([](QString &&hint, QString &&hide) {
+		auto withShow = rpl::combine(
+			hiddenPhrase(),
+			tr::lng_gift_visible_show_arrow(
+				lt_arrow,
+				rpl::single(arrow),
+				Ui::Text::WithEntities)
+		) | rpl::map([=](QString &&hint, const TextWithEntities &hide) {
 			return TextWithEntities{ std::move(hint) }.append(' ').append(
 				Ui::Text::Link(std::move(hide)));
 		});
-		auto text = !e.savedToProfile
+		auto withHide = rpl::combine(
+			visiblePhrase(),
+			tr::lng_gift_visible_hide_arrow(
+				lt_arrow,
+				rpl::single(arrow),
+				Ui::Text::WithEntities)
+		) | rpl::map([](QString &&hint, const TextWithEntities &hide) {
+			return TextWithEntities{ std::move(hint) }.append(' ').append(
+				Ui::Text::Link(std::move(hide)));
+		});
+		auto text = (!e.savedToProfile && canToggle && canUpgrade)
+			? std::move(withShow)
+			: !e.savedToProfile
 			? hiddenPhrase(Ui::Text::WithEntities)
 			: canToggle
 			? std::move(withHide)
@@ -1905,7 +1931,9 @@ void GenericCreditsEntryBox(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				std::move(text),
-				st::creditsBoxAboutDivider));
+				st::creditsBoxAboutDivider),
+			st::boxRowPadding,
+			style::al_top);
 		label->setClickHandlerFilter([=](const auto &...) {
 			toggleVisibility(!e.savedToProfile);
 			return false;
@@ -1916,9 +1944,15 @@ void GenericCreditsEntryBox(
 				box,
 				tr::lng_gift_in_blockchain(
 					lt_link,
-					tr::lng_gift_in_blockchain_link() | Ui::Text::ToLink(),
+					tr::lng_gift_in_blockchain_link_arrow(
+						lt_arrow,
+						rpl::single(arrow),
+						Ui::Text::WithEntities
+					) | Ui::Text::ToLink(),
 					Ui::Text::WithEntities),
-				st::creditsBoxAboutDivider));
+				st::creditsBoxAboutDivider),
+			st::boxRowPadding,
+			style::al_top);
 		label->setClickHandlerFilter([=](const auto &...) {
 			UrlClickHandler::Open(
 				TonAddressUrl(session, uniqueGift->ownerAddress));
@@ -1970,8 +2004,7 @@ void GenericCreditsEntryBox(
 		} else if (s.cancelled || s.cancelledByBot) {
 			label->setTextColorOverride(st::menuIconAttentionColor->c);
 		}
-		box->addRow(
-			object_ptr<Ui::CenterWrap<>>(box, std::move(label)));
+		box->addRow(std::move(label), st::boxRowPadding, style::al_top);
 	}
 
 	Ui::AddSkip(content);
@@ -2000,6 +2033,8 @@ void GenericCreditsEntryBox(
 			? tr::lng_credits_subscription_off_rejoin_button()
 			: canUpgradeFree
 			? tr::lng_gift_upgrade_free()
+			: canUpgrade
+			? tr::lng_gift_unique_upgrade()
 			: (canToggle && !e.savedToProfile)
 			? (e.giftChannelSavedId
 				? tr::lng_gift_show_on_channel
@@ -2069,7 +2104,7 @@ void GenericCreditsEntryBox(
 				e.giftResaleForceTon,
 				to,
 				crl::guard(box, [=] { box->closeBox(); }));
-		} else if (canUpgradeFree) {
+		} else if (canUpgrade) {
 			upgrade();
 		} else if (canToggle && !e.savedToProfile) {
 			toggleVisibility(true);

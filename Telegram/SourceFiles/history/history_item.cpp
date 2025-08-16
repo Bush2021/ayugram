@@ -6471,12 +6471,9 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 			Data::GiftCode{
 				.slug = qs(data.vslug()),
 				.message = (data.vmessage()
-					? TextWithEntities{
-						.text = qs(data.vmessage()->data().vtext()),
-						.entities = Api::EntitiesFromMTP(
-							&history()->session(),
-							data.vmessage()->data().ventities().v),
-					}
+					? Api::ParseTextWithEntities(
+						&history()->session(),
+						*data.vmessage())
 					: TextWithEntities()),
 				.channel = (boostedId
 					? history()->owner().channel(boostedId).get()
@@ -6523,12 +6520,9 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 		using Fields = Data::GiftCode;
 		auto fields = Fields{
 			.message = (data.vmessage()
-				? TextWithEntities{
-					.text = qs(data.vmessage()->data().vtext()),
-					.entities = Api::EntitiesFromMTP(
-						&history()->session(),
-						data.vmessage()->data().ventities().v),
-				}
+				? Api::ParseTextWithEntities(
+					&history()->session(),
+					*data.vmessage())
 				: TextWithEntities()),
 			.channel = ((service && peerIsChannel(to))
 				? history()->owner().channel(peerToChannel(to)).get()
