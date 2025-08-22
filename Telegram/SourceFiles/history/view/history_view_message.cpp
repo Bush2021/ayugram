@@ -1120,10 +1120,13 @@ QSize Message::performCountOptimalSize() {
 
 void Message::refreshTopicButton() {
 	const auto item = data();
-	if (isAttachedToPrevious()
-		|| delegate()->elementHideTopicButton(this)) {
+	if (isAttachedToPrevious() || delegate()->elementHideTopicButton(this)) {
 		_topicButton = nullptr;
 	} else if (const auto topic = item->topic()) {
+		if (topic->channel()->useSubsectionTabs()) {
+			_topicButton = nullptr;
+			return;
+		}
 		if (!_topicButton) {
 			_topicButton = std::make_unique<TopicButton>();
 		}
@@ -1162,8 +1165,8 @@ int Message::marginTop() const {
 			result += bar->height();
 		}
 	}
-	if (const auto monoforumBar = Get<MonoforumSenderBar>()) {
-		result += monoforumBar->height();
+	if (const auto bar = Get<ForumThreadBar>()) {
+		result += bar->height();
 	}
 	if (const auto service = Get<ServicePreMessage>()) {
 		if (!AyuFeatures::MessageShot::isTakingShot()) {
@@ -1213,8 +1216,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		if (const auto date = Get<DateBadge>()) {
 			aboveh += date->height();
 		}
-		if (const auto sender = Get<MonoforumSenderBar>()) {
-			aboveh += sender->height();
+		if (const auto bar = Get<ForumThreadBar>()) {
+			aboveh += bar->height();
 		}
 		if (context.clip.intersects(QRect(0, aboveh, width(), unreadbarh))) {
 			p.translate(0, aboveh);

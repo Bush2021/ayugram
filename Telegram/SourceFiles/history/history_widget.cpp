@@ -115,6 +115,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_pinned_section.h"
 #include "history/view/history_view_pinned_bar.h"
 #include "history/view/history_view_group_call_bar.h"
+#include "history/view/history_view_group_members_widget.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/view/history_view_reply.h"
 #include "history/view/history_view_requests_bar.h"
@@ -122,7 +123,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_subsection_tabs.h"
 #include "history/view/history_view_translate_bar.h"
 #include "history/view/media/history_view_media.h"
-#include "profile/profile_block_group_members.h"
 #include "core/click_handler_types.h"
 #include "chat_helpers/field_autocomplete.h"
 #include "chat_helpers/tabbed_panel.h"
@@ -2189,6 +2189,18 @@ void HistoryWidget::setupShortcuts() {
 					std::make_shared<Scheduled>(_history));
 				return true;
 			});
+		if (showRecordButton()) {
+			const auto isVoice = request->check(Command::RecordVoice, 1);
+			const auto isRound = !isVoice
+				&& request->check(Command::RecordRound, 1);
+			(isVoice || isRound) && request->handle([=] {
+				if (_voiceRecordBar) {
+					_voiceRecordBar->startRecordingAndLock(isRound);
+					return true;
+				}
+				return false;
+			});
+		}
 		if (session().supportMode()) {
 			request->check(
 				Command::SupportToggleMuted
@@ -5962,11 +5974,7 @@ void HistoryWidget::showMembersDropdown() {
 	if (!_membersDropdown) {
 		_membersDropdown.create(this, st::membersInnerDropdown);
 		_membersDropdown->setOwnedWidget(
-			object_ptr<Profile::GroupMembersWidget>(
-				this,
-				controller(),
-				_peer,
-				st::membersInnerItem));
+			object_ptr<HistoryView::GroupMembersWidget>(this, controller(), _peer));
 		_membersDropdown->resizeToWidth(st::membersInnerWidth);
 
 		_membersDropdown->setMaxHeight(countMembersDropdownHeightMax());

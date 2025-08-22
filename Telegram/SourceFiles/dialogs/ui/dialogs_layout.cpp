@@ -1149,6 +1149,7 @@ void RowPainter::Paint(
 		return {};
 	}();
 	previewOptions.ignoreGroup = true;
+	previewOptions.searchLowerText = context.searchLowerText;
 
 	const auto badgesState = context.displayUnreadInfo
 		? entry->chatListBadgesState()

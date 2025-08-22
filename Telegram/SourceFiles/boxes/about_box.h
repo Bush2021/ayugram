@@ -14,5 +14,8 @@ class SessionController;
 }
 
 void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controller);
-
+void ArchiveHintBox(
+	not_null<Ui::GenericBox*> box,
+	bool unarchiveOnNewMessage,
+	Fn<void()> onUnarchive);
 QString currentVersionText();

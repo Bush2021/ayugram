@@ -72,7 +72,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/vertical_list.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/label_with_custom_emoji.h"
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/popup_menu.h"
 #include "webview/webview_interface.h"
@@ -388,7 +387,7 @@ void FillBotUsepic(
 		not_null<Ui::GenericBox*> box,
 		not_null<PeerData*> bot,
 		base::weak_ptr<Window::SessionController> weak) {
-	auto aboutLabel = Ui::CreateLabelWithCustomEmoji(
+	auto aboutLabel = object_ptr<Ui::FlatLabel>(
 		box->verticalLayout(),
 		tr::lng_allow_bot_webview_details(
 			lt_emoji,
@@ -397,7 +396,6 @@ void FillBotUsepic(
 		) | rpl::map([](TextWithEntities text) {
 			return Ui::Text::Link(std::move(text), u"internal:"_q);
 		}),
-		Core::TextContext({ .session = &bot->session() }),
 		st::defaultFlatLabel);
 	const auto userpic = Ui::CreateChild<Ui::UserpicButton>(
 		box->verticalLayout(),
@@ -525,7 +523,6 @@ void ConfirmEmojiStatusAccessBox(
 				rpl::single(name),
 				Ui::Text::RichLangValue),
 			st::botEmojiStatusText),
-		st::boxRowPadding,
 		style::al_top);
 
 	box->addButton(tr::lng_bot_emoji_status_access_allow(), [=] {
@@ -569,7 +566,6 @@ void ConfirmEmojiStatusBox(
 			box,
 			tr::lng_bot_emoji_status_title(),
 			st::botEmojiStatusTitle),
-		st::boxRowPadding,
 		style::al_top);
 	AddSkip(box->verticalLayout());
 
@@ -581,7 +577,6 @@ void ConfirmEmojiStatusBox(
 				rpl::single(Ui::Text::Bold(bot->name())),
 				Ui::Text::RichLangValue),
 			st::botEmojiStatusText),
-		st::boxRowPadding,
 		style::al_top);
 
 	AddSkip(box->verticalLayout(), 2 * st::defaultVerticalListSkip);
