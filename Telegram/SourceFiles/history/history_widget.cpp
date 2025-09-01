@@ -882,7 +882,7 @@ HistoryWidget::HistoryWidget(
 		| PeerUpdateFlag::Slowmode
 		| PeerUpdateFlag::BotStartToken
 		| PeerUpdateFlag::MessagesTTL
-		| PeerUpdateFlag::ChatThemeEmoji
+		| PeerUpdateFlag::ChatThemeToken
 		| PeerUpdateFlag::FullInfo
 		| PeerUpdateFlag::StarsPerMessage
 		| PeerUpdateFlag::GiftSettings
@@ -956,10 +956,10 @@ HistoryWidget::HistoryWidget(
 		if (flags & PeerUpdateFlag::MessagesTTL) {
 			checkMessagesTTL();
 		}
-		if ((flags & PeerUpdateFlag::ChatThemeEmoji) && _list) {
-			const auto emoji = _peer->themeEmoji();
+		if ((flags & PeerUpdateFlag::ChatThemeToken) && _list) {
+			const auto emoji = _peer->themeToken();
 			if (Data::CloudThemes::TestingColors() && !emoji.isEmpty()) {
-				_peer->owner().cloudThemes().themeForEmojiValue(
+				_peer->owner().cloudThemes().themeForTokenValue(
 					emoji
 				) | rpl::filter_optional(
 				) | rpl::take(
