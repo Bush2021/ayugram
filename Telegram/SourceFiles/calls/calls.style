@@ -624,11 +624,12 @@ groupCallMenuCover: ShortInfoCover(shortInfoCover) {
 	namePosition: point(17px, 28px);
 	statusPosition: point(17px, 8px);
 }
+groupCallTextPalette: TextPalette(defaultTextPalette) {
+	linkFg: groupCallActiveFg;
+}
 groupCallMenuAbout: FlatLabel(defaultFlatLabel) {
 	textFg: groupCallMemberNotJoinedStatus;
-	palette: TextPalette(defaultTextPalette) {
-		linkFg: groupCallActiveFg;
-	}
+	palette: groupCallTextPalette;
 	minWidth: 200px;
 	maxHeight: 92px;
 }
@@ -1082,6 +1083,19 @@ groupCallBox: Box(defaultBox) {
 groupCallLayerBox: Box(groupCallBox) {
 	buttonPadding: margins(8px, 8px, 8px, 8px);
 }
+groupCallDividerBar: DividerBar {
+	bg: groupCallBg;
+	top: icon {{ "box_divider_top", groupCallMemberNotJoinedStatus }};
+	bottom: icon {{ "box_divider_bottom", groupCallMemberNotJoinedStatus }};
+}
+groupCallDividerLabel: DividerLabel {
+	bar: groupCallDividerBar;
+	label: FlatLabel(boxDividerLabel) {
+		textFg: groupCallVideoSubTextFg;
+		palette: groupCallTextPalette;
+	}
+}
+
 groupCallLevelMeter: LevelMeter(defaultLevelMeter) {
 	height: 18px;
 	lineWidth: 3px;

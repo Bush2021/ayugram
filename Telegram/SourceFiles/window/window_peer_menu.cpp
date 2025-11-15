@@ -1077,14 +1077,9 @@ void Filler::addTopicLink() {
 	if (!channel) {
 		return;
 	}
-	const auto id = _topic->rootId();
 	const auto controller = _controller;
 	_addAction(tr::lng_context_copy_topic_link(tr::now), [=] {
-		const auto base = channel->hasUsername()
-			? channel->username()
-			: "c/" + QString::number(peerToChannel(channel->id).bare);
-		const auto query = base + '/' + QString::number(id.bare);
-		const auto link = channel->session().createInternalLinkFull(query);
+		const auto link = Info::Profile::TopicLink(_topic, true);
 		QGuiApplication::clipboard()->setText(link);
 		controller->showToast(channel->hasUsername()
 			? tr::lng_channel_public_link_copied(tr::now)

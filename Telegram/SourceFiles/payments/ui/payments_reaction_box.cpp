@@ -12,10 +12,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/boost_box.h" // MakeBoostFeaturesBadge.
 #include "ui/controls/who_reacted_context_action.h"
 #include "ui/effects/premium_bubble.h"
+#include "ui/effects/ministar_particles.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/widgets/labels.h"
 #include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/slide_wrap.h"
@@ -25,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
+#include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_media_player.h"
 #include "styles/style_premium.h"
@@ -36,7 +39,8 @@ namespace Settings {
 	not_null<Main::Session*> session,
 	rpl::producer<CreditsAmount> balanceValue,
 	bool rightAlign,
-	rpl::producer<float64> opacityValue = nullptr);
+	rpl::producer<float64> opacityValue = nullptr,
+	bool dark = false);
 } // namespace Settings
 
 namespace Ui {
@@ -145,6 +149,62 @@ void PaidReactionSlider(
 	slider->setChangeFinishedCallback([=](float64 value) {
 		changed(ratioToValue(value));
 	});
+
+	struct State {
+		StarParticles particles = StarParticles(
+			StarParticles::Type::Right,
+			200,
+			st::lineWidth * 7);
+		Ui::Animations::Basic animation;
+	};
+	const auto state = slider->lifetime().make_state<State>();
+
+	const auto stars = Ui::CreateChild<Ui::RpWidget>(slider->parentWidget());
+	stars->show();
+	stars->raise();
+	slider->geometryValue() | rpl::start_with_next([=](QRect rect) {
+		stars->setGeometry(rect);
+	}, stars->lifetime());
+
+	state->animation.init([=] { stars->update(); });
+	stars->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	const auto seekSize = st::paidReactSlider.seekSize.width();
+	const auto seekRadius = seekSize / 2.;
+	stars->paintRequest() | rpl::start_with_next([=] {
+		if (!state->animation.animating()) {
+			state->animation.start();
+		}
+		auto p = QPainter(stars);
+		auto hq = PainterHighQualityEnabler(p);
+		const auto progress = slider->value();
+		const auto rect = stars->rect();
+		const auto availableWidth = rect.width() - seekSize;
+		const auto seekCenter = seekRadius + availableWidth * progress;
+
+		state->particles.setSpeed(.1 + progress * .3);
+		state->particles.setVisible(.25 + .65 * progress);
+
+		auto fullPath = QPainterPath();
+		fullPath.addRoundedRect(QRectF(rect), seekRadius, seekRadius);
+		auto circlePath = QPainterPath();
+		circlePath.addEllipse(
+			QPointF(seekCenter, rect.height() / 2.),
+			seekRadius,
+			seekRadius);
+		auto rightRect = QPainterPath();
+		rightRect.addRect(
+			QRectF(seekCenter, 0, rect.width() - seekCenter, rect.height()));
+
+		p.setClipPath(fullPath.subtracted(circlePath));
+		state->particles.setColor(Qt::white);
+		state->particles.paint(p, rect, crl::now());
+		p.setClipping(false);
+
+		p.setClipPath(fullPath.intersected(circlePath.united(rightRect)));
+		state->particles.setColor(st::creditsBg3->c);
+		state->particles.paint(p, rect, crl::now());
+	}, stars->lifetime());
 }
 
 [[nodiscard]] QImage GenerateBadgeImage(int count) {
@@ -288,12 +348,14 @@ void FillTopReactors(
 		rpl::producer<int> chosen,
 		rpl::producer<uint64> shownPeer,
 		Fn<void(uint64)> changeShownPeer) {
-	container->add(
-		MakeBoostFeaturesBadge(
+	const auto badge = container->add(
+		object_ptr<SlideWrap<RpWidget>>(
 			container,
-			tr::lng_paid_react_top_title(),
-			[](QRect) { return st::creditsBg3->b; }),
-		st::boxRowPadding + st::paidReactTopTitleMargin,
+			MakeBoostFeaturesBadge(
+				container,
+				tr::lng_paid_react_top_title(),
+				[](QRect) { return st::creditsBg3->b; }),
+			st::boxRowPadding + st::paidReactTopTitleMargin),
 		style::al_top);
 
 	const auto height = st::paidReactTopNameSkip + st::normalFont->height;
@@ -357,8 +419,10 @@ void FillTopReactors(
 				barePeerId,
 				changeShownPeer); };
 		if (list.empty()) {
+			badge->hide(anim::type::normal);
 			wrap->hide(anim::type::normal);
 		} else {
+			badge->show(anim::type::normal);
 			for (const auto &widget : state->widgets) {
 				widget->hide();
 			}
@@ -386,6 +450,7 @@ void FillTopReactors(
 
 		state->updated.fire({});
 	}, wrap->lifetime());
+	badge->finishAnimating();
 	wrap->finishAnimating();
 
 	rpl::combine(
@@ -523,12 +588,28 @@ void PaidReactionsBox(
 		object_ptr<Checkbox>(
 			box,
 			tr::lng_paid_react_show_in_top(tr::now),
-			state->shownPeer.current() != 0),
+			state->shownPeer.current() != 0,
+			st::paidReactBoxCheckbox),
 		style::al_top);
 	named->checkedValue(
 	) | rpl::start_with_next([=](bool show) {
 		state->shownPeer = show ? state->savedShownPeer : 0;
 	}, named->lifetime());
+
+	AddSkip(content);
+	AddSkip(content);
+
+	AddDividerText(
+		content,
+		tr::lng_paid_react_agree(
+			lt_link,
+			rpl::combine(
+				tr::lng_paid_react_agree_link(),
+				tr::lng_group_invite_subscription_about_url()
+			) | rpl::map([](const QString &text, const QString &url) {
+				return Ui::Text::Link(text, url);
+			}),
+			Ui::Text::RichLangValue));
 
 	const auto button = box->addButton(rpl::single(QString()), [=] {
 		args.send(state->chosen.current(), state->shownPeer.current());

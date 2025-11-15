@@ -13,8 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_chat.h"
 #include "data/data_user.h"
 #include "lang/lang_keys.h"
+#include "lottie/lottie_icon.h"
 #include "main/main_account.h"
 #include "main/main_session.h"
+#include "settings/settings_common.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
@@ -47,6 +49,21 @@ void StartWithBox(
 		base::unique_qptr<Ui::PopupMenu> menu;
 	};
 	const auto state = box->lifetime().make_state<State>();
+
+	{
+		auto icon = Settings::CreateLottieIcon(
+			box->verticalLayout(),
+			{
+				.name = u"rtmp"_q,
+				.sizeOverride = st::normalBoxLottieSize,
+			},
+			{});
+		box->verticalLayout()->add(std::move(icon.widget), {}, style::al_top);
+		box->setShowFinishedCallback([animate = icon.animate] {
+			animate(anim::repeat::loop);
+		});
+		Ui::AddSkip(box->verticalLayout());
+	}
 
 	StartRtmpProcess::FillRtmpRows(
 		box->verticalLayout(),

@@ -537,7 +537,6 @@ changePhoneDescription: FlatLabel(defaultFlatLabel) {
 }
 changePhoneDescriptionPadding: margins(0px, 1px, 0px, 8px);
 changePhoneIconPadding: margins(0px, 39px, 0px, 5px);
-changePhoneIconSize: 120px;
 changePhoneLabel: FlatLabel(defaultFlatLabel) {
 	minWidth: 275px;
 	textFg: windowSubTextFg;
@@ -545,6 +544,8 @@ changePhoneLabel: FlatLabel(defaultFlatLabel) {
 changePhoneError: FlatLabel(changePhoneLabel) {
 	textFg: boxTextFgError;
 }
+
+normalBoxLottieSize: size(120px, 120px);
 
 adminLogFilterUserpicLeft: 15px;
 adminLogFilterLittleSkip: 16px;

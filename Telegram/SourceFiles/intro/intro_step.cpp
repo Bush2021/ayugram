@@ -137,6 +137,10 @@ rpl::producer<const style::RoundButton*> Step::nextButtonStyle() const {
 	return rpl::single((const style::RoundButton*)(nullptr));
 }
 
+rpl::producer<> Step::nextButtonFocusRequests() const {
+	return rpl::never();
+}
+
 void Step::goBack() {
 	if (_goCallback) {
 		_goCallback(nullptr, StackAction::Back, Animate::Back);

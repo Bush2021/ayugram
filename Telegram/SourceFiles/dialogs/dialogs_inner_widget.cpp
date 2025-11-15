@@ -2125,6 +2125,7 @@ bool InnerWidget::addQuickActionRipple(
 	}
 
 	auto name = ResolveQuickDialogLottieIconName(type);
+	const auto rowHeight = row->height();
 	context->icon = Lottie::MakeIcon({
 		.name = std::move(name),
 		.sizeOverride = Size(st::dialogsQuickActionSize),
@@ -2133,16 +2134,12 @@ bool InnerWidget::addQuickActionRipple(
 	context->icon->jumpTo(context->icon->framesCount() - 1, [=] {
 		const auto size = QSize(
 			st::dialogsQuickActionRippleSize,
-			row->height());
-		const auto isRemovingFromList
-			= (action == Dialogs::Ui::QuickDialogAction::Archive);
+			rowHeight);
 		if (!context->ripple) {
 			context->ripple = std::make_unique<Ui::RippleAnimation>(
 				st::defaultRippleAnimation,
 				Ui::RippleAnimation::RectMask(size),
-				isRemovingFromList
-					? Fn<void()>([=] { update(); })
-					: updateCallback);
+				updateCallback);
 		}
 		if (!context->rippleFg) {
 			context->rippleFg = std::make_unique<Ui::RippleAnimation>(
@@ -2159,13 +2156,11 @@ bool InnerWidget::addQuickActionRipple(
 							Rect(size),
 							context->icon.get(),
 							ResolveQuickDialogLabel(
-								row->history(),
+								history,
 								action,
 								_filterId));
 					}),
-				isRemovingFromList
-					? Fn<void()>([=] { update(); })
-					: std::move(updateCallback));
+				std::move(updateCallback));
 		}
 		context->ripple->add(QPoint(size.width() / 2, size.height() / 2));
 		context->rippleFg->add(QPoint(size.width() / 2, size.height() / 2));
@@ -3285,6 +3280,18 @@ void InnerWidget::showSponsoredMenu(int peerSearchIndex, QPoint globalPos) {
 	const auto peer = entry->peer;
 	const auto remove = crl::guard(this, [=] {
 		_sponsoredRemoved.emplace(peer);
+		if (_pressedRightButtonData) {
+			for (const auto &result : _peerSearchResults) {
+				if (result->peer == peer
+					&& result->sponsored
+					&& _pressedRightButtonData
+						== &result->sponsored->button) {
+					_pressedRightButtonData = nullptr;
+					_pressedRightButton = false;
+					break;
+				}
+			}
+		}
 		_peerSearchResults.erase(
 			ranges::remove(
 				_peerSearchResults,
@@ -3613,12 +3620,17 @@ void InnerWidget::clearSearchResults(bool alsoPeerSearchResults) {
 }
 
 void InnerWidget::clearPeerSearchResults() {
-	_peerSearchResults.clear();
-	if (_pressedRightButtonSponsored) {
-		_pressedRightButtonData = nullptr;
-		_pressedRightButtonSponsored = false;
-		_pressedRightButton = false;
+	if (_pressedRightButtonData) {
+		for (const auto &result : _peerSearchResults) {
+			if (result->sponsored
+				&& _pressedRightButtonData == &result->sponsored->button) {
+				_pressedRightButtonData = nullptr;
+				_pressedRightButton = false;
+				break;
+			}
+		}
 	}
+	_peerSearchResults.clear();
 }
 
 void InnerWidget::clearPreviewResults() {
@@ -4181,7 +4193,7 @@ void InnerWidget::refreshEmpty() {
 			_emptyList,
 			{
 				.name = u"no_chats"_q,
-				.sizeOverride = Size(st::changePhoneIconSize),
+				.sizeOverride = st::normalBoxLottieSize,
 			});
 		_emptyList->add(std::move(icon.widget), style::al_top);
 		Ui::AddSkip(_emptyList);

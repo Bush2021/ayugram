@@ -119,6 +119,7 @@ protected:
 	void keyPressEvent(QKeyEvent *e) override;
 
 private:
+	void setupStep();
 	void refreshLang();
 	void showFinished();
 	void createLanguageLink();

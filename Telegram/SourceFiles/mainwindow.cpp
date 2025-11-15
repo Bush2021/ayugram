@@ -151,6 +151,8 @@ void MainWindow::finishFirstShow() {
 
 	if (!_passcodeLock && _main) {
 		_main->activate();
+	} else if (!_passcodeLock && _intro) {
+		_intro->setInnerFocus();
 	}
 }
 

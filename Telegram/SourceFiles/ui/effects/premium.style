@@ -34,6 +34,7 @@ PremiumCover {
 	starTopSkip: pixels;
 	titlePadding: margins;
 	titleFont: font;
+	titleFg: color;
 	about: FlatLabel;
 	aboutMaxWidth: pixels;
 	additionalShadowForDarkThemes: bool;
@@ -58,6 +59,7 @@ defaultPremiumCover: PremiumCover {
 	starTopSkip: 37px;
 	titlePadding: margins(0px, 18px, 0px, 11px);
 	titleFont: boxTitleFont;
+	titleFg: windowBoldFg;
 	about: FlatLabel(defaultFlatLabel) {
 		style: premiumAboutTextStyle;
 		palette: TextPalette(defaultTextPalette) {
@@ -334,11 +336,7 @@ boostReplaceUserpicsRow: UserpicsRow {
 	complex: true;
 }
 
-showOrIconLastSeen: icon{{ "settings/premium/large_lastseen", windowFgActive }};
-showOrIconReadTime: icon{{ "settings/premium/large_readtime", windowFgActive }};
-showOrIconBg: windowBgActive;
-showOrIconPadding: margins(12px, 12px, 12px, 12px);
-showOrIconMargin: margins(0px, 28px, 0px, 12px);
+showOrTitleIconMargin: 8px;
 showOrTitlePadding: margins(0px, 0px, 0px, 5px);
 showOrAboutPadding: margins(0px, 0px, 0px, 16px);
 showOrShowButton: RoundButton(defaultActiveButton) {
@@ -388,6 +386,8 @@ boostFeatureStories: icon{{ "settings/premium/features/feature_stories", windowB
 boostFeatureTranscribe: icon{{ "settings/premium/features/feature_voice", windowBgActive }};
 boostFeatureAutoTranslate: icon{{ "menu/translate", windowBgActive }};
 boostFeatureOffSponsored: icon{{ "settings/premium/features/feature_off_sponsored", windowBgActive }};
+boostFeatureProfileColor: icon{{ "settings/premium/features/feature_color_profile", windowBgActive }};
+boostFeatureProfileIcon: icon{{ "settings/premium/features/feature_profile_cover", windowBgActive }};
 
 paidReactBox: Box(boostBox) {
 	buttonPadding: margins(22px, 22px, 22px, 22px);
@@ -398,18 +398,23 @@ paidReactBox: Box(boostBox) {
 		style: semiboldTextStyle;
 	}
 }
+paidReactBoxCheckbox: Checkbox(defaultCheckbox) {
+	width: 0px;
+}
 paidReactBubbleIcon: icon{{ "settings/premium/star", premiumButtonFg }};
 paidReactBubbleTop: 5px;
 paidReactSliderTop: 5px;
 paidReactSlider: MediaSlider(defaultContinuousSlider) {
-	activeFg: creditsBg3;
-	inactiveFg: creditsBg2;
-	activeFgOver: creditsBg3;
-	inactiveFgOver: creditsBg2;
-	activeFgDisabled: creditsBg3;
-	inactiveFgDisabled: creditsBg2;
-	width: 6px;
+	activeFg: windowBgOver;
+	inactiveFg: windowBgOver;
+	activeFgOver: windowBgOver;
+	inactiveFgOver: windowBgOver;
+	activeFgDisabled: windowBgOver;
+	inactiveFgDisabled: windowBgOver;
+	width: 16px;
 	seekSize: size(16px, 16px);
+	borderFg: creditsBg3;
+	borderWidth: 2px;
 }
 paidReactTitleSkip: 23px;
 paidReactTopTitleMargin: margins(10px, 26px, 10px, 12px);

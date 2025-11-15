@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_premium.h"
 #include "base/unixtime.h"
 #include "boxes/send_credits_box.h" // SetButtonMarkedLabel
-#include "boxes/star_gift_box.h"
 #include "boxes/sticker_set_box.h"
 #include "chat_helpers/stickers_gift_box_pack.h"
 #include "chat_helpers/stickers_lottie.h"
@@ -36,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_thumbnails.h"
 #include "ui/effects/premium_graphics.h"
 #include "ui/painter.h"
+#include "ui/top_background_gradient.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
@@ -298,7 +298,7 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 			_stars->setColorOverride(
 				Ui::Premium::CreditsIconGradientStops());
 		}
-		_lockedUntilDate = data.info.lockedUntilDate;
+		_lockedUntilDate = data.resale ? 0 : data.info.lockedUntilDate;
 	});
 
 	refreshLocked();
@@ -620,9 +620,9 @@ void GiftButton::cacheUniqueBackground(
 		auto p = QPainter(&_uniqueBackgroundCache);
 		p.setClipRect(inner);
 		const auto skip = inner.width() / 3;
-		Ui::PaintPoints(
+		Ui::PaintBgPoints(
 			p,
-			Ui::PatternPointsSmall(),
+			Ui::PatternBgPointsSmall(),
 			_uniquePatternCache,
 			_uniquePatternEmoji.get(),
 			*unique,
@@ -632,16 +632,20 @@ void GiftButton::cacheUniqueBackground(
 
 void GiftButton::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
-	const auto unique = v::is<GiftTypeStars>(_descriptor)
-		? v::get<GiftTypeStars>(_descriptor).info.unique.get()
-		: nullptr;
+	const auto stargift = std::get_if<GiftTypeStars>(&_descriptor);
+	const auto unique = stargift ? stargift->info.unique.get() : nullptr;
 	const auto onsale = unique && unique->starsForResale && small();
-	const auto requirePremium = v::is<GiftTypeStars>(_descriptor)
-		&& !v::get<GiftTypeStars>(_descriptor).userpic
-		&& !v::get<GiftTypeStars>(_descriptor).info.unique
-		&& v::get<GiftTypeStars>(_descriptor).info.requirePremium;
-	const auto hidden = v::is<GiftTypeStars>(_descriptor)
-		&& v::get<GiftTypeStars>(_descriptor).hidden;
+	const auto requirePremium = stargift
+		&& !stargift->userpic
+		&& !stargift->info.unique
+		&& stargift->info.requirePremium;
+	const auto hidden = stargift && stargift->hidden;
+	const auto soldOut = stargift
+		&& !(stargift->pinned || stargift->pinnedSelection)
+		&& !unique
+		&& !stargift->userpic
+		&& stargift->info.limitedCount
+		&& !stargift->info.limitedLeft;
 	const auto extend = currentExtend();
 	const auto position = QPoint(extend.left(), extend.top());
 	const auto background = _delegate->background();
@@ -683,7 +687,7 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 				progress * (thickness * 2 + st::giftBoxUserpicSkip)));
 		}
 	}
-	if (_locked) {
+	if (_locked && !soldOut) {
 		st::giftBoxLockIcon.paint(
 			p,
 			position + st::giftBoxLockIconPosition,
@@ -780,10 +784,6 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 		const auto count = data.info.limitedCount;
 		const auto pinned = data.pinned || data.pinnedSelection;
 		if (count || pinned) {
-			const auto soldOut = !pinned
-				&& !unique
-				&& !data.userpic
-				&& !data.info.limitedLeft;
 			const auto yourLeft = data.info.perUserTotal
 				? (data.info.perUserRemains
 					? tr::lng_gift_stars_your_left(

@@ -802,6 +802,9 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				_peerDecorationsUpdated.fire_copy(result);
 			}
 		}
+		if (result->changeColorProfile(data.vprofile_color())) {
+			flags |= UpdateFlag::ColorProfile;
+		}
 	});
 
 	if (minimal) {
@@ -1119,6 +1122,9 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			if (result->isMinimalLoaded()) {
 				_peerDecorationsUpdated.fire_copy(result);
 			}
+		}
+		if (result->changeColorProfile(data.vprofile_color())) {
+			flags |= UpdateFlag::ColorProfile;
 		}
 	}, [&](const MTPDchannelForbidden &data) {
 		const auto channel = result->asChannel();
@@ -5355,6 +5361,14 @@ void Session::addRecentSelfForwards(const RecentSelfForwards &data) {
 
 rpl::producer<RecentSelfForwards> Session::recentSelfForwards() const {
 	return _recentSelfForwards.events();
+}
+
+void Session::addRecentJoinChat(const RecentJoinChat &data) {
+	_recentJoinChat.fire_copy(data);
+}
+
+rpl::producer<RecentJoinChat> Session::recentJoinChat() const {
+	return _recentJoinChat.events();
 }
 
 void Session::clearLocalStorage() {

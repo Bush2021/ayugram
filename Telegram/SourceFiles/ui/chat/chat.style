@@ -885,6 +885,7 @@ reactionInlineTagRightRadius: 3px;
 reactionInlineTagArrow: 5px;
 reactionInlineTagDot: 5px;
 reactionInlineTagDotSkip: 2px;
+reactionInlineEmptySkip: 2px;
 reactionInlineTagFont: font(12px);
 reactionInlineTagNamePosition: point(26px, 2px);
 reactionInlineTagPromoPosition: point(20px, 2px);

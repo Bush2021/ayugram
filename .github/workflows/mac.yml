@@ -17,6 +17,7 @@ jobs:
         defines:
           - ""
     env:
+      UPLOAD_ARTIFACT: "true"
       ONLY_CACHE: "false"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
@@ -85,13 +86,15 @@ jobs:
           cmake --build ../out --config Release --parallel
 
       - name: Move artifact.
+        if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd $REPO_NAME/out/Release
           mkdir artifact
           mv AyuGram.app artifact/
           mv Updater artifact/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
+        if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
           name: ${{ env.ARTIFACT_NAME }}

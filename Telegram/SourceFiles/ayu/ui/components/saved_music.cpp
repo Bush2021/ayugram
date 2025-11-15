@@ -173,17 +173,14 @@ AyuMusicButton::AyuMusicButton(
 	MusicButtonData data,
 	Fn<void()> handler)
 	: RippleButton(parent, st::infoMusicButtonRipple)
-	  , _performer(std::make_unique<Ui::FlatLabel>(
-		  this,
-		  data.performer,
-		  st::infoMusicButtonPerformer))
-	  , _title(std::make_unique<Ui::FlatLabel>(
-		  this,
-		  data.title,
-		  st::infoMusicButtonTitle))
+	  , _performer(std::make_unique<Ui::FlatLabel>(this, QString(), st::infoMusicButtonPerformer))
+	  , _title(std::make_unique<Ui::FlatLabel>(this, QString(), st::infoMusicButtonTitle))
 	  , _mediaView(data.mediaView) {
-	_performerText = data.performer;
-	_titleText = data.title;
+	const auto composed = data.name.composedName();
+	_performer->setText(composed.performer);
+	_title->setText(composed.title);
+	_performerText = composed.performer;
+	_titleText = composed.title;
 	rpl::combine(
 		_title->naturalWidthValue(),
 		_performer->naturalWidthValue()
@@ -204,10 +201,11 @@ AyuMusicButton::AyuMusicButton(
 AyuMusicButton::~AyuMusicButton() = default;
 
 void AyuMusicButton::updateData(MusicButtonData data) {
-	_performer->setText(data.performer);
-	_title->setText(data.title);
-	_performerText = data.performer;
-	_titleText = data.title;
+	const auto composed = data.name.composedName();
+	_performer->setText(composed.performer);
+	_title->setText(composed.title);
+	_performerText = composed.performer;
+	_titleText = composed.title;
 	_mediaView = data.mediaView;
 	downloadAndMakeCover(data.msgId);
 

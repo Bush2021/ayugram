@@ -11,6 +11,7 @@ using "ui/widgets/widgets.style";
 using "ui/menu_icons.style";
 using "media/player/media_player.style";
 using "boxes/boxes.style";
+using "calls/calls.style";
 using "chat_helpers/chat_helpers.style";
 
 mediaviewOverDuration: 150;
@@ -915,8 +916,7 @@ storiesReportBox: ReportBox(defaultReportBox) {
 		textMargins: margins(1px, 26px, 1px, 4px);
 		heightMax: 116px;
 	}
-	dividerBg: groupCallBg;
-	dividerFg: groupCallVideoSubTextFg;
+	divider: groupCallDividerLabel;
 	spam: icon {{ "menu/delete", storiesComposeWhiteText }};
 	fake: icon {{ "menu/fake", storiesComposeWhiteText }};
 	violence: icon {{ "menu/violence", storiesComposeWhiteText }};

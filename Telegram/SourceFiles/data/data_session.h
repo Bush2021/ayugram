@@ -126,6 +126,11 @@ struct RecentSelfForwards {
 	MessageIdsList ids;
 };
 
+struct RecentJoinChat {
+	PeerId fromPeerId = 0;
+	PeerId joinedPeerId = 0;
+};
+
 class Session final {
 public:
 	using ViewElement = HistoryView::Element;
@@ -895,6 +900,9 @@ public:
 	void addRecentSelfForwards(const RecentSelfForwards &data);
 	[[nodiscard]] rpl::producer<RecentSelfForwards> recentSelfForwards() const;
 
+	void addRecentJoinChat(const RecentJoinChat &data);
+	[[nodiscard]] rpl::producer<RecentJoinChat> recentJoinChat() const;
+
 	void clearLocalStorage();
 
 private:
@@ -1264,6 +1272,7 @@ private:
 		NextToUpgradeGift> _nextForUpgradeGifts;
 
 	rpl::event_stream<RecentSelfForwards> _recentSelfForwards;
+	rpl::event_stream<RecentJoinChat> _recentJoinChat;
 
 	rpl::lifetime _lifetime;
 

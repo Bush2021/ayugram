@@ -1034,7 +1034,7 @@ void OverlayWidget::updateGeometryToScreen(bool inMove) {
 		.arg(available.y())
 		.arg(available.width())
 		.arg(available.height()));
-	_window->setGeometry(available);
+	_window->Ui::RpWidget::setGeometry(available);
 }
 
 void OverlayWidget::updateControlsGeometry() {
@@ -2144,7 +2144,9 @@ void OverlayWidget::resizeContentByScreenSize() {
 		_h = _height;
 	}
 	_x = (width() - _w) / 2;
-	_y = _skipTop + (useh - _h) / 2;
+	_y = _fullScreenVideo
+		? (_minUsedTop + (_maxUsedHeight - _h) / 2)
+		: (_skipTop + (useh - _h) / 2);
 	_geometryAnimation.stop();
 }
 
@@ -6058,8 +6060,11 @@ void OverlayWidget::snapXY() {
 	auto ymin = height() - _h, ymax = _minUsedTop;
 	accumulate_min(xmin, (width() - _w) / 2);
 	accumulate_max(xmax, (width() - _w) / 2);
-	accumulate_min(ymin, _skipTop + (_availableHeight - _h) / 2);
-	accumulate_max(ymax, _skipTop + (_availableHeight - _h) / 2);
+	const auto centerY = _fullScreenVideo
+		? (_minUsedTop + (_maxUsedHeight - _h) / 2)
+		: (_skipTop + (_availableHeight - _h) / 2);
+	accumulate_min(ymin, centerY);
+	accumulate_max(ymax, centerY);
 	accumulate_max(_x, xmin);
 	accumulate_min(_x, xmax);
 	accumulate_max(_y, ymin);

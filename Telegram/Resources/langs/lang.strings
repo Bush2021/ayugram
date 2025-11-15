@@ -742,6 +742,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_settings_language" = "Language";
 "lng_settings_default_scale" = "Default interface scale";
+"lng_settings_scale" = "Interface scale";
 "lng_settings_connection_type" = "Connection type";
 "lng_settings_downloading_update" = "Downloading update {progress}...";
 "lng_settings_privacy_title" = "Privacy";
@@ -976,6 +977,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_font_family" = "Font family";
 
 "lng_settings_color_title" = "Color preview";
+"lng_settings_color_tab_profile" = "Profile";
+"lng_settings_color_tab_name" = "Name";
 "lng_settings_color_reply" = "Reply to your message";
 "lng_settings_color_reply_channel" = "Reply to your channel message";
 "lng_settings_color_text" = "Your name and replies to your messages will be shown in the selected color.";
@@ -990,10 +993,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_color_emoji_off" = "Off";
 "lng_settings_color_emoji_about" = "Make replies to your messages stand out by adding custom patterns to them.";
 "lng_settings_color_emoji_about_channel" = "Select an icon to create a custom pattern for replies to your messages.";
-"lng_settings_color_subscribe" = "Subscribe to {link} to choose a custom color for your name.";
 "lng_settings_color_changed" = "Your name color has been updated!";
 "lng_settings_color_changed_channel" = "Your channel color has been updated!";
+"lng_settings_color_changed_profile" = "Your profile style has been updated!";
+"lng_settings_color_changed_profile_channel" = "Your channel profile style has been updated!";
 "lng_settings_color_apply" = "Apply Style";
+"lng_settings_color_profile_emoji" = "Add icons to Profile";
+"lng_settings_color_profile_emoji_channel" = "Profile Logo";
+"lng_settings_color_reset" = "Reset Profile Color";
+"lng_settings_color_profile_about" = "You can change the color of your name and customize replies to you. {link}";
+"lng_settings_color_profile_about_link" = "Change {emoji}";
+"lng_settings_color_choose_channel" = "Choose a color and a logo for your channel's profile";
+"lng_settings_color_choose_group" = "Choose a color and a logo for the group's profile";
+"lng_settings_color_group_boost_footer#one" = "The group has **{count}** boost. {link}";
+"lng_settings_color_group_boost_footer#other" = "The group has **{count}** boosts. {link}";
+"lng_settings_color_group_boost_footer_link" = "What are boosts?";
 
 "lng_suggest_hide_new_title" = "Hide new chats?";
 "lng_suggest_hide_new_about" = "You are receiving lots of new chats from users who are not in your Contact List.\n\nDo you want to have such chats **automatically muted** and **archived**?";
@@ -1618,6 +1632,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_delete_note" = "Delete Note";
 "lng_info_bio_label" = "Bio";
 "lng_info_link_label" = "Link";
+"lng_info_link_topic_label" = "This topic link will only work for group members";
 "lng_info_location_label" = "Location";
 "lng_info_about_label" = "Description";
 "lng_info_work_open" = "Open";
@@ -1646,6 +1661,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_open_app_short" = "Open";
 "lng_profile_open_app_about" = "By launching this mini app, you agree to the {terms}.";
 "lng_profile_open_app_terms" = "Terms of Service for Mini Apps";
+"lng_profile_open_photo" = "Open Photo";
 "lng_profile_bot_permissions_title" = "Allow access to";
 "lng_profile_bot_emoji_status_access" = "Emoji Status";
 "lng_info_add_as_contact" = "Add to contacts";
@@ -1668,6 +1684,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_changed_photo_title" = "Photo updated";
 "lng_profile_changed_photo_about" = "You can change it in {link}.";
 "lng_profile_changed_photo_link" = "Settings";
+
+"lng_profile_action_short_message" = "Message";
+"lng_profile_action_short_mute" = "Mute";
+"lng_profile_action_short_unmute" = "Unmute";
+"lng_profile_action_short_call" = "Call";
+"lng_profile_action_short_discuss" = "Discuss";
+"lng_profile_action_short_gift" = "Gift";
+"lng_profile_action_short_join" = "Join";
+"lng_profile_action_short_report" = "Report";
+"lng_profile_action_short_leave" = "Leave";
+"lng_profile_action_short_more" = "More";
+"lng_profile_action_short_manage" = "Manage";
+
 "lng_media_type_photos" = "Photos";
 "lng_media_type_gifs" = "GIFs";
 "lng_media_type_videos" = "Videos";
@@ -2742,6 +2771,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_premium_summary_about_filter_tags" = "Display folder names for each chat in the chat list.";
 "lng_premium_summary_subtitle_todo_lists" = "Checklists";
 "lng_premium_summary_about_todo_lists" = "Plan, assign, and complete tasks - seamlessly and efficiently.";
+"lng_premium_summary_subtitle_peer_colors" = "Name and Profile Colors";
+"lng_premium_summary_about_peer_colors" = "Choose a color and logo for your profile and replies to your messages.";
 "lng_premium_summary_bottom_subtitle" = "About Telegram Premium";
 "lng_premium_summary_bottom_about" = "While the free version of Telegram already gives its users more than any other messaging application, **Telegram Premium** pushes its capabilities even further.\n\n**Telegram Premium** is a paid option, because most Premium Features require additional expenses from Telegram to third parties such as data center providers and server manufacturers. Contributions from **Telegram Premium** users allow us to cover such costs and also help Telegram stay free for everyone.";
 "lng_premium_summary_button" = "Subscribe for {cost} per month";
@@ -3351,6 +3382,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_feature_custom_emoji_pack" = "Custom Emoji Pack";
 "lng_feature_transcribe" = "Voice-to-Text Conversion";
 "lng_feature_autotranslate" = "Autotranslation of Messages";
+"lng_feature_profile_color_channel#one" = "**{count}** Color for Channel Cover";
+"lng_feature_profile_color_channel#other" = "**{count}** Colors for Channel Cover";
+"lng_feature_profile_color_group#one" = "**{count}** Color for Group Cover";
+"lng_feature_profile_color_group#other" = "**{count}** Colors for Group Cover";
+"lng_feature_profile_icon_channel" = "Custom Logo for Channel Cover";
+"lng_feature_profile_icon_group" = "Custom Logo for Group Cover";
 
 "lng_edit_topics_enable" = "Enable Topics";
 "lng_edit_topics_about" = "The group chat will be divided into topics created by admins or users.";
@@ -3621,6 +3658,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_stars_your_finished" = "none left";
 "lng_gift_stars_tabs_all" = "All Gifts";
 "lng_gift_stars_tabs_my" = "My Gifts";
+"lng_gift_stars_tabs_my_empty" = "You don't have any gifts you can use as a profile cover.";
+"lng_gift_stars_tabs_my_empty_next" = "Browse gifts available for purchase {emoji}";
 "lng_gift_stars_tabs_collectibles" = "Collectibles";
 "lng_gift_send_title" = "Send a Gift";
 "lng_gift_send_message" = "Enter Message";
@@ -4541,6 +4580,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_add_tag_selector#other" = "You can add a tag to the messages";
 "lng_message_tagged_with" = "Message tagged with {emoji}";
 "lng_tagged_view_saved" = "View";
+
+"lng_add_channel_to_filter_selector" = "You can add a channel to your folder";
+"lng_add_group_to_filter_selector" = "You can add a group to your folder";
 
 "lng_context_animated_emoji" = "This message contains emoji from **{name} pack**.";
 "lng_context_animated_emoji_many#one" = "This message contains emoji from **{count} pack**.";

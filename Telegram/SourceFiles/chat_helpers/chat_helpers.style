@@ -226,8 +226,7 @@ ReportBox {
 	noIconButton: SettingsButton;
 	label: FlatLabel;
 	field: InputField;
-	dividerBg: color;
-	dividerFg: color;
+	divider: DividerLabel;
 	spam: icon;
 	fake: icon;
 	violence: icon;
@@ -825,6 +824,29 @@ selfForwardsTaggerToast: Toast(defaultToast) {
 	radius: 9px;
 	padding: margins(54px, 12px, 19px, 12px);
 	iconPosition: point(15px, 6px);
+}
+joinChatAddToFilterToast: Toast(defaultToast) {
+	minWidth: 160px;
+	maxWidth: 380px;
+	radius: 9px;
+	padding: margins(54px, 12px, 44px, 12px);
+	iconPosition: point(15px, 6px);
+}
+joinChatAddToFilterToastButton: IconButton(defaultIconButton) {
+	width: 40px;
+	height: 40px;
+
+	icon: icon{
+		{ "chat/reactions_round_small", windowBgRipple },
+		{ "chat/reactions_expand_panel", windowSubTextFg },
+	};
+	iconOver: icon{
+		{ "chat/reactions_round_small", windowBgRipple },
+		{ "chat/reactions_expand_panel", windowSubTextFg },
+	};
+	rippleAreaPosition: point(10px, 10px);
+	rippleAreaSize: 20px;
+	ripple: universalRippleAnimation;
 }
 
 choosePeerGroupIcon: icon {{ "info/edit/create_group", lightButtonFg }};
@@ -1449,8 +1471,7 @@ defaultReportBox: ReportBox {
 	}
 	label: boxLabel;
 	field: newGroupDescription;
-	dividerBg: boxDividerBg;
-	dividerFg: windowSubTextFg;
+	divider: defaultDividerLabel;
 	spam: menuIconDelete;
 	fake: menuIconFake;
 	violence: menuIconViolence;
