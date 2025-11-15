@@ -21,7 +21,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media.h"
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_cursor_state.h"
-#include "base/unixtime.h"
 #include "chat_helpers/emoji_interactions.h"
 #include "core/click_handler_types.h"
 #include "main/main_session.h"
@@ -43,94 +42,212 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 
 namespace HistoryView {
-namespace {
 
-[[nodiscard]] QString SchedulePeriodText(TimeId period) {
-	struct Entry {
-		TimeId period = 0;
-		QString text;
-	};
-	const auto map = std::vector<Entry>{
-		{ 60, u"minutely"_q },
-		{ 300, u"5-minutely"_q },
-			? (deleted + date + ' ' + tr::lng_imported(tr::now))
-			: name.isEmpty()
-			? (deleted + date)
-			: (deleted + name + afterAuthor);
-		auto marked = TextWithEntities();
-		if (const auto count = _data.stars) {
-			marked.append(
-				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
-			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
-		}
-		marked.append(full);
-		_authorEditedDate.setMarkedText(
-			st::msgDateTextStyle,
-			marked,
-			Ui::NameTextOptions(),
-			Core::TextContext({ .session = &_reactionsOwner->session() }));
-	} else {
-		TextWithEntities deleted;
-		if (_data.flags & Data::Flag::AyuDeleted) {
-			deleted = Ui::Text::IconEmoji(&st::deletedIcon);
-			if (!(_data.flags & Data::Flag::Edited)) {
-				deleted.append(' ');
-			}
-		}
+struct BottomInfo::Effect {
+	mutable std::unique_ptr<Ui::ReactionFlyAnimation> animation;
+	mutable QImage image;
+	EffectId id = 0;
+};
 
-		TextWithEntities edited;
-		if (_data.flags & Data::Flag::Edited) {
-			edited = Ui::Text::IconEmoji(&st::editedIcon);
-			edited.append(' ');
-		} else if (_data.flags & Data::Flag::EstimateDate) {
-			edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
-		} else if (_data.scheduleRepeatPeriod) {
-			edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
-		}
+BottomInfo::BottomInfo(
+	not_null<::Data::Reactions*> reactionsOwner,
+	Data &&data)
+: _reactionsOwner(reactionsOwner)
+, _data(std::move(data)) {
+	layout();
+}
 
-		const auto author = _data.author;
-		const auto prefix = !author.isEmpty()
-			? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q)
-			: QString();
+BottomInfo::~BottomInfo() = default;
 
-		const auto date = TextWithEntities{}
-			.append(edited)
-			.append(makeDateString());
-
-		const auto afterAuthor = TextWithEntities{}.append(prefix).append(date);
-		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor.text);
-		const auto authorWidth = st::msgDateFont->width(author);
-		const auto maxWidth = st::maxSignatureSize;
-		_authorElided = !author.isEmpty()
-			&& (authorWidth + afterAuthorWidth > maxWidth);
-		const auto name = _authorElided
-			? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
-			: author;
-
-		auto full = TextWithEntities{};
-		if (_data.flags & Data::Flag::Sponsored) {
-			// ...
-		} else if (_data.flags & Data::Flag::Imported) {
-			full.append(deleted).append(date).append(' ').append(tr::lng_imported(tr::now));
-		} else if (name.isEmpty()) {
-			full.append(deleted).append(date);
-		} else {
-			full.append(deleted).append(name).append(afterAuthor);
-		}
-
-		const auto context = Core::TextContext({
-			.session = &_reactionsOwner->session(),
-			.repaint = [] {},
-			.customEmojiLoopLimit = 0,
-		});
-
-		_authorEditedDate.setMarkedText(
-			st::msgDateTextStyle,
-			full,
-			Ui::NameTextOptions(),
-			context);
+void BottomInfo::update(Data &&data, int availableWidth) {
+	_data = std::move(data);
+	layout();
+	if (width() > 0) {
+		resizeGetHeight(std::min(maxWidth(), availableWidth));
 	}
 }
+
+int BottomInfo::countEffectMaxWidth() const {
+	auto result = 0;
+	if (_effect) {
+		result += st::reactionInfoSize;
+		result += st::reactionInfoBetween;
+	}
+	if (result) {
+		result += (st::reactionInfoSkip - st::reactionInfoBetween);
+	}
+	return result;
+}
+
+int BottomInfo::countEffectHeight(int newWidth) const {
+	const auto left = 0;
+	auto x = 0;
+	auto y = 0;
+	auto widthLeft = newWidth;
+	if (_effect) {
+		const auto add = st::reactionInfoBetween;
+		const auto width = st::reactionInfoSize;
+		if (x > left && widthLeft < width) {
+			x = left;
+			y += st::msgDateFont->height;
+			widthLeft = newWidth;
+		}
+		x += width + add;
+		widthLeft -= width + add;
+	}
+	if (x > left) {
+		y += st::msgDateFont->height;
+	}
+	return y;
+}
+
+int BottomInfo::firstLineWidth() const {
+	if (height() == minHeight()) {
+		return width();
+	}
+	return maxWidth() - _effectMaxWidth;
+}
+
+bool BottomInfo::isWide() const {
+	return (_data.flags & Data::Flag::Edited)
+		|| !_data.author.isEmpty()
+		|| !_views.isEmpty()
+		|| !_replies.isEmpty()
+		|| _effect;
+}
+
+TextState BottomInfo::textState(
+		not_null<const Message*> view,
+		QPoint position) const {
+	const auto item = view->data();
+	auto result = TextState(item);
+	if (const auto link = replayEffectLink(view, position)) {
+		result.link = link;
+		return result;
+	}
+	const auto textWidth = _authorEditedDate.maxWidth();
+	auto withTicksWidth = textWidth;
+	if (!AyuFeatures::MessageShot::isTakingShot() && (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending))) {
+		withTicksWidth += st::historySendStateSpace;
+	}
+	if (!_views.isEmpty()) {
+		const auto viewsWidth = _views.maxWidth();
+		const auto right = width()
+			- withTicksWidth
+			- ((_data.flags & Data::Flag::Pinned) ? st::historyPinWidth : 0)
+			- st::historyViewsSpace
+			- st::historyViewsWidth
+			- viewsWidth;
+		const auto inViews = QRect(
+			right,
+			0,
+			withTicksWidth + st::historyViewsWidth,
+			st::msgDateFont->height
+		).contains(position);
+		if (inViews) {
+			result.customTooltip = true;
+			const auto fullViews = tr::lng_views_tooltip(
+				tr::now,
+				lt_count_decimal,
+				*_data.views);
+			const auto fullForwards = _data.forwardsCount
+				? ('\n' + tr::lng_forwards_tooltip(
+					tr::now,
+					lt_count_decimal,
+					*_data.forwardsCount))
+				: QString();
+			result.customTooltipText = fullViews + fullForwards;
+		}
+	}
+	const auto inTime = QRect(
+		width() - withTicksWidth,
+		0,
+		withTicksWidth,
+		st::msgDateFont->height
+	).contains(position);
+	if (inTime) {
+		result.cursor = CursorState::Date;
+	}
+	return result;
+}
+
+ClickHandlerPtr BottomInfo::replayEffectLink(
+		not_null<const Message*> view,
+		QPoint position) const {
+	if (!_effect) {
+		return nullptr;
+	}
+	auto left = 0;
+	auto top = 0;
+	auto available = width();
+	if (height() != minHeight()) {
+		available = std::min(available, _effectMaxWidth);
+		left += width() - available;
+		top += st::msgDateFont->height;
+	}
+	if (_effect) {
+		const auto image = QRect(
+			left,
+			top,
+			st::reactionInfoSize,
+			st::msgDateFont->height);
+		if (image.contains(position)) {
+			if (!_replayLink) {
+				_replayLink = replayEffectLink(view);
+			}
+			return _replayLink;
+		}
+	}
+	return nullptr;
+}
+
+ClickHandlerPtr BottomInfo::replayEffectLink(
+		not_null<const Message*> view) const {
+	const auto weak = base::make_weak(view);
+	return std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+		const auto my = context.other.value<ClickHandlerContext>();
+		if ([[maybe_unused]] const auto controller = my.sessionWindow.get()) {
+			if (const auto strong = weak.get()) {
+				strong->delegate()->elementStartEffect(strong, nullptr);
+			}
+		}
+	});
+}
+
+bool BottomInfo::isSignedAuthorElided() const {
+	return _authorElided;
+}
+
+void BottomInfo::paint(
+		Painter &p,
+		QPoint position,
+		int outerWidth,
+		bool unread,
+		bool inverted,
+		const PaintContext &context) const {
+	const auto st = context.st;
+	const auto stm = context.messageStyle();
+
+	auto right = position.x() + width();
+	const auto firstLineBottom = position.y() + st::msgDateFont->height;
+	if (!AyuFeatures::MessageShot::isTakingShot() && (_data.flags & Data::Flag::OutLayout)) {
+		const auto &icon = (_data.flags & Data::Flag::Sending)
+			? (inverted
+				? st->historySendingInvertedIcon()
+				: st->historySendingIcon())
+			: unread
+			? (inverted
+				? st->historySentInvertedIcon()
+				: stm->historySentIcon)
+			: (inverted
+				? st->historyReceivedInvertedIcon()
+				: stm->historyReceivedIcon);
+		icon.paint(
+			p,
+			QPoint(right, firstLineBottom) + st::historySendStatePosition,
+			outerWidth);
+		right -= st::historySendStateSpace;
+	}
 
 	const auto authorEditedWidth = _authorEditedDate.maxWidth();
 	right -= authorEditedWidth;
@@ -302,21 +419,19 @@ void BottomInfo::layoutDateText() {
 	const auto &settings = AyuSettings::getInstance();
 
 	const auto makeDateString = [&] {
-		return (_data.flags & Data::Flag::ForwardedDate)
-			? langDateTime(_data.date)
-			: formatMessageTime(_data.date.time());
+		return QLocale().toString(
+			_data.date.time(),
+			QLocale::ShortFormat);
 	};
 
 	if (!settings.replaceBottomInfoWithIcons) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
-			? (settings.deletedMark + ' ')
-			: QString();
+								? (settings.deletedMark + ' ')
+								: QString();
 		const auto edited = (_data.flags & Data::Flag::Edited)
-			? (settings.editedMark + ' ')
-			: (_data.flags & Data::Flag::EstimateDate)
+								? (settings.editedMark + ' ')
+								: (_data.flags & Data::Flag::EstimateDate)
 			? (tr::lng_approximate(tr::now) + ' ')
-			: _data.scheduleRepeatPeriod
-			? (SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ')
 			: QString();
 		const auto author = _data.author;
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
@@ -338,17 +453,17 @@ void BottomInfo::layoutDateText() {
 			? (deleted + date)
 			: (deleted + name + afterAuthor);
 		auto marked = TextWithEntities();
-		if (const auto count = _data.stars) {
-			marked.append(
-				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
-			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
-		}
-		marked.append(full);
-		_authorEditedDate.setMarkedText(
+	if (const auto count = _data.stars) {
+		marked.append(
+			Ui::Text::IconEmoji(&st::starIconEmojiSmall)
+		).append(Lang::FormatCountToShort(count).string).append(u", "_q);
+	}
+	marked.append(full);
+	_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
 			marked,
 			Ui::NameTextOptions(),
-			Core::TextContext({ .session = &_reactionsOwner->session() }));
+		Core::TextContext({ .session = &_reactionsOwner->session() }));
 	} else {
 		TextWithEntities deleted;
 		if (_data.flags & Data::Flag::AyuDeleted) {
@@ -363,15 +478,11 @@ void BottomInfo::layoutDateText() {
 			edited = Ui::Text::IconEmoji(&st::editedIcon);
 			edited.append(' ');
 		} else if (_data.flags & Data::Flag::EstimateDate) {
-			edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
-		} else if (_data.scheduleRepeatPeriod) {
-			edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
+		    edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
 		}
 
 		const auto author = _data.author;
-		const auto prefix = !author.isEmpty()
-			? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q)
-			: QString();
+		const auto prefix = !author.isEmpty() ? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q) : QString();
 
 		const auto date = TextWithEntities{}
 			.append(edited)
@@ -578,19 +689,6 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (item->awaitingVideoProcessing()) {
 		result.flags |= Flag::EstimateDate;
-	}
-	if (item->isDeleted()) {
-		result.flags |= Flag::AyuDeleted;
-	}
-	if (item->isScheduled()) {
-		result.scheduleRepeatPeriod = item->scheduleRepeatPeriod();
-	}
-	if (forwarded
-			&& forwarded->savedFromPeer
-			&& forwarded->savedFromMsgId
-			&& !item->externalReply()) {
-		result.date = base::unixtime::parse(forwarded->originalDate);
-		result.flags |= Flag::ForwardedDate;
 	}
 	// We don't want to pass and update it in Data for now.
 	//if (item->unread()) {

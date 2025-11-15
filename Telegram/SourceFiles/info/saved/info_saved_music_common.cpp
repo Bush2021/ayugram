@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/saved/info_saved_music_common.h"
 
+#include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"

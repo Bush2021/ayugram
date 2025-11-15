@@ -848,16 +848,6 @@ reactionsTabs: MultiSelect(defaultMultiSelect) {
 }
 reactionsTabIconSkip: 3px;
 
-SendAsButton {
-	width: pixels;
-	height: pixels;
-	size: pixels;
-	activeBg: color;
-	activeFg: color;
-	cross: CrossAnimation;
-	duration: int;
-}
-
 sendAsButton: SendAsButton {
 	width: 44px;
 	height: 46px;
