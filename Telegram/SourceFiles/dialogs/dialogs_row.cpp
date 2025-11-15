@@ -12,7 +12,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/credits_graphics.h"
 #include "ui/effects/outline_segments.h"
 #include "ui/effects/ripple_animation.h"
+#include "ui/effects/round_checkbox.h"
 #include "ui/image/image_prepare.h"
+#include "ui/text/custom_emoji_text_badge.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
@@ -30,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "base/unixtime.h"
+#include "styles/style_calls.h"
 #include "styles/style_dialogs.h"
 
 // AyuGram includes
@@ -451,27 +454,32 @@ void Row::PaintCornerBadgeFrame(
 		q.restore();
 
 		const auto outline = QRectF(0, 0, photoSize, photoSize);
-		const auto storiesUnreadCount = data->storiesUnreadCount;
-		const auto storiesUnreadBrush = [&] {
-			if (context.active || !storiesUnreadCount) {
-				return st::dialogsUnreadBgMutedActive->b;
-			}
-			auto gradient = Ui::UnreadStoryOutlineGradient(outline);
-			return QBrush(gradient);
-		}();
-		const auto storiesBrush = context.active
-			? st::dialogsUnreadBgMutedActive->b
-			: st::dialogsUnreadBgMuted->b;
 		const auto storiesUnread = st::dialogsStoriesFull.lineTwice / 2.;
 		const auto storiesLine = st::dialogsStoriesFull.lineReadTwice / 2.;
 		auto segments = std::vector<Ui::OutlineSegment>();
-		segments.reserve(storiesCount);
-		const auto storiesReadCount = storiesCount - storiesUnreadCount;
-		for (auto i = 0; i != storiesReadCount; ++i) {
-			segments.push_back({ storiesBrush, storiesLine });
-		}
-		for (auto i = 0; i != storiesUnreadCount; ++i) {
-			segments.push_back({ storiesUnreadBrush, storiesUnread });
+		if (data->storiesHasVideoStream) {
+			const auto storiesVideoStreamBrush = st::attentionButtonFg->b;
+			segments.push_back({ storiesVideoStreamBrush, storiesUnread });
+		} else {
+			const auto storiesUnreadCount = data->storiesUnreadCount;
+			const auto storiesUnreadBrush = [&] {
+				if (context.active || !storiesUnreadCount) {
+					return st::dialogsUnreadBgMutedActive->b;
+				}
+				auto gradient = Ui::UnreadStoryOutlineGradient(outline);
+				return QBrush(gradient);
+			}();
+			const auto storiesBrush = context.active
+				? st::dialogsUnreadBgMutedActive->b
+				: st::dialogsUnreadBgMuted->b;
+			segments.reserve(storiesCount);
+			const auto storiesReadCount = storiesCount - storiesUnreadCount;
+			for (auto i = 0; i != storiesReadCount; ++i) {
+				segments.push_back({ storiesBrush, storiesLine });
+			}
+			for (auto i = 0; i != storiesUnreadCount; ++i) {
+				segments.push_back({ storiesUnreadBrush, storiesUnread });
+			}
 		}
 		if (peer && (peer->forum() || peer->monoforum())) {
 			const auto radius = context.st->photoSize
@@ -479,6 +487,10 @@ void Row::PaintCornerBadgeFrame(
 			Ui::PaintOutlineSegments(q, outline, radius, segments);
 		} else {
 			Ui::PaintOutlineSegments(q, outline, segments);
+		}
+
+		if (data->storiesHasVideoStream) {
+			Ui::PaintLiveBadge(q, 0, 0, photoSize);
 		}
 	}
 
@@ -568,7 +580,7 @@ void Row::paintUserpic(
 	const auto storiesHas = storiesPeer
 		? storiesPeer->hasActiveStories()
 		: storiesFolder
-		? storiesFolder->storiesCount()
+		? (storiesFolder->storiesCount() > 0)
 		: false;
 	if (!cornerBadgeShown && !storiesHas) {
 		BasicRow::paintUserpic(p, entry, peer, videoUserpic, context, false);
@@ -603,6 +615,11 @@ void Row::paintUserpic(
 		: (storiesPeer && storiesPeer->hasUnreadStories())
 		? 1
 		: 0;
+	const auto storiesHasVideoStream = storiesSource
+		? storiesSource->hasVideoStream
+		: (storiesPeer && storiesPeer->hasActiveVideoStream())
+		? 1
+		: 0;
 	const auto limit = Ui::kOutlineSegmentsMax;
 	const auto storiesCount = std::min(storiesCountReal, limit);
 	const auto storiesUnreadCount = std::min(storiesUnreadCountReal, limit);
@@ -631,12 +648,14 @@ void Row::paintUserpic(
 		|| _cornerBadgeUserpic->frameIndex != frameIndex
 		|| _cornerBadgeUserpic->storiesCount != storiesCount
 		|| _cornerBadgeUserpic->storiesUnreadCount != storiesUnreadCount
+		|| _cornerBadgeUserpic->storiesHasVideoStream != storiesHasVideoStream
 		|| videoUserpic) {
 		_cornerBadgeUserpic->key = key;
 		_cornerBadgeUserpic->paletteVersion = paletteVersion;
 		_cornerBadgeUserpic->active = active;
 		_cornerBadgeUserpic->storiesCount = storiesCount;
 		_cornerBadgeUserpic->storiesUnreadCount = storiesUnreadCount;
+		_cornerBadgeUserpic->storiesHasVideoStream = storiesHasVideoStream;
 		_cornerBadgeUserpic->frameIndex = frameIndex;
 		_cornerBadgeUserpic->layersManager.markFrameShown();
 		PaintCornerBadgeFrame(

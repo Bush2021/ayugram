@@ -39,6 +39,7 @@ private:
 	bool handleHideWorkaround(QOpenGLFunctions &f);
 
 	void paintBackground() override;
+	void paintVideoStream() override;
 	void paintTransformedVideoFrame(ContentGeometry geometry) override;
 	void paintTransformedStaticContent(
 		const QImage &image,

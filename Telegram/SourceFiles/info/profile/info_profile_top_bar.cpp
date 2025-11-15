@@ -70,6 +70,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/outline_segments.h"
+#include "ui/effects/round_checkbox.h"
 #include "ui/empty_userpic.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
@@ -316,6 +317,10 @@ TopBar::TopBar(
 	});
 	return owned;
 }()) {
+	_peer->updateFull();
+	if (const auto broadcast = _peer->monoforumBroadcast()) {
+		broadcast->updateFull();
+	}
 	const auto controller = descriptor.controller;
 
 	if (_peer->isMegagroup() || _peer->isChat()) {
@@ -369,16 +374,12 @@ TopBar::TopBar(
 			std::move(badgeUpdates),
 			_botVerify->updated());
 	}
+	_title->naturalWidthValue() | rpl::start_with_next([=](int w) {
+		_title->resizeToWidth(w);
+	}, _title->lifetime());
 	badgeUpdates = rpl::merge(
 		std::move(badgeUpdates),
-		nameValue() | rpl::map([=](const QString &name) {
-			const auto emojiCount = ranges::count(name, true, [](QChar ch) {
-				return ch.isHighSurrogate();
-			});
-			_title->resizeToWidth(_title->st().style.font->width(name)
-				+ emojiCount);
-			return rpl::empty_value();
-		}),
+		nameValue() | rpl::to_empty,
 		rpl::duplicate(descriptor.backToggles) | rpl::to_empty);
 	std::move(badgeUpdates) | rpl::start_with_next([=] {
 		updateLabelsPosition();
@@ -704,6 +705,18 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 		});
 		buttons.push_back(join);
 		_actions->add(join);
+	} else if (const auto channel = peer->monoforumBroadcast()) {
+		const auto message = Ui::CreateChild<TopBarActionButton>(
+			this,
+			tr::lng_profile_action_short_channel(tr::now),
+			st::infoProfileTopBarActionMessage);
+		message->setClickedCallback([=, window = controller] {
+			window->showPeerHistory(
+				channel,
+				Window::SectionShow::Way::Forward);
+		});
+		buttons.push_back(message);
+		_actions->add(message);
 	}
 	{
 		const auto notifications = Ui::CreateChild<TopBarActionButton>(
@@ -782,7 +795,7 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 		&& user
 		&& !user->sharedMediaInfo()
 		&& !user->isInaccessible()
-		&& user->hasCalls()) {
+		&& user->callsStatus() != UserData::CallsStatus::Disabled) {
 		const auto call = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_call(tr::now),
@@ -796,7 +809,8 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 	if (chechMax()) {
 		return;
 	}
-	if (const auto chat = channel ? channel->discussionLink() : nullptr) {
+	if (const auto chat = channel ? channel->discussionLink() : nullptr;
+			chat && chat->isMegagroup()) {
 		const auto discuss = Ui::CreateChild<TopBarActionButton>(
 			this,
 			tr::lng_profile_action_short_discuss(tr::now),
@@ -895,18 +909,31 @@ void TopBar::setupActions(not_null<Window::SessionController*> controller) {
 void TopBar::setupUserpicButton(
 		not_null<Window::SessionController*> controller) {
 	_userpicButton = base::make_unique_q<Ui::AbstractButton>(this);
+
+	const auto invalidate = [=] {
+		_userpicUniqueKey = InMemoryKey();
+		_userpicButton->setAttribute(
+			Qt::WA_TransparentForMouseEvents,
+			!_peer->userpicPhotoId() && !_hasStories);
+		updateVideoUserpic();
+	};
+
 	rpl::single(
 		rpl::empty_value()
 	) | rpl::then(
 		_peer->session().changes().peerFlagsValue(
 			_peer,
-			Data::PeerUpdate::Flag::Photo) | rpl::to_empty
-	) | rpl::start_with_next([=] {
-		_userpicButton->setAttribute(
-			Qt::WA_TransparentForMouseEvents,
-			!_peer->userpicPhotoId() && !_hasStories);
-		updateVideoUserpic();
-	}, lifetime());
+			Data::PeerUpdate::Flag::Photo
+				| Data::PeerUpdate::Flag::FullInfo) | rpl::to_empty
+	) | rpl::start_with_next(invalidate, lifetime());
+
+	if (const auto broadcast = _peer->monoforumBroadcast()) {
+		_peer->session().changes().peerFlagsValue(
+			broadcast,
+			Data::PeerUpdate::Flag::Photo
+				| Data::PeerUpdate::Flag::FullInfo
+		) | rpl::to_empty | rpl::start_with_next(invalidate, lifetime());
+	}
 
 	const auto openPhoto = [=, peer = _peer] {
 		if (const auto id = peer->userpicPhotoId()) {
@@ -1126,7 +1153,7 @@ void TopBar::setupUserpicButton(
 }
 
 void TopBar::setupUniqueBadgeTooltip() {
-	if (!_badge) {
+	if (!_badge || _source == Source::Preview) {
 		return;
 	}
 	base::timer_once(kWaitBeforeGiftBadge) | rpl::then(
@@ -1223,7 +1250,7 @@ void TopBar::setPatternEmojiId(std::optional<DocumentId> patternEmojiId) {
 
 void TopBar::setLocalEmojiStatusId(EmojiStatusId emojiStatusId) {
 	_localCollectible = emojiStatusId.collectible;
-	if (emojiStatusId) {
+	if (!emojiStatusId.collectible) {
 		_badgeContent = Badge::Content{ BadgeType::Premium, emojiStatusId };
 	} else {
 		_badgeContent = BadgeContentForPeer(_peer);
@@ -1244,6 +1271,8 @@ auto TopBar::effectiveCollectible() const
 -> std::shared_ptr<Data::EmojiStatusCollectible> {
 	return _localCollectible
 		? _localCollectible
+		: _localColorProfileIndex
+		? nullptr
 		: _peer->emojiStatusId().collectible;
 }
 
@@ -1311,22 +1340,26 @@ void TopBar::updateLabelsPosition() {
 		titleMostLeft,
 		rect::m::sum::h(st::boxRowPadding),
 		progressCurrent);
-	auto titleWidth = width() - interpolatedPadding - reservedRight;
 	const auto verifiedWidget = _verified ? _verified->widget() : nullptr;
 	const auto badgeWidget = _badge ? _badge->widget() : nullptr;
 	const auto botVerifyWidget = _botVerify ? _botVerify->widget() : nullptr;
+	auto badgesWidth = 0;
 	if (verifiedWidget) {
-		titleWidth -= verifiedWidget->width();
+		badgesWidth += verifiedWidget->width();
 	}
 	if (badgeWidget) {
-		titleWidth -= badgeWidget->width();
+		badgesWidth += badgeWidget->width();
 	}
 	if (botVerifyWidget) {
-		titleWidth -= botVerifyWidget->width();
+		badgesWidth += botVerifyWidget->width();
 	}
 	if (verifiedWidget || badgeWidget) {
-		titleWidth -= st::infoVerifiedCheckPosition.x();
+		badgesWidth += st::infoVerifiedCheckPosition.x();
 	}
+	const auto titleWidth = width()
+		- interpolatedPadding
+		- reservedRight
+		- badgesWidth;
 
 	if (titleWidth > 0 && _title->textMaxWidth() > titleWidth) {
 		_title->resizeToWidth(titleWidth);
@@ -2355,9 +2388,14 @@ void TopBar::updateStoryOutline(std::optional<QColor> edgeColor) {
 	const auto hasActiveStories = (_source == Source::Preview)
 		? true
 		: user->hasActiveStories();
+	const auto hasLiveStories = (_source == Source::Preview)
+		? false
+		: user->hasActiveVideoStream();
 
-	if (_hasStories != hasActiveStories) {
+	if (_hasStories != hasActiveStories
+		|| _hasLiveStories != hasLiveStories) {
 		_hasStories = hasActiveStories;
+		_hasLiveStories = hasLiveStories;
 		update();
 	}
 
@@ -2400,21 +2438,30 @@ void TopBar::updateStoryOutline(std::optional<QColor> edgeColor) {
 	const auto baseColor = edgeColor
 		? Ui::BlendColors(*edgeColor, Qt::white, .5)
 		: _storyOutlineBrush.color();
-	const auto unreadBrush = edgeColor
+	const auto unreadBrush = _hasLiveStories
+		? st::attentionButtonFg->b
+		: edgeColor
 		? QBrush(baseColor)
 		: _storyOutlineBrush;
 	const auto readBrush = edgeColor
 		? QBrush(anim::with_alpha(baseColor, 0.5))
 		: QBrush(st::dialogsUnreadBgMuted->b);
 
-	const auto readTill = source->readTill;
-	const auto widthSmall = widthBig / 2.;
-	for (const auto &storyIdDates : source->ids) {
-		const auto isUnread = (storyIdDates.id > readTill);
+	if (_hasLiveStories) {
 		_storySegments.push_back({
-			.brush = isUnread ? unreadBrush : readBrush,
-			.width = !isUnread ? widthSmall : widthBig,
+			.brush = unreadBrush,
+			.width = widthBig,
 		});
+	} else {
+		const auto readTill = source->readTill;
+		const auto widthSmall = widthBig / 2.;
+		for (const auto &storyIdDates : source->ids) {
+			const auto isUnread = (storyIdDates.id > readTill);
+			_storySegments.push_back({
+				.brush = isUnread ? unreadBrush : readBrush,
+				.width = !isUnread ? widthSmall : widthBig,
+			});
+		}
 	}
 }
 
@@ -2443,6 +2490,17 @@ void TopBar::paintStoryOutline(QPainter &p, const QRect &geometry) {
 		padding + outlineWidth / 2);
 
 	Ui::PaintOutlineSegments(p, outlineRect, _storySegments);
+
+	if (_hasLiveStories) {
+		const auto outline = _edgeColor.current().value_or(
+			_solidBg.value_or(st::boxDividerBg->c));
+		Ui::PaintLiveBadge(
+			p,
+			geometry.x(),
+			geometry.y() + outlineWidth + padding,
+			geometry.width(),
+			outline);
+	}
 }
 
 void TopBar::setupStatusWithRating() {

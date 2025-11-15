@@ -229,7 +229,8 @@ public:
 		setCheckedInternal(checked, animated);
 	}
 	void setCustomizedCheckSegments(
-		std::vector<Ui::OutlineSegment> segments);
+		std::vector<Ui::OutlineSegment> segments,
+		bool liveBadge);
 	void setHidden(bool hidden) {
 		_hidden = hidden;
 	}

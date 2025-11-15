@@ -22,6 +22,10 @@ struct WebPageStickerSet;
 enum class WebPageType : uint8;
 enum class NewMessageType;
 
+namespace Calls {
+class GroupCall;
+} // namespace Calls
+
 namespace HistoryView {
 struct Group;
 class Element;
@@ -385,6 +389,8 @@ public:
 	[[nodiscard]] rpl::producer<not_null<History*>> historyChanged() const;
 	void notifyViewPaidReactionSent(not_null<const ViewElement*> view);
 	[[nodiscard]] rpl::producer<not_null<const ViewElement*>> viewPaidReactionSent() const;
+	void notifyCallPaidReactionSent(not_null<Calls::GroupCall*> call);
+	[[nodiscard]] rpl::producer<not_null<Calls::GroupCall*>> callPaidReactionSent() const;
 	void sendHistoryChangeNotifications();
 
 	void notifyPinnedDialogsOrderUpdated();
@@ -1079,6 +1085,7 @@ private:
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewPaidReactionSent;
+	rpl::event_stream<not_null<Calls::GroupCall*>> _callPaidReactionSent;
 	rpl::event_stream<not_null<const History*>> _historyUnloaded;
 	rpl::event_stream<not_null<const History*>> _historyCleared;
 	base::flat_set<not_null<History*>> _historiesChanged;

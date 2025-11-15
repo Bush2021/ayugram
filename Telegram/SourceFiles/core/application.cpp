@@ -174,6 +174,7 @@ Application::Application()
 , _langCloudManager(std::make_unique<Lang::CloudManager>(langpack()))
 , _emojiKeywords(std::make_unique<ChatHelpers::EmojiKeywords>())
 , _tray(std::make_unique<Tray>())
+, _setupEmailLock(false)
 , _autoLockTimer([=] { checkAutoLock(); }) {
 	Ui::Integration::Set(&_private->uiIntegration);
 
@@ -1224,6 +1225,20 @@ rpl::producer<bool> Application::passcodeLockChanges() const {
 
 rpl::producer<bool> Application::passcodeLockValue() const {
 	return _passcodeLock.value();
+}
+
+void Application::lockBySetupEmail() {
+	_setupEmailLock = true;
+	enumerateWindows([&](not_null<Window::Controller*> w) {
+		w->setupSetupEmailLock();
+	});
+}
+
+void Application::unlockSetupEmail() {
+	_setupEmailLock = false;
+	enumerateWindows([&](not_null<Window::Controller*> w) {
+		w->clearSetupEmailLock();
+	});
 }
 
 bool Application::someSessionExists() const {

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/local_url_handlers.h"
 
 #include "api/api_authorizations.h"
+#include "api/api_cloud_password.h"
 #include "api/api_confirm_phone.h"
 #include "api/api_chat_filters.h"
 #include "api/api_chat_invite.h"
@@ -52,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_peer_menu.h"
 #include "window/themes/window_theme_editor_box.h" // GenerateSlug.
 #include "payments/payments_checkout_process.h"
+#include "settings/cloud_password/settings_cloud_password_login_email.h"
 #include "settings/settings_active_sessions.h"
 #include "settings/settings_credits.h"
 #include "settings/settings_credits_graphics.h"
@@ -501,6 +503,33 @@ bool ShowWallPaper(
 	return result;
 }
 
+void LoginEmailBox(
+		not_null<Ui::GenericBox*> box,
+		rpl::producer<QString> email,
+		Fn<void()> callback) {
+	{
+		box->getDelegate()->setTitle(rpl::duplicate(
+			email
+		) | rpl::map(Ui::Text::WrapEmailPattern));
+		for (const auto &child : ranges::views::reverse(
+				box->parentWidget()->children())) {
+			if (child && child->isWidgetType()) {
+				(static_cast<QWidget*>(child))->setAttribute(
+					Qt::WA_TransparentForMouseEvents);
+				break;
+			}
+		}
+	}
+	Ui::ConfirmBox(box, Ui::ConfirmBoxArgs{
+		.text = tr::lng_settings_cloud_login_email_box_about(),
+		.confirmed = [=](Fn<void()> close) {
+			callback();
+			close();
+		},
+		.confirmText = tr::lng_settings_cloud_login_email_box_ok(),
+	});
+}
+
 [[nodiscard]] ChatAdminRights ParseRequestedAdminRights(
 		const QString &value) {
 	auto result = ChatAdminRights();
@@ -637,7 +666,6 @@ bool ResolveUsernameOrPhone(
 		post = postId;
 	}
 	const auto storyParam = params.value(u"story"_q);
-	const auto storyId = storyParam.toInt();
 	const auto storyAlbumParam = params.value(u"album"_q);
 	const auto storyAlbumId = storyAlbumParam.toInt();
 	const auto giftCollectionParam = params.value(u"collection"_q);
@@ -669,7 +697,7 @@ bool ResolveUsernameOrPhone(
 		.usernameOrId = domain,
 		.phone = phone,
 		.messageId = post,
-		.storyId = storyId,
+		.storyParam = storyParam,
 		.storyAlbumId = storyAlbumId,
 		.giftCollectionId = giftCollectionId,
 		.videoTimestamp = (!videot.isEmpty()
@@ -763,6 +791,21 @@ bool ResolvePrivatePost(
 	return true;
 }
 
+void ShowLoginEmailSettings(Window::SessionController *controller) {
+	controller->session().api().cloudPassword().reload();
+	controller->uiShow()->show(Box(
+		LoginEmailBox,
+		controller->session().api().cloudPassword().state(
+		) | rpl::map([](const Core::CloudPasswordState &state) {
+			return state.loginEmailPattern;
+		}),
+		[=] {
+			controller->showSettings(
+				::Settings::CloudLoginEmailId());
+			controller->window().activate();
+		}));
+}
+
 bool ResolveSettings(
 		Window::SessionController *controller,
 		const Match &match,
@@ -791,6 +834,9 @@ bool ResolveSettings(
 			return ::Settings::GlobalTTLId();
 		} else if (section == u"information"_q) {
 			return ::Settings::Information::Id();
+		} else if (section == u"login_email"_q) {
+			ShowLoginEmailSettings(controller);
+			return {};
 		}
 		return ::Settings::Main::Id();
 	}();
@@ -1591,6 +1637,21 @@ bool ResolveUniqueGift(
 	return true;
 }
 
+bool ResolveGiftAuction(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto slug = match->captured(1);
+	if (slug.isEmpty()) {
+		return false;
+	}
+	controller->showStarGiftAuction(slug);
+	return true;
+}
+
 bool ResolveConferenceCall(
 		Window::SessionController *controller,
 		const Match &match,
@@ -1689,7 +1750,7 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolvePrivatePost
 		},
 		{
-			u"^settings(/language|/devices|/folders|/privacy|/themes|/change_number|/auto_delete|/information|/edit_profile|/phone_privacy)?$"_q,
+			u"^settings(/language|/devices|/folders|/privacy|/themes|/change_number|/auto_delete|/information|/edit_profile|/phone_privacy|/login_email)?$"_q,
 			ResolveSettings
 		},
 		{
@@ -1727,6 +1788,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^nft/?\\?slug=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
 			ResolveUniqueGift
+		},
+		{
+			u"^stargift_auction/?\\?slug=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
+			ResolveGiftAuction
 		},
 		{
 			u"^call/?\\?slug=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
@@ -1916,6 +1981,9 @@ QString TryConvertUrlToLocal(QString url) {
 		} else if (const auto nftMatch = regex_match(u"^nft/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto slug = nftMatch->captured(1);
 			return u"tg://nft?slug="_q + slug;
+		} else if (const auto auctionMatch = regex_match(u"^auction/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
+			const auto slug = auctionMatch->captured(1);
+			return u"tg://stargift_auction?slug="_q + slug;
 		} else if (const auto callMatch = regex_match(u"^call/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto slug = callMatch->captured(1);
 			return u"tg://call?slug="_q + slug;
@@ -1948,7 +2016,7 @@ QString TryConvertUrlToLocal(QString url) {
 				"/?$|"
 				"/[a-zA-Z0-9\\.\\_\\-]+/?(\\?|$)|"
 				"/\\d+/?(\\?|$)|"
-				"/s/\\d+/?(\\?|$)|"
+				"/s/(\\d+|live)/?(\\?|$)|"
 				"/a/\\d+/?(\\?|$)|"
 				"/c/\\d+/?(\\?|$)|"
 				"/\\d+/\\d+/?(\\?|$)"
@@ -1971,7 +2039,7 @@ QString TryConvertUrlToLocal(QString url) {
 				added = u"&topic=%1&post=%2"_q.arg(threadPostMatch->captured(1), threadPostMatch->captured(2));
 			} else if (const auto postMatch = regex_match(u"^/(\\d+)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
 				added = u"&post="_q + postMatch->captured(1);
-			} else if (const auto storyMatch = regex_match(u"^/s/(\\d+)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
+			} else if (const auto storyMatch = regex_match(u"^/s/(\\d+|live)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
 				added = u"&story="_q + storyMatch->captured(1);
 			} else if (const auto albumMatch = regex_match(u"^/a/(\\d+)(/?\\?|/?$)"_q, usernameMatch->captured(2))) {
 				added = u"&album="_q + albumMatch->captured(1);

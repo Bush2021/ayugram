@@ -234,6 +234,9 @@ struct SmallBalanceBot {
 struct SmallBalanceReaction {
 	ChannelId channelId = 0;
 };
+struct SmallBalanceVideoStream {
+	PeerId streamerId = 0;
+};
 struct SmallBalanceSubscription {
 	QString name;
 };
@@ -254,6 +257,7 @@ struct SmallBalanceForSearch {
 struct SmallBalanceSource : std::variant<
 	SmallBalanceBot,
 	SmallBalanceReaction,
+	SmallBalanceVideoStream,
 	SmallBalanceSubscription,
 	SmallBalanceDeepLink,
 	SmallBalanceStarGift,

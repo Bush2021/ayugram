@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/gift_premium_box.h"
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
+#include "boxes/star_gift_resale_box.h"
 #include "boxes/transfer_gift_box.h"
 #include "chat_helpers/stickers_gift_box_pack.h"
 #include "chat_helpers/stickers_lottie.h"
@@ -2437,7 +2438,7 @@ void UniqueGiftValueBox(
 					platform(Ui::Text::WithEntities),
 					lt_arrow,
 					rpl::single(Ui::Text::IconEmoji(&st::textMoreIconEmoji)),
-					[](const QString &text) { return Ui::Text::Link(text); }),
+					tr::link),
 				st::uniqueGiftValueAvailableLink,
 				st::defaultPopupMenu,
 				Core::TextContext({ .session = &show->session() })),
@@ -2892,6 +2893,9 @@ void SmallBalanceBox(
 			: QString();
 	}, [&](SmallBalanceReaction value) {
 		return owner->peer(peerFromChannel(value.channelId))->name();
+	}, [&](SmallBalanceVideoStream value) {
+		dark = true;
+		return owner->peer(value.streamerId)->name();
 	}, [](SmallBalanceSubscription value) {
 		return value.name;
 	}, [](SmallBalanceDeepLink) {
@@ -2938,6 +2942,11 @@ void SmallBalanceBox(
 					: v::is<SmallBalanceReaction>(source)
 					? tr::lng_credits_small_balance_reaction(
 						lt_channel,
+						rpl::single(Ui::Text::Bold(name)),
+						Ui::Text::RichLangValue)
+					: v::is<SmallBalanceVideoStream>(source)
+					? tr::lng_credits_small_balance_video_stream(
+						lt_name,
 						rpl::single(Ui::Text::Bold(name)),
 						Ui::Text::RichLangValue)
 					: v::is<SmallBalanceDeepLink>(source)

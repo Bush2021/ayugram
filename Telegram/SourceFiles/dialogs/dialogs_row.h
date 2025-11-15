@@ -182,9 +182,10 @@ private:
 		QImage frame;
 		QImage cacheTTL;
 		int frameIndex = -1;
-		uint32 paletteVersion : 17 = 0;
+		uint32 paletteVersion : 16 = 0;
 		uint32 storiesCount : 7 = 0;
 		uint32 storiesUnreadCount : 7 = 0;
+		uint32 storiesHasVideoStream : 1 = 0;
 		uint32 active : 1 = 0;
 	};
 

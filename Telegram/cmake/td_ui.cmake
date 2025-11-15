@@ -74,6 +74,8 @@ PRIVATE
     calls/group/ui/calls_group_recording_box.h
     calls/group/ui/calls_group_scheduled_labels.cpp
     calls/group/ui/calls_group_scheduled_labels.h
+    calls/group/ui/calls_group_stars_coloring.cpp
+    calls/group/ui/calls_group_stars_coloring.h
     calls/group/ui/desktop_capture_choose_source.cpp
     calls/group/ui/desktop_capture_choose_source.h
     calls/ui/calls_device_menu.cpp
@@ -395,6 +397,8 @@ PRIVATE
     ui/controls/download_bar.h
     ui/controls/emoji_button.cpp
     ui/controls/emoji_button.h
+    ui/controls/feature_list.cpp
+    ui/controls/feature_list.h
     ui/controls/filter_link_header.cpp
     ui/controls/filter_link_header.h
     ui/controls/jump_down_button.cpp

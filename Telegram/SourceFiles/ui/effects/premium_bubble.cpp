@@ -359,7 +359,9 @@ void BubbleWidget::setupParticles(not_null<Ui::RpWidget*> parent) {
 		p.setClipping(false);
 
 		p.setClipPath(fullRect.subtracted(bubblePath));
-		_particles->setColor(st::creditsBg3->c);
+		_particles->setColor(_brushOverride
+			? st::groupCallMemberInactiveIcon->c
+			: st::creditsBg3->c);
 		_particles->paint(p, _particlesWidget->rect(), crl::now());
 	}, _particlesWidget->lifetime());
 
@@ -487,6 +489,11 @@ void BubbleWidget::animateTo(BubbleRowState state) {
 	anim::easeOutCirc);
 }
 
+void BubbleWidget::setBrushOverride(std::optional<QBrush> brushOverride) {
+	_brushOverride = std::move(brushOverride);
+	update();
+}
+
 void BubbleWidget::paintEvent(QPaintEvent *e) {
 	if (!_bubble.counter().has_value()) {
 		return;
@@ -545,6 +552,9 @@ void BubbleWidget::paintEvent(QPaintEvent *e) {
 
 
 	_bubble.paintBubble(p, bubbleRect, [&] {
+		if (_brushOverride) {
+			return *_brushOverride;
+		}
 		switch (_type) {
 		case BubbleType::NoPremium:
 		case BubbleType::UpgradePrice:
@@ -561,7 +571,7 @@ void BubbleWidget::resizeEvent(QResizeEvent *e) {
 	RpWidget::resizeEvent(e);
 }
 
-void AddBubbleRow(
+not_null<BubbleWidget*> AddBubbleRow(
 		not_null<Ui::VerticalLayout*> parent,
 		const style::PremiumBubble &st,
 		rpl::producer<> showFinishes,
@@ -571,7 +581,7 @@ void AddBubbleRow(
 		BubbleType type,
 		std::optional<tr::phrase<lngtag_count>> phrase,
 		const style::icon *icon) {
-	AddBubbleRow(
+	return AddBubbleRow(
 		parent,
 		st,
 		std::move(showFinishes),
@@ -585,7 +595,7 @@ void AddBubbleRow(
 		st::boxRowPadding);
 }
 
-void AddBubbleRow(
+not_null<BubbleWidget*> AddBubbleRow(
 		not_null<Ui::VerticalLayout*> parent,
 		const style::PremiumBubble &st,
 		rpl::producer<> showFinishes,
@@ -612,6 +622,7 @@ void AddBubbleRow(
 		container->resize(parentSize.width(), size.height());
 	}, bubble->lifetime());
 	bubble->show();
+	return bubble;
 }
 
 } // namespace Ui::Premium

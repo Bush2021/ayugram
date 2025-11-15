@@ -277,6 +277,10 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 				? tr::lng_gift_transfer_button(
 					tr::now,
 					Ui::Text::WithEntities)
+				: (data.info.auction() && !data.info.soldOut)
+				? tr::lng_gift_stars_auction_join(
+					tr::now,
+					Ui::Text::WithEntities)
 				: _delegate->star().append(' ' + format(data.info.stars))),
 			kMarkupTextOptions,
 			_delegate->textContext());
@@ -639,6 +643,10 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 		&& !stargift->userpic
 		&& !stargift->info.unique
 		&& stargift->info.requirePremium;
+	const auto auction = stargift
+		&& !stargift->userpic
+		&& !stargift->info.unique
+		&& stargift->info.auction();
 	const auto hidden = stargift && stargift->hidden;
 	const auto soldOut = stargift
 		&& !(stargift->pinned || stargift->pinnedSelection)
@@ -655,7 +663,7 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 	if (unique) {
 		cacheUniqueBackground(unique, width, background.height() / dpr);
 		p.drawImage(extend.left(), extend.top(), _uniqueBackgroundCache);
-	} else if (requirePremium) {
+	} else if (requirePremium || auction) {
 		auto hq = PainterHighQualityEnabler(p);
 		auto pen = st::creditsFg->p;
 		pen.setWidth(style::ConvertScaleExact(2.));
@@ -799,6 +807,8 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					? ('#' + QString::number(unique->number))
 					: data.resale
 					? tr::lng_gift_stars_resale(tr::now)
+					: (!unique && data.info.auction())
+					? tr::lng_gift_stars_auction(tr::now)
 					: soldOut
 					? tr::lng_gift_stars_sold_out(tr::now)
 					: (!data.userpic
@@ -827,7 +837,8 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					? st::boxTextFgGood->c
 					: soldOut
 					? st::attentionButtonFg->c
-					: (!data.userpic && data.info.requirePremium)
+					: (!data.userpic
+						&& (data.info.auction() || data.info.requirePremium))
 					? st::creditsFg->c
 					: st::windowActiveTextFg->c),
 				.bg2 = (onsale

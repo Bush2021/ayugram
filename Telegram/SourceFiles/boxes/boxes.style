@@ -929,6 +929,14 @@ scheduleTimeSeparator: FlatLabel(defaultFlatLabel) {
 	}
 }
 scheduleTimeSeparatorPadding: margins(2px, 0px, 2px, 0px);
+scheduleRepeatDropdownLock: IconEmoji {
+	icon: icon {{ "emoji/premium_lock", windowActiveTextFg }};
+	padding: margins(-2px, 1px, 0px, 0px);
+}
+scheduleRepeatDropdownArrow: IconEmoji {
+	icon: icon {{ "intro_country_dropdown", windowActiveTextFg }};
+	padding: margins(3px, 6px, 3px, 0px);
+}
 
 muteBoxTimeField: InputField(scheduleDateField) {
 	textMargins: margins(0px, 0px, 0px, 0px);
@@ -998,9 +1006,8 @@ contactsWithStories: PeerList(peerListBox) {
 		statusPosition: point(70px, 27px);
 
 		checkbox: RoundImageCheckbox(defaultPeerListCheckbox) {
-			selectExtendTwice: 1px;
 			imageRadius: 21px;
-			imageSmallRadius: 19px;
+			imageSmallRadius: 18px;
 			check: RoundCheckbox(defaultPeerListCheck) {
 				size: 0px;
 			}

@@ -261,11 +261,13 @@ void MenuVolumeItem::updateSliderColor(float64 value) {
 		Ui::ColorFromSerialized(0x24CD80),
 		Ui::ColorFromSerialized(0x3BBCEC),
 	} };
-	_slider->setActiveFgOverride((value < 0.25)
-		? anim::color(colors[0], colors[1], value / 0.25)
-		: (value < 0.5)
-		? anim::color(colors[1], colors[2], (value - 0.25) / 0.25)
-		: anim::color(colors[2], colors[3], (value - 0.5) / 0.5));
+	_slider->setColorOverrides({
+		.activeFg = (value < 0.25)
+			? anim::color(colors[0], colors[1], value / 0.25)
+			: (value < 0.5)
+			? anim::color(colors[1], colors[2], (value - 0.25) / 0.25)
+			: anim::color(colors[2], colors[3], (value - 0.5) / 0.5),
+	});
 }
 
 not_null<QAction*> MenuVolumeItem::action() const {

@@ -289,10 +289,16 @@ boostTitleBadgeSkip: 6px;
 boostCenteredTitle: FlatLabel(boostTitle) {
 	align: align(top);
 }
+darkEditStarsCenteredTitle: FlatLabel(boostCenteredTitle) {
+	textFg: groupCallMembersFg;
+}
 boostTextSkip: 5px;
 boostText: FlatLabel(defaultFlatLabel) {
 	minWidth: 40px;
 	align: align(top);
+}
+darkEditStarsText: FlatLabel(boostText) {
+	textFg: groupCallMembersFg;
 }
 boostTextPending: FlatLabel(boostText) {
 	textFg: windowSubTextFg;
@@ -313,6 +319,13 @@ boostBox: Box(premiumPreviewDoubledLimitsBox) {
 		height: 42px;
 		textTop: 12px;
 		style: semiboldTextStyle;
+	}
+}
+darkEditStarsClose: IconButton(boxTitleClose) {
+	icon: icon {{ "box_button_close", groupCallMemberInactiveIcon }};
+	iconOver: icon {{ "box_button_close", groupCallMemberInactiveIcon }};
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: groupCallMembersBgOver;
 	}
 }
 
@@ -391,7 +404,6 @@ boostFeatureProfileIcon: icon{{ "settings/premium/features/feature_profile_cover
 
 paidReactBox: Box(boostBox) {
 	buttonPadding: margins(22px, 22px, 22px, 22px);
-	buttonHeight: 42px;
 	button: RoundButton(defaultActiveButton) {
 		height: 42px;
 		textTop: 12px;
@@ -400,6 +412,13 @@ paidReactBox: Box(boostBox) {
 }
 paidReactBoxCheckbox: Checkbox(defaultCheckbox) {
 	width: 0px;
+}
+darkEditStarsBox: Box(paidReactBox) {
+	bg: groupCallMembersBg;
+	title: FlatLabel(boxTitle) {
+		textFg: groupCallMembersFg;
+		align: align(top);
+	}
 }
 paidReactBubbleIcon: icon{{ "settings/premium/star", premiumButtonFg }};
 paidReactBubbleTop: 5px;
@@ -416,12 +435,24 @@ paidReactSlider: MediaSlider(defaultContinuousSlider) {
 	borderFg: creditsBg3;
 	borderWidth: 2px;
 }
+darkEditStarsSlider: MediaSlider(paidReactSlider) {
+	inactiveFg: groupCallMembersBgOver;
+	inactiveFgOver: groupCallMembersBgOver;
+	inactiveFgDisabled: groupCallMembersBgOver;
+}
 paidReactTitleSkip: 23px;
 paidReactTopTitleMargin: margins(10px, 26px, 10px, 12px);
 paidReactTopMargin: margins(0px, 12px, 0px, 11px);
 paidReactTopUserpic: 42px;
 paidReactTopNameSkip: 47px;
 paidReactTopBadgeSkip: 32px;
+paidReactCrown: icon{{ "calls/filled_stream_crown-24x24", premiumButtonFg }};
+paidReactCrownTop: 7px;
+paidReactCrownSkip: 12px;
+paidReactCrownOutline: 1px;
+paidReactCrownSmall: icon{{ "calls/filled_stream_crown-20x20", premiumButtonFg }};
+paidReactCrownSmallTop: 4px;
+paidReactCrownMargin: margins(0px, 0px, 0px, 0px);
 paidReactToastLabel: FlatLabel(defaultFlatLabel) {
 	textFg: toastFg;
 	palette: defaultToastPalette;
@@ -527,4 +558,28 @@ starrefPopupMenu: PopupMenu(defaultPopupMenu) {
 		widthMin: 156px;
 		widthMax: 200px;
 	}
+}
+
+starSelectInfoPadding: margins(12px, 8px, 12px, 8px);
+starSelectInfoTitle: FlatLabel(defaultFlatLabel) {
+	minWidth: 40px;
+	textFg: windowBoldFg;
+	align: align(top);
+	style: TextStyle(boxTextStyle) {
+		font: font(18px semibold);
+	}
+}
+starSelectInfoSubtext: FlatLabel(defaultFlatLabel) {
+	minWidth: 40px;
+	textFg: windowFg;
+	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(10px);
+	}
+}
+videoStreamInfoTitle: FlatLabel(starSelectInfoTitle) {
+	textFg: groupCallMembersFg;
+}
+videoStreamInfoSubtext: FlatLabel(starSelectInfoSubtext) {
+	textFg: groupCallMembersFg;
 }

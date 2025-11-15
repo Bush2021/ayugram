@@ -22,6 +22,7 @@ public:
 
 private:
 	void paintBackground() override;
+	void paintVideoStream() override;
 	void paintTransformedVideoFrame(ContentGeometry geometry) override;
 	void paintTransformedStaticContent(
 		const QImage &image,

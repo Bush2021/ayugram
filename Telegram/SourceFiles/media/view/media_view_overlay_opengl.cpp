@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "media/stories/media_stories_view.h"
 #include "media/streaming/media_streaming_common.h"
+#include "media/view/media_view_video_stream.h"
 #include "platform/platform_overlay_widget.h"
 #include "base/platform/base_platform_info.h"
 #include "core/crash_reports.h"
@@ -271,6 +272,9 @@ void OverlayWidget::RendererGL::paint(
 	if (handleHideWorkaround(f)) {
 		return;
 	}
+	if (const auto stream = _owner->_videoStream.get()) {
+		stream->ensureBorrowedRenderer(f);
+	}
 	const auto factor = widget->devicePixelRatioF();
 	if (_factor != factor) {
 		_factor = factor;
@@ -333,6 +337,10 @@ void OverlayWidget::RendererGL::paintBackground() {
 			offset,
 			QColor(0, 0, 0));
 	}
+}
+
+void OverlayWidget::RendererGL::paintVideoStream() {
+	_owner->_videoStream->borrowedPaint(*_f);
 }
 
 void OverlayWidget::RendererGL::paintTransformedVideoFrame(

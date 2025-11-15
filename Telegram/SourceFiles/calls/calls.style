@@ -743,22 +743,6 @@ groupCallJoinAsList: PeerList(groupCallInviteMembersList) {
 		statusPosition: point(73px, 28px);
 	}
 }
-peerListJoinAsList: PeerList(peerListBox) {
-	item: PeerListItem(peerListBoxItem) {
-		height: 56px;
-		checkbox: RoundImageCheckbox(defaultPeerListCheckbox) {
-			check: RoundCheckbox(defaultRoundCheckbox) {
-				size: 0px;
-			}
-			imageRadius: 19px;
-			imageSmallRadius: 15px;
-		}
-		photoSize: 38px;
-		photoPosition: point(24px, 9px);
-		namePosition: point(73px, 9px);
-		statusPosition: point(73px, 28px);
-	}
-}
 groupCallMultiSelect: MultiSelect(defaultMultiSelect) {
 	bg: groupCallMembersBg;
 	item: MultiSelectItem(defaultMultiSelectItem) {
@@ -1609,6 +1593,7 @@ confcallLinkButton: RoundButton(defaultActiveButton) {
 confcallLinkBoxInitial: Box(defaultBox) {
 	buttonPadding: margins(12px, 11px, 24px, 96px);
 	buttonHeight: 42px;
+	buttonWide: true;
 	button: confcallLinkButton;
 	shadowIgnoreTopSkip: true;
 }
@@ -1712,15 +1697,35 @@ groupCallInviteLinkIcon: icon {{ "info/edit/group_manage_links", mediaviewTextLi
 groupCallMessagesScroll: ScrollArea(defaultScrollArea) {
 	barHidden: true;
 }
-groupCallMessagePadding: margins(8px, 2px, 8px, 2px);
+groupCallMessagePadding: margins(8px, 3px, 8px, 2px);
 groupCallMessageSkip: 8px;
 groupCallMessagePalette: TextPalette(defaultTextPalette) {
 	linkFg: radialFg;
 	monoFg: radialFg;
 	spoilerFg: radialFg;
 }
+groupCallMessageBadge: RoundButton(defaultActiveButton) {
+	textBg: attentionButtonFg;
+	textBgOver: attentionButtonFg;
+	width: -6px;
+	height: 11px;
+	radius: 5px;
+	textTop: 0px;
+	style: TextStyle(semiboldTextStyle) {
+		font: font(8px semibold);
+	}
+}
+groupCallMessageBadgeMargin: margins(0px, 4px, 0px, 0px);
 groupCallUserpic: 20px;
 groupCallUserpicPadding: margins(2px, 2px, 4px, 2px);
+groupCallPinnedPadding: margins(10px, 4px, 10px, 2px);
+groupCallPinnedMaxWidth: 96px;
+groupCallPinnedUserpic: 22px;
+
+groupCallTopReactorBadge: RoundCheckbox(defaultRoundCheckbox) {
+	width: 1px;
+	border: groupCallMembersBg;
+}
 
 confcallLinkMenu: IconButton(boxTitleClose) {
 	icon: icon {{ "title_menu_dots", boxTitleCloseFg }};

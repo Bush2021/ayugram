@@ -114,7 +114,7 @@ namespace Gift {
 
 struct Data {
 	PeerId peerId;
-	int months = 0;
+	int days = 0;
 	bool me = false;
 
 	explicit operator bool() const {
@@ -125,7 +125,7 @@ struct Data {
 [[nodiscard]] QString Serialize(const Data &gift) {
 	return QString::number(gift.peerId.value)
 		+ ':'
-		+ QString::number(gift.months)
+		+ QString::number(gift.days)
 		+ ':'
 		+ QString::number(gift.me ? 1 : 0);
 }
@@ -137,7 +137,7 @@ struct Data {
 	}
 	return {
 		.peerId = PeerId(components[0].toULongLong()),
-		.months = components[1].toInt(),
+		.days = components[1].toInt(),
 		.me = (components[2].toInt() == 1),
 	};
 }
@@ -1100,9 +1100,9 @@ void Premium::setupSubscriptionOptions(
 
 void Premium::setupSwipeBack() {
 	using namespace Ui::Controls;
-	
+
 	auto swipeBackData = lifetime().make_state<SwipeBackResult>();
-	
+
 	auto update = [=](SwipeContextData data) {
 		if (data.translation > 0) {
 			if (!swipeBackData->callback) {
@@ -1121,7 +1121,7 @@ void Premium::setupSwipeBack() {
 			(*swipeBackData) = {};
 		}
 	};
-	
+
 	auto init = [=](int, Qt::LayoutDirection direction) {
 		return (direction == Qt::RightToLeft)
 			? DefaultSwipeBackHandlerFinishData([=] {
@@ -1129,7 +1129,7 @@ void Premium::setupSwipeBack() {
 			})
 			: SwipeHandlerFinishData();
 	};
-	
+
 	SetupSwipeHandler({
 		.widget = this,
 		.scroll = v::null,
@@ -1190,11 +1190,16 @@ base::weak_qptr<Ui::RpWidget> Premium::createPinnedToTop(
 		if (gift) {
 			auto &data = _controller->session().data();
 			if (const auto peer = data.peer(gift.peerId)) {
+				const auto months = gift.days / 30;
 				return (gift.me
-					? tr::lng_premium_summary_subtitle_gift_me
-					: tr::lng_premium_summary_subtitle_gift)(
+					? (months
+						? tr::lng_premium_summary_subtitle_gift_me
+						: tr::lng_premium_summary_subtitle_gift_days_me)
+					: (months
+						? tr::lng_premium_summary_subtitle_gift
+						: tr::lng_premium_summary_subtitle_gift_days))(
 						lt_count,
-						rpl::single(float64(gift.months)),
+						rpl::single(float64(months ? months : gift.days)),
 						lt_user,
 						rpl::single(Ui::Text::Bold(peer->name())),
 						Ui::Text::RichLangValue);
@@ -1520,9 +1525,9 @@ void ShowPremium(
 void ShowGiftPremium(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
-		int months,
+		int days,
 		bool me) {
-	ShowPremium(controller, Ref::Gift::Serialize({ peer->id, months, me }));
+	ShowPremium(controller, Ref::Gift::Serialize({ peer->id, days, me }));
 }
 
 void ShowEmojiStatusPremium(

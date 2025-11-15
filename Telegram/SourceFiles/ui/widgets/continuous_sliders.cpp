@@ -271,8 +271,8 @@ void MediaSlider::addDivider(float64 atValue, const QSize &size) {
 	_dividers.push_back(Divider{ atValue, size });
 }
 
-void MediaSlider::setActiveFgOverride(std::optional<QColor> color) {
-	_activeFgOverride = color;
+void MediaSlider::setColorOverrides(ColorOverrides overrides) {
+	_overrides = std::move(overrides);
 	update();
 }
 
@@ -324,12 +324,14 @@ void MediaSlider::paintEvent(QPaintEvent *e) {
 	const auto end = from + length;
 	const auto activeFg = disabled
 		? _st.activeFgDisabled
-		: _activeFgOverride
-		? QBrush(*_activeFgOverride)
+		: _overrides.activeFg
+		? QBrush(*_overrides.activeFg)
 		: anim::brush(_st.activeFg, _st.activeFgOver, over);
 	const auto receivedTillFg = _st.receivedTillFg;
 	const auto inactiveFg = disabled
 		? _st.inactiveFgDisabled
+		: _overrides.inactiveFg
+		? QBrush(*_overrides.inactiveFg)
 		: anim::brush(_st.inactiveFg, _st.inactiveFgOver, over);
 	const auto borderFg = _st.borderFg;
 	if (mid > from) {
@@ -350,8 +352,14 @@ void MediaSlider::paintEvent(QPaintEvent *e) {
 				till - from - borderWidth);
 		p.setClipRect(fromClipRect);
 		if (borderWidth > 0) {
-			p.setPen(QPen(borderFg, borderWidth));
-			p.setBrush(horizontal ? borderFg : inactiveFg);
+			const auto borderPen = _overrides.activeBorder
+				? QPen(*_overrides.activeBorder, borderWidth)
+				: QPen(borderFg, borderWidth);
+			const auto bgBrush = _overrides.activeBg
+				? QBrush(*_overrides.activeBg)
+				: (horizontal ? borderFg : inactiveFg);
+			p.setPen(borderPen);
+			p.setBrush(bgBrush);
 		} else {
 			p.setPen(Qt::NoPen);
 			p.setBrush(horizontal ? activeFg : inactiveFg);
@@ -390,7 +398,10 @@ void MediaSlider::paintEvent(QPaintEvent *e) {
 				end - begin - borderWidth);
 		p.setClipRect(endClipRect);
 		if (borderWidth > 0) {
-			p.setPen(QPen(borderFg, borderWidth));
+			const auto endBorderPen = _overrides.inactiveBorder
+				? QPen(*_overrides.inactiveBorder, borderWidth)
+				: QPen(borderFg, borderWidth);
+			p.setPen(endBorderPen);
 		} else {
 			p.setPen(Qt::NoPen);
 		}
@@ -450,12 +461,18 @@ void MediaSlider::paintEvent(QPaintEvent *e) {
 			((1. - markerSizeRatio) * size) / 2.);
 		if (remove * 2 < size) {
 			p.setClipRect(rect());
+			const auto seekFg = _overrides.seekFg
+				? QBrush(*_overrides.seekFg)
+				: activeFg;
 			if (borderWidth > 0) {
-				p.setPen(QPen(borderFg, borderWidth));
-				p.setBrush(activeFg);
+				const auto seekBorderPen = _overrides.seekBorder
+					? QPen(*_overrides.seekBorder, borderWidth)
+					: QPen(borderFg, borderWidth);
+				p.setPen(seekBorderPen);
+				p.setBrush(seekFg);
 			} else {
 				p.setPen(Qt::NoPen);
-				p.setBrush(activeFg);
+				p.setBrush(seekFg);
 			}
 			const auto xshift = horizontal
 				? std::max(

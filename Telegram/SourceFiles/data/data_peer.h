@@ -576,9 +576,11 @@ public:
 		None,
 		HasRead,
 		HasUnread,
+		HasVideoStream,
 	};
 	[[nodiscard]] bool hasActiveStories() const;
 	[[nodiscard]] bool hasUnreadStories() const;
+	[[nodiscard]] bool hasActiveVideoStream() const;
 	void setStoriesState(StoriesState state);
 
 	[[nodiscard]] int peerGiftsCount() const;

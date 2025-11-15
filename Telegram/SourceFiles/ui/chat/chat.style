@@ -322,8 +322,6 @@ historyPinOutIcon: icon {{ "history_pin", historyOutIconFg }};
 historyPinOutSelectedIcon: icon {{ "history_pin", historyOutIconFgSelected }};
 historyPinInvertedIcon: icon {{ "history_pin", historySendingInvertedIconFg }};
 
-historySendPadding: 9px;
-historySendRight: 2px;
 historyBotMenuSkip: 8px;
 historyBotMenuMaxWidth: 160px;
 historyBotMenuButton: RoundButton(defaultActiveButton) {
@@ -874,7 +872,6 @@ sendAsButton: SendAsButton {
 	}
 	duration: 135;
 }
-
 reactionInlinePadding: margins(5px, 2px, 7px, 2px);
 reactionInlineSize: 18px;
 reactionInlineImage: 32px;
