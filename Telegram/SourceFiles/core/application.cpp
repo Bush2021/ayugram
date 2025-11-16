@@ -1192,7 +1192,7 @@ bool Application::openInternalUrl(const QString &url, QVariant context) {
 }
 
 QString Application::changelogLink() const {
-	return u"https://github.com/AyuGram/AyuGramDesktop/releases"_q;
+	return u"https://github.com/Bush2021/ayugram/releases"_q;
 }
 
 bool Application::openCustomUrl(
