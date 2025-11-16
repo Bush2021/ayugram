@@ -147,7 +147,7 @@ jobs:
           %TDESKTOP_BUILD_ARCH% ^
           -D TDESKTOP_API_ID=2040 ^
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF ^
           -D DESKTOP_APP_NO_PDB=ON ^
           %TDESKTOP_BUILD_DEFINE%
@@ -160,7 +160,6 @@ jobs:
           set OUT=%TBUILD%\%REPO_NAME%\out\Release
           mkdir artifact
           move %OUT%\AyuGram.exe artifact/
-          move %OUT%\Updater.exe artifact/
       - uses: actions/upload-artifact@v5
         name: Upload artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')

@@ -80,7 +80,7 @@ jobs:
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -D TDESKTOP_API_ID=2040 \
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 \
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
           -D CMAKE_EXE_LINKER_FLAGS="-Wl,-x"
 
           cmake --build ../out --config Release --parallel
@@ -91,7 +91,6 @@ jobs:
           cd $REPO_NAME/out/Release
           mkdir artifact
           mv AyuGram.app artifact/
-          mv Updater artifact/
 
       - uses: actions/upload-artifact@v5
         if: env.UPLOAD_ARTIFACT == 'true'
