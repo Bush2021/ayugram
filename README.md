@@ -41,8 +41,7 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 
 #### Official
 
-You can download prebuilt Windows binary from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases) or from
-the [Telegram channel](https://t.me/AyuGramReleases).
+You can download prebuilt Windows binary from [Releases tab](https://github.com/Bush2021/ayugram/releases).
 
 #### Winget
 
@@ -59,14 +58,14 @@ scoop install ayugram
 
 #### Self-built
 
-Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) if you want to
+Follow [official guide](https://github.com/Bush2021/ayugram/blob/dev/docs/building-win-x64.md) if you want to
 build by yourself.
 
 ### macOS
 
 #### Official
 
-You can download prebuilt macOS package from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases).
+You can download prebuilt macOS package from [Releases tab](https://github.com/Bush2021/ayugram/releases).
 
 #### Homebrew
 
@@ -120,7 +119,7 @@ dnf install ayugram-desktop
 
 Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
 
-Or follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
+Or follow the [official guide](https://github.com/Bush2021/ayugram/blob/dev/docs/building-linux.md).
 
 ### Remarks for Windows
 
