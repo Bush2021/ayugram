@@ -40,8 +40,7 @@
 
 #### Официальная версия
 
-Вы можете скачать готовый бинарный файл со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
-[Телеграм канала](https://t.me/AyuGramReleases).
+Вы можете скачать готовый бинарный файл со вкладки [Releases](https://github.com/Bush2021/ayugram/releases).
 
 #### Winget
 
@@ -58,14 +57,14 @@ scoop install ayugram
 
 #### Сборка вручную
 
-Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md), если
+Следуйте [официальному руководству](https://github.com/Bush2021/ayugram/blob/dev/docs/building-win-x64.md), если
 вы хотите собрать AyuGram сами.
 
 ### macOS
 
 #### Официальная версия
 
-Вы можете скачать подписанный пакет со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases).
+Вы можете скачать подписанный пакет со вкладки [Releases](https://github.com/Bush2021/ayugram/releases).
 
 #### Homebrew
 

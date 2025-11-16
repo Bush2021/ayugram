@@ -382,7 +382,7 @@ MainMenu::MainMenu(
 
 	_telegram->setMarkedText(Ui::Text::Link(
 		u"AyuGram Desktop"_q,
-		u"https://ayugram.one"_q));
+		u"https://github.com/Bush2021/ayugram"_q));
 	_telegram->setLinksTrusted();
 	_version->setMarkedText(
 		Ui::Text::Link(
