@@ -419,9 +419,7 @@ void BottomInfo::layoutDateText() {
 	const auto &settings = AyuSettings::getInstance();
 
 	const auto makeDateString = [&] {
-		return QLocale().toString(
-			_data.date.time(),
-			QLocale::ShortFormat);
+		return formatMessageTime(_data.date.time());
 	};
 
 	if (!settings.replaceBottomInfoWithIcons) {
