@@ -10,7 +10,7 @@ jobs:
 
   macos:
     name: macOS
-    runs-on: macos-15
+    runs-on: macos-15-intel # The ARM64 runners only a half RAM and storage which isn't enough for official (prepare.py) tdesktop build. See https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories.
 
     strategy:
       matrix:
