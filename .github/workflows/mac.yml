@@ -83,7 +83,8 @@ jobs:
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
           -D CMAKE_EXE_LINKER_FLAGS="-Wl,-x"
 
-          cmake --build ../out --config Release --parallel
+          # cmake --build ../out --config Release --parallel
+          xcodebuild -project ../out/Telegram.xcodeproj -scheme Telegram -configuration Release build
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
