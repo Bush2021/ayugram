@@ -688,6 +688,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	if (item->awaitingVideoProcessing()) {
 		result.flags |= Flag::EstimateDate;
 	}
+	if (item->isDeleted()) {
+		result.flags |= Flag::AyuDeleted;
+	}
 	// We don't want to pass and update it in Data for now.
 	//if (item->unread()) {
 	//	result.flags |= Flag::Unread;
