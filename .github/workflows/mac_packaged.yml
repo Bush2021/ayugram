@@ -132,7 +132,8 @@ jobs:
             echo "ARTIFACT_NAME=AyuGram" >> $GITHUB_ENV
           fi
 
-          cmake -Bbuild -GNinja . \
+          # cmake -Bbuild -GNinja . \
+          cmake -Bbuild -GXcode . \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_OSX_ARCHITECTURES=arm64 \
           -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
@@ -141,7 +142,10 @@ jobs:
           -DDESKTOP_APP_DISABLE_AUTOUPDATE=ON \
           $DEFINE
 
-          cmake --build build --parallel
+          # cmake --build build --parallel
+          # `xcodebuild` is used instead of `cmake --build` to make icons work properly.
+          # https://github.com/Bush2021/ayugram/blob/7d16d749fdaf55867754e8d8ef585d04c9382092/Telegram/CMakeLists.txt#L1996
+          xcodebuild -project build/tdesktop.xcodeproj -configuration Release -parallelizeTargets
 
           cd build
           macdeployqt AyuGram.app
