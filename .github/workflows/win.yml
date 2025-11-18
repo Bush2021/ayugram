@@ -1,9 +1,6 @@
 name: Windows
 
 on:
-  push:
-    tags:
-      - '*'
   workflow_dispatch:
 
 jobs:
