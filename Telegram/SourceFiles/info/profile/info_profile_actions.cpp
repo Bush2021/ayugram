@@ -1707,14 +1707,6 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				return false;
 			});
 		}
-
-		AddMainButton(
-			result,
-			tr::lng_info_add_as_contact(),
-			CanAddContactValue(user),
-			[=] { controller->window().show(Box(EditContactBox, controller, user)); },
-			tracker,
-			nullptr);
 	} else {
 		const auto topicRootId = _topic ? _topic->rootId() : 0;
 		const auto addToLink = topicRootId
