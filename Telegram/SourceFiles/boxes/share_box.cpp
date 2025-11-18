@@ -592,7 +592,7 @@ void ShareBox::showMenu(not_null<Ui::RpWidget*> parent) {
 		uiShow()->showBox(
 			HistoryView::PrepareScheduleBox(
 				this,
-				nullptr, // ChatHelpers::Show for effect attachment.
+				_descriptor.session,
 				sendMenuDetails(),
 				[=](Api::SendOptions options) { submit(options); },
 				action.options,

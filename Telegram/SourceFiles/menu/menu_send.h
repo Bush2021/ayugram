@@ -89,7 +89,7 @@ struct Action {
 
 FillMenuResult FillSendMenu(
 	not_null<Ui::PopupMenu*> menu,
-	std::shared_ptr<ChatHelpers::Show> showForEffect,
+	std::shared_ptr<ChatHelpers::Show> maybeShow,
 	Details details,
 	Fn<void(Action, Details)> action,
 	const style::ComposeIcons *iconsOverride = nullptr,
@@ -104,7 +104,7 @@ FillMenuResult AttachSendMenuEffect(
 
 void SetupMenuAndShortcuts(
 	not_null<Ui::RpWidget*> button,
-	std::shared_ptr<ChatHelpers::Show> show,
+	std::shared_ptr<ChatHelpers::Show> maybeShow,
 	Fn<Details()> details,
 	Fn<void(Action, Details)> action,
 	const style::PopupMenu *stOverride = nullptr,
