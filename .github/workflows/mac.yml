@@ -10,7 +10,7 @@ jobs:
 
   macos:
     name: macOS
-    runs-on: macos-15-intel # The ARM64 runners only a half RAM and storage which isn't enough for official (prepare.py) tdesktop build. See https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories.
+    runs-on: macos-26
 
     strategy:
       matrix:
@@ -42,7 +42,7 @@ jobs:
           # Disable spotlight.
           sudo mdutil -a -i off
 
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.1.app/Contents/Developer
 
       - name: ThirdParty cache.
         id: cache-third-party
