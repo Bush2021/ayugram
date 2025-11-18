@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
 #include "data/data_drafts.h"
+#include "data/data_group_call.h"
 #include "data/data_messages.h"
 #include "data/data_message_reactions.h"
 #include "data/data_saved_sublist.h"
@@ -1101,9 +1102,12 @@ void ComposeControls::initLikeButton() {
 }
 
 void ComposeControls::initEditStarsButton() {
-	if (!_features.editMessageStars) {
+	if (!editStarsButtonShown()) {
 		delete base::take(_editStars);
-		_chosenStarsCount = std::nullopt;
+		if (_chosenStarsCount) {
+			_chosenStarsCount = std::nullopt;
+			updateSendButtonType();
+		}
 		return;
 	}
 	if (_chosenStarsCount.value_or(0) < _minStarsCount.current()) {
@@ -1139,22 +1143,27 @@ void ComposeControls::editStarsFrom(int selected) {
 	}));
 }
 
-void ComposeControls::updateLikeParent() {
-	if (_like) {
-		using namespace Controls;
-		const auto hidden = _like->isHidden();
-		const auto &restriction = _writeRestriction.current();
-		if (_writeRestricted
-			&& restriction.type == WriteRestrictionType::PremiumRequired) {
-			_like->setParent(_writeRestricted.get());
+void ComposeControls::updateControlsParents() {
+	const auto toggle = [&](auto &&control, bool inRestriction) {
+		if (!control) {
+			return;
+		}
+		const auto hidden = control->isHidden();
+		if (_writeRestricted && inRestriction) {
+			control->setParent(_writeRestricted.get());
 		} else {
-			_like->setParent(_wrap.get());
+			control->setParent(_wrap.get());
 		}
 		if (!hidden) {
-			_like->show();
+			control->show();
 			updateControlsGeometry(_wrap->size());
 		}
-	}
+	};
+	using Type = Controls::WriteRestrictionType;
+	const auto &restriction = _writeRestriction.current();
+	toggle(_like, restriction.type == Type::PremiumRequired);
+	toggle(_commentsShown, restriction.type != Type::None);
+	toggle(_starsReaction, restriction.type != Type::None);
 }
 
 void ComposeControls::updateFeatures(ChatHelpers::ComposeFeatures features) {
@@ -1167,7 +1176,7 @@ void ComposeControls::updateFeatures(ChatHelpers::ComposeFeatures features) {
 		} else {
 			_like = Ui::CreateChild<Ui::IconButton>(_wrap.get(), _st.like);
 			initLikeButton();
-			updateLikeParent();
+			updateControlsParents();
 			if (updateLikeShown()) {
 				updateControlsVisibility();
 			}
@@ -1296,19 +1305,26 @@ void ComposeControls::setToggleCommentsButton(
 		_commentsShown->setClickedCallback([=] {
 			_commentsShownToggles.fire({});
 		});
+		updateControlsParents();
+		_commentsShownHidden.value(
+		) | rpl::start_with_next([=](bool hidden) {
+			if (_commentsShown->isHidden() != hidden) {
+				if (hidden) {
+					_commentsShown->hide();
+				} else {
+					_commentsShown->show();
+					updateControlsGeometry(_wrap->size());
+				}
+			}
+		}, _commentsShown->lifetime());
 		std::move(
 			state
 		) | rpl::start_with_next([=](ToggleCommentsState value) {
 			if (value == ToggleCommentsState::Empty) {
-				if (!_commentsShown->isHidden()) {
-					_commentsShown->hide();
-					updateControlsGeometry(_wrap->size());
-				}
+				_commentsShownHidden = true;
 				return;
-			} else if (_commentsShown->isHidden()) {
-				_commentsShown->show();
-				updateControlsGeometry(_wrap->size());
 			}
+			_commentsShownHidden = false;
 			const auto icon = (value == ToggleCommentsState::Shown)
 				? &_st.commentsShown
 				: nullptr;
@@ -1339,6 +1355,7 @@ void ComposeControls::setStarsReactionCounter(
 			_st.attach,
 			_st.starsReactionCounter,
 			std::move(count));
+		updateControlsParents();
 		updateControlsVisibility();
 
 		_starsReaction->widthValue(
@@ -1919,7 +1936,7 @@ bool ComposeControls::showRecordButton() const {
 }
 
 bool ComposeControls::showEditStarsButton() const {
-	return _features.editMessageStars
+	return editStarsButtonShown()
 		&& !HasSendText(_field)
 		&& !readyToForward()
 		&& !isEditingMessage()
@@ -1936,13 +1953,17 @@ void ComposeControls::clearListenState() {
 }
 
 void ComposeControls::clearChosenStarsForMessage() {
-	const auto empty = _features.editMessageStars
+	const auto empty = editStarsButtonShown()
 		? _minStarsCount.current()
 		: std::optional<int>();
 	if (_chosenStarsCount != empty) {
 		_chosenStarsCount = empty;
 		updateSendButtonType();
 	}
+}
+
+bool ComposeControls::editStarsButtonShown() const {
+	return _features.editMessageStars && !_videoStreamAdmin.current();
 }
 
 int ComposeControls::chosenStarsForMessage() const {
@@ -2841,7 +2862,7 @@ void ComposeControls::initWriteRestriction() {
 	}, _writeRestricted->lifetime());
 	_writeRestricted->resize(
 		_writeRestricted->width(),
-		st::historyUnblock.height);
+		_st.send.inner.height);
 	const auto background = [=](QPainter &p, QRect clip) {
 		paintBackground(p, _writeRestricted->rect(), clip);
 	};
@@ -2973,7 +2994,7 @@ void ComposeControls::updateWrappingVisibility() {
 		_writeRestricted->setVisible(!hidden && restricted);
 	}
 	_wrap->setVisible(!hidden && !restricted);
-	updateLikeParent();
+	updateControlsParents();
 	if (!hidden && !restricted) {
 		updateControlsGeometry(_wrap->size());
 		_wrap->raise();
@@ -3198,10 +3219,13 @@ void ComposeControls::updateControlsVisibility() {
 	if (_scheduled) {
 		_scheduled->setVisible(!isEditingMessage());
 	}
-	SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField);
+	if (_commentsShown) {
+		_commentsShown->setVisible(!_commentsShownHidden.current());
+	}
 	if (_starsReaction) {
 		_starsReaction->show();
 	}
+	SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField);
 }
 
 bool ComposeControls::updateLikeShown() {
@@ -3278,6 +3302,7 @@ bool ComposeControls::updateSendAsButton(
 		if (!_sendAs) {
 			return false;
 		}
+		_videoStreamAdmin = false;
 		_sendAs = nullptr;
 		return true;
 	} else if (_sendAs) {
@@ -3287,8 +3312,18 @@ bool ComposeControls::updateSendAsButton(
 	_sendAs = std::make_unique<Ui::SendAsButton>(_wrap.get(), st.button);
 	if (videoStream) {
 		Ui::SetupSendAsButton(_sendAs.get(), st, videoStream, _show);
+		_videoStreamAdmin = videoStream->sendAsValue(
+		) | rpl::map([=](not_null<PeerData*> peer) {
+			return (videoStream->peer() == peer)
+				|| (videoStream->creator() && peer->isSelf());
+		}) | rpl::distinct_until_changed(
+		) | rpl::after_next([=](bool admin) {
+			initEditStarsButton();
+			updateControlsGeometry(_wrap->size());
+		});
 	} else {
 		Ui::SetupSendAsButton(_sendAs.get(), st, rpl::single(peer), _show);
+		_videoStreamAdmin = false;
 	}
 	return true;
 }
@@ -3326,15 +3361,13 @@ void ComposeControls::paintBackground(QPainter &p, QRect full, QRect clip) {
 		p.setBrush(_st.bg);
 		p.setPen(Qt::NoPen);
 		const auto r = _st.radius;
-		if (_commentsShown
-			&& !_commentsShown->isHidden()
-			&& !_wrap->isHidden()) {
+		if (_commentsShown && !_commentsShown->isHidden()) {
 			p.drawRoundedRect(_commentsShown->geometry(), r, r);
 			full.setLeft(full.left()
 				+ _commentsShown->width()
 				+ _st.commentsSkip);
 		}
-		if (_starsReaction && !_wrap->isHidden()) {
+		if (_starsReaction) {
 			full.setWidth(full.width()
 				- _starsReaction->width()
 				- _st.starsSkip);
