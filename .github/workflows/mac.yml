@@ -84,6 +84,8 @@ jobs:
           -D CMAKE_EXE_LINKER_FLAGS="-Wl,-x"
 
           # cmake --build ../out --config Release --parallel
+          # `xcodebuild` is used instead of `cmake --build` to make icons work properly.
+          # https://github.com/Bush2021/ayugram/blob/7d16d749fdaf55867754e8d8ef585d04c9382092/Telegram/CMakeLists.txt#L1996
           xcodebuild -project ../out/Telegram.xcodeproj -scheme Telegram -configuration Release build
 
       - name: Move artifact.
