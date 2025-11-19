@@ -23,6 +23,9 @@ public:
         : count_(count) {
     }
 
+    TimedCountDownLatch(const TimedCountDownLatch &) = delete;
+    TimedCountDownLatch &operator=(const TimedCountDownLatch &) = delete;
+
     void countDown() {
         std::unique_lock lock(mutex_);
         if (count_ > 0) {

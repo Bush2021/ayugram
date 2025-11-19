@@ -321,8 +321,14 @@ void AddOpenChannelAction(PeerData *peerData,
 void AddShadowBanAction(PeerData *peerData,
 						const Window::PeerMenuCallback &addCallback) {
 	const auto &settings = AyuSettings::getInstance();
-	if (!peerData || !peerData->isUser() || !settings.filtersEnabled) {
+	if (!peerData || !(peerData->isUser() || peerData->isBroadcast()) || !settings.filtersEnabled) {
 		return;
+	}
+
+	if (const auto user = peerData->asUser()) {
+		if (user->isSelf()) {
+			return;
+		}
 	}
 
 	const auto realId = getDialogIdFromPeer(peerData);

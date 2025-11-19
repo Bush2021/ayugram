@@ -644,7 +644,13 @@ void Cover::setupSavedMusic() {
 						AyuSettings::set_adaptiveCoverColor(!settings.adaptiveCoverColor);
 						AyuSettings::save();
 
-						_musicButton->entity()->updateData(DocumentMusicButtonData(document, item));
+						const auto mediaRefreshed = item ? item->media() : nullptr;
+						const auto documentRefreshed = mediaRefreshed ? mediaRefreshed->document() : nullptr;
+
+						if (!documentRefreshed) {
+							return;
+						}
+						_musicButton->entity()->updateData(DocumentMusicButtonData(documentRefreshed, item));
 					},
 					&st::menuIconPalette);
 

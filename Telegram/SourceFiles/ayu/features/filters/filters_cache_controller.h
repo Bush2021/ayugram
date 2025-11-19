@@ -9,23 +9,27 @@
 #include "filters_controller.h"
 #include "ayu/data/entities.h"
 
+namespace Data {
+struct Group;
+}
+
 using namespace FiltersController;
 
 namespace FiltersCacheController {
 
-
 void rebuildCache();
 
 std::unordered_map<long long, std::unordered_set<HashablePattern, PatternHasher>> buildExclusions(
-	const std::vector<RegexFilterGlobalExclusion>& exclusions,
-	const std::vector<HashablePattern>& shared);
+	const std::vector<RegexFilterGlobalExclusion> &exclusions,
+	const std::vector<HashablePattern> &shared);
 
-std::optional<bool> isFiltered(not_null<HistoryItem *> item);
-void putFiltered(not_null<HistoryItem *> item, bool res);
+std::optional<bool> isFiltered(not_null<HistoryItem*> item);
+void putFiltered(not_null<HistoryItem*> item, const Data::Group *group, bool res);
+
+void invalidate(not_null<HistoryItem*> item);
 
 std::optional<std::vector<ReversiblePattern>> getPatternsByDialogId(uint64 dialogId);
 std::optional<const std::unordered_set<HashablePattern, PatternHasher>> getExclusionsByDialogId(long long dialogId);
 const std::vector<HashablePattern> &getSharedPatterns();
 
 }
-

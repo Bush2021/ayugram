@@ -16,8 +16,9 @@ namespace FiltersController {
 
 bool isEnabled(PeerData *peer);
 bool isBlocked(not_null<HistoryItem*> item);
-bool filteredWithoutCaching(not_null<HistoryItem*> historyItem);
 bool filtered(not_null<HistoryItem*> historyItem);
+
+void invalidate(not_null<HistoryItem*> item);
 
 struct ReversiblePattern
 {

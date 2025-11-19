@@ -24,6 +24,7 @@
 #include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
+#include "history/history.h"
 #include "history/history_item.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
@@ -146,7 +147,7 @@ bool FilterUtils::importFromJson(const QByteArray &json) {
 
 	if (changes == ApplyChanges{}) {
 		Ui::Toast::Show(tr::ayu_FiltersToastFailNoChanges(tr::now));
-        LOG(("FilterUtils: received empty changes"));
+		LOG(("FilterUtils: received empty changes"));
 		return false;
 	}
 
@@ -369,7 +370,7 @@ int typeOfMessage(const HistoryItem *item) {
 	return 0; // TYPE_TEXT
 }
 
-QString FilterUtils::extractAllText(not_null<HistoryItem*> item) {
+QString extractSingle(const not_null<HistoryItem*> item) {
 	QString text(item->originalText().text);
 	if (!item->originalText().entities.empty()) {
 		for (const auto &entity : item->originalText().entities) {
@@ -378,7 +379,22 @@ QString FilterUtils::extractAllText(not_null<HistoryItem*> item) {
 				text.append(entity.data());
 			}
 		}
-		text.append("\n");
+	}
+
+	return text;
+}
+
+QString FilterUtils::extractAllText(const not_null<HistoryItem*> item, const Data::Group *group) {
+	auto text = QString();
+	if (group) {
+		for (const auto &groupItem : group->items) {
+			const auto res = extractSingle(groupItem).trimmed();
+			if (!res.isEmpty()) {
+				text.append(res).append("\n");
+			}
+		}
+	} else {
+		text = extractSingle(item).trimmed();
 	}
 
 	if (const auto markup = item->Get<HistoryMessageReplyMarkup>()) {

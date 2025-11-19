@@ -26,25 +26,23 @@ struct ApplyChanges
 
 	std::map<long long, QString> peersToBeResolved;
 
-	bool operator==(const ApplyChanges&) const = default;
+	bool operator==(const ApplyChanges &) const = default;
 };
 
-
-class FilterUtils final: public QObject
+class FilterUtils final : public QObject
 {
-
-
 	Q_OBJECT
+
 public:
 	static FilterUtils &getInstance() {
 		static FilterUtils instance;
 		return instance;
 	}
+
 	FilterUtils(const FilterUtils &) = delete;
 	FilterUtils &operator=(const FilterUtils &) = delete;
 	FilterUtils(FilterUtils &&) = delete;
 	FilterUtils &operator=(FilterUtils &&) = delete;
-
 
 	void importFromLink(const QString &link);
 	bool importFromJson(const QByteArray &json);
@@ -52,11 +50,11 @@ public:
 	void publishFilters();
 	static QString exportFilters();
 
-	static QString extractAllText(not_null<HistoryItem *> item);
-private:
-	FilterUtils():
-    _manager(std::make_unique<QNetworkAccessManager>()) {
+	static QString extractAllText(not_null<HistoryItem*> item, const Data::Group *group);
 
+private:
+	FilterUtils()
+		: _manager(std::make_unique<QNetworkAccessManager>()) {
 	}
 
 	bool handleResponse(const QByteArray &response);
@@ -65,9 +63,8 @@ private:
 	ApplyChanges prepareChanges(const QJsonObject &response);
 	void applyChanges(const ApplyChanges &changes);
 
-	QTimer* _timer = nullptr;
+	QTimer *_timer = nullptr;
 
 	std::unique_ptr<QNetworkAccessManager> _manager = nullptr;
 	QNetworkReply *_reply = nullptr;
 };
-

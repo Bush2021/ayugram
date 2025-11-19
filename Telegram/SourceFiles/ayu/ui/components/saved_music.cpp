@@ -131,7 +131,7 @@ Cover GetCurrentCover(
 	};
 }
 
-QRgb ExtractColorFromCover(const QPixmap &cover) {
+std::optional<QRgb> ExtractColorFromCover(const QPixmap &cover) {
 	const auto palette = Ayu::Ui::Palette::from(cover).generate();
 
 	const auto *swatch = palette.darkVibrantSwatch();
@@ -146,7 +146,7 @@ QRgb ExtractColorFromCover(const QPixmap &cover) {
 	}
 
 	if (!swatch) {
-		return GetNoCoverBgColor().rgb();
+		return std::nullopt;
 	}
 
 	const auto extractedColor = swatch->rgb();
@@ -235,7 +235,7 @@ void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 
 void AyuMusicButton::makeCover() {
 	const auto weak = base::make_weak(this);
-	crl::async([=, mediaView = _mediaView]
+	crl::async([=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText]()
 	{
 		const auto &settings = AyuSettings::getInstance();
 		const auto &font = st::infoMusicButtonTitle.style.font;
@@ -245,7 +245,7 @@ void AyuMusicButton::makeCover() {
 		auto cover = GetCurrentCover(mediaView, QSize(size, size));
 
 		if (cover.noCover) {
-			const auto pix = Ayu::Ui::Itunes::FetchCover(_performerText, _titleText, size);
+			const auto pix = Ayu::Ui::Itunes::FetchCover(performerText, titleText, size);
 			if (!pix.isNull()) {
 				const auto img = Image(pix.toImage());
 				const auto args = Images::PrepareArgs{
@@ -262,32 +262,42 @@ void AyuMusicButton::makeCover() {
 		if (cover.noCover || !settings.adaptiveCoverColor) {
 			bgColor = GetNoCoverBgColor();
 		} else {
-			bgColor = QColor::fromRgb(ExtractColorFromCover(cover.pixToBg));
+			if (const auto extractedColor = ExtractColorFromCover(cover.pixToBg)) {
+				bgColor = QColor::fromRgb(*extractedColor);
+			} else { // example: fully black image
+				cover.noCover = true;
+				bgColor = GetNoCoverBgColor();
+			}
 		}
 
-		const auto strong = weak.get();
-		if (!strong) {
-			return;
-		}
-
-		strong->_currentCover = {
-			.pix = cover.pixToDraw,
-			.bg = bgColor,
-			.noCover = cover.noCover
-		};
-
-		crl::on_main([=]
-		{
-			const auto strong2 = weak.get();
-			if (!strong2) {
+		crl::on_main([weak, cover = std::move(cover), bgColor]() mutable {
+			const auto strong = weak.get();
+			if (!strong) {
 				return;
 			}
 
-			strong2->repaint();
-			strong2->_title->repaint();
-			strong2->_performer->repaint();
+			strong->_currentCover = {
+				.pix = cover.pixToDraw,
+				.bg = bgColor,
+				.noCover = cover.noCover,
+			};
 
-			strong2->_onReady.fire({});
+			const auto &settings2 = AyuSettings::getInstance();
+			const auto &cover2 = *strong->_currentCover;
+
+			if (!cover2.noCover && settings2.adaptiveCoverColor && !cover2.pix.isNull()) {
+				strong->_title->setTextColorOverride(Qt::white);
+				strong->_performer->setTextColorOverride(performerColor);
+			} else {
+				strong->_title->setTextColorOverride(std::nullopt);
+				strong->_performer->setTextColorOverride(std::nullopt);
+			}
+
+			strong->repaint();
+			strong->_title->repaint();
+			strong->_performer->repaint();
+
+			strong->_onReady.fire({});
 		});
 	});
 }
@@ -316,20 +326,9 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 	}
 
 	if (!cover.pix.isNull()) {
-		if (!cover.noCover && settings.adaptiveCoverColor) {
-			_title->setTextColorOverride(Qt::white);
-			_performer->setTextColorOverride(performerColor);
-		} else {
-			_title->setTextColorOverride(std::nullopt);
-			_performer->setTextColorOverride(std::nullopt);
-		}
-
 		auto hq = PainterHighQualityEnabler(p);
 		const auto coverRect = QRect(st::infoMusicButtonPadding.left(), st::infoMusicButtonPadding.top(), size, size);
 		p.drawPixmap(coverRect, cover.pix);
-	} else {
-		_title->setTextColorOverride(std::nullopt);
-		_performer->setTextColorOverride(std::nullopt);
 	}
 }
 

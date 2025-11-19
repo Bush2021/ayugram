@@ -115,32 +115,29 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 	if (path.isEmpty()) {
 		return;
 	}
-	crl::on_main([&]
+	crl::on_main([=]
 	{
 		data->save(Data::FileOriginMessage(item->fullId()), path);
 
-
-		session->downloaderTaskFinished() | rpl::filter([&]
+		session->downloaderTaskFinished() | rpl::filter([=]
 		{
-			return data->status == FileDownloadFailed || fileSize(item) == data->size;
-		}) | rpl::start_with_next([&]() mutable
+			return !data || data->status == FileDownloadFailed || fileSize(item) == data->size;
+		}) | rpl::start_with_next([=]() mutable
 								  {
 									  latch->countDown();
 								  },
 								  *lifetime);
 	});
 
-
 	constexpr auto overall = std::chrono::minutes(15);
 	const auto startTime = std::chrono::steady_clock::now();
-
 
 	while (std::chrono::steady_clock::now() - startTime < overall) {
 		if (latch->await(std::chrono::minutes(5))) {
 			break;
 		}
 
-		if (!data->loading()) {
+		if (!data || !data->loading()) {
 			break;
 		}
 	}
@@ -154,11 +151,11 @@ void forwardMessagesSync(not_null<Main::Session*> session,
 						 Data::ForwardOptions options) {
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
 
-	crl::on_main([=, &latch]
+	crl::on_main([=]
 	{
 		session->api().forwardMessages(Data::ResolvedForwardDraft(items, options),
 									   action,
-									   [&]
+									   [=]
 									   {
 										   latch->countDown();
 									   });
@@ -211,12 +208,12 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 	if (finalCheck()) {
 		saveToFiles();
 	} else {
-		crl::on_main([&]
+		crl::on_main([=]
 		{
-			session->downloaderTaskFinished() | rpl::filter([&]
+			session->downloaderTaskFinished() | rpl::filter([=]
 			{
 				return finalCheck();
-			}) | rpl::start_with_next([&]() mutable
+			}) | rpl::start_with_next([=]() mutable
 									  {
 										  saveToFiles();
 										  latch->countDown();
@@ -246,13 +243,13 @@ void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &act
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
 	auto lifetime = std::make_shared<rpl::lifetime>();
 
-	crl::on_main([&]
+	crl::on_main([=]
 	{
 		session->data().itemIdChanged()
-			| rpl::filter([&](const Data::Session::IdChange &update)
+			| rpl::filter([=](const Data::Session::IdChange &update)
 			{
 				return action.history->peer->id == update.newId.peer;
-			}) | rpl::start_with_next([&]
+			}) | rpl::start_with_next([=]
 									  {
 										  latch->countDown();
 									  },

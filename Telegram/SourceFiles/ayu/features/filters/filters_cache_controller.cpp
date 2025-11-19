@@ -10,20 +10,22 @@
 
 #include "filters_controller.h"
 #include "ayu/data/ayu_database.h"
+#include "data/data_groups.h"
 #include "data/data_peer.h"
+#include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
 
 static std::mutex mutex;
 
 namespace FiltersCacheController {
+
 std::optional<std::vector<HashablePattern>> sharedPatterns;
 std::optional<std::unordered_map<long long, std::vector<ReversiblePattern>>> patternsByDialogId;
 
 std::optional<std::unordered_map<long long, std::unordered_set<HashablePattern, PatternHasher>>> exclusionsByDialogId;
 
-std::unordered_map<long long, std::unordered_map<std::optional<int>,std::optional<bool>>> filteredMessages;
-
+std::unordered_map<long long, std::unordered_map<std::optional<int>, std::optional<bool>>> filteredMessages;
 
 void rebuildCache() {
 	std::lock_guard lock(mutex);
@@ -40,9 +42,7 @@ void rebuildCache() {
 		}
 
 		int flags = UREGEX_MULTILINE;
-		if (filter.caseInsensitive)
-			flags |= UREGEX_CASE_INSENSITIVE;
-
+		if (filter.caseInsensitive) flags |= UREGEX_CASE_INSENSITIVE;
 
 		auto status = U_ZERO_ERROR;
 		auto pattern = RegexPattern::compile(UnicodeString::fromUTF8(filter.text), flags, status);
@@ -69,16 +69,13 @@ void rebuildCache() {
 std::unordered_map<long long, std::unordered_set<HashablePattern, PatternHasher>> buildExclusions(
 	const std::vector<RegexFilterGlobalExclusion> &exclusions,
 	const std::vector<HashablePattern> &shared) {
-
 	std::unordered_map<long long, std::unordered_set<HashablePattern, PatternHasher>> exclusionsByDialogId;
 
 	for (const auto &exclusion : exclusions) {
-
 		auto &exclusionSet = exclusionsByDialogId[exclusion.dialogId];
 
 		for (const auto &filter : shared) {
 			if (filter.id == exclusion.filterId) {
-
 				exclusionSet.insert(filter);
 				break;
 			}
@@ -87,7 +84,7 @@ std::unordered_map<long long, std::unordered_set<HashablePattern, PatternHasher>
 	return exclusionsByDialogId;
 }
 
-std::optional<bool> isFiltered(not_null<HistoryItem *> item) {
+std::optional<bool> isFiltered(not_null<HistoryItem*> item) {
 	std::lock_guard lock(mutex);
 	auto dialogIt = filteredMessages.find(item->history()->peer->id.value);
 
@@ -103,9 +100,40 @@ std::optional<bool> isFiltered(not_null<HistoryItem *> item) {
 	return it->second;
 }
 
-void putFiltered(not_null<HistoryItem *> item, bool res) {
+void putFiltered(not_null<HistoryItem*> item, const Data::Group *group, bool res) {
 	std::lock_guard lock(mutex);
 	filteredMessages[item->history()->peer->id.value][item->id.bare] = res;
+	if (group && res) {
+		for (const auto& groupItem : group->items) {
+			filteredMessages[item->history()->peer->id.value][groupItem->id.bare] = true;
+		}
+	}
+}
+
+void invalidateSingle(not_null<HistoryItem*> item) {
+	const auto dialogIt = filteredMessages.find(item->history()->peer->id.value);
+
+	if (dialogIt == filteredMessages.end()) {
+		return;
+	}
+
+	const auto it = dialogIt->second.find(item->id.bare);
+	if (it == dialogIt->second.end()) {
+		return;
+	}
+
+	dialogIt->second.erase(it);
+}
+
+void invalidate(not_null<HistoryItem*> item) {
+	std::lock_guard lock(mutex);
+	if (const auto group = item->history()->owner().groups().find(item)) {
+		for (const auto& groupItem : group->items) {
+			invalidateSingle(groupItem);
+		}
+	} else {
+		invalidateSingle(item);
+	}
 }
 
 std::optional<std::vector<ReversiblePattern>> getPatternsByDialogId(uint64 dialogId) {

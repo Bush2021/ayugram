@@ -85,12 +85,14 @@ TranslateManager::Builder TranslateManager::request(
 
 mtpRequestId TranslateManager::performTranslation(Builder &req) {
 	const auto id = _nextId++;
-	_pending.emplace(id,
-					 Pending{
-						 .done = std::move(req._done),
-						 .fail = std::move(req._fail),
-						 .cancel = nullptr,
-					 });
+	_pending.emplace(
+		id,
+		Pending{
+			.done = std::move(req._done),
+			.fail = std::move(req._fail),
+			.cancel = nullptr,
+		}
+	);
 	req._id = id;
 
 	std::vector<TextWithEntities> texts;
@@ -171,7 +173,7 @@ mtpRequestId TranslateManager::performTranslation(Builder &req) {
 
 	CallbackSuccess onSuccess = [this, id, resultTexts = std::move(resultTexts), cacheKeys = std::move(cacheKeys),
 			uncachedIndices = std::move(uncachedIndices), texts = std::move(texts),
-			fromLang, toLang, &req](const std::vector<TextWithEntities> &translated) mutable
+			fromLang, toLang, session = req.session()](const std::vector<TextWithEntities> &translated) mutable
 	{
 		for (size_t i = 0; i < translated.size() && i < uncachedIndices.size(); ++i) {
 			const auto index = uncachedIndices[i];
@@ -179,13 +181,15 @@ mtpRequestId TranslateManager::performTranslation(Builder &req) {
 
 			const auto &key = cacheKeys[index];
 			if (!key.isEmpty()) {
-				insertToCache(key,
-							  CacheEntry{
-								  .originalText = texts[index],
-								  .translatedText = translated[i],
-								  .fromLang = fromLang,
-								  .toLang = toLang
-							  });
+				insertToCache(
+					key,
+					CacheEntry{
+						.originalText = texts[index],
+						.translatedText = translated[i],
+						.fromLang = fromLang,
+						.toLang = toLang
+					}
+				);
 			}
 		}
 
@@ -193,7 +197,7 @@ mtpRequestId TranslateManager::performTranslation(Builder &req) {
 		for (const auto &translatedText : resultTexts) {
 			vec.push_back(MTP_textWithEntities(
 				MTP_string(translatedText.text),
-				Api::EntitiesToMTP(req.session(), translatedText.entities)));
+				Api::EntitiesToMTP(session, translatedText.entities)));
 		}
 		const auto result = MTP_messages_translateResult(MTP_vector<MTPTextWithEntities>(vec));
 		triggerDone(id, result);

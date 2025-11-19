@@ -433,6 +433,9 @@ LastCrashedWindow::LastCrashedWindow(
 	_yourReportName.setTextInteractionFlags(Qt::TextSelectableByMouse);
 
 	_includeUsername.setText(u"Include username @%1 as your contact info"_q.arg(_reportUsername));
+	_includeUsername.setCheckState(Qt::Unchecked);
+	_includeUsername.setDisabled(true);
+	_includeUsername.setVisible(false);
 
 	_report.setPlainText(_reportTextNoUsername);
 
