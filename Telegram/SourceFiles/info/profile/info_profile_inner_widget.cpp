@@ -214,7 +214,7 @@ void InnerWidget::setupSavedMusic(not_null<Ui::VerticalLayout*> container) {
 	Info::Saved::SetupSavedMusic(
 		container,
 		_controller,
-		_peer,
+		_sublist ? _sublist->sublistPeer() : _peer,
 		_topBarColor.value());
 }
 
@@ -249,6 +249,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 
 	const auto &settings = AyuSettings::getInstance();
 
+	const auto peer = _sublist ? _sublist->sublistPeer() : _peer;
 	auto content = object_ptr<Ui::VerticalLayout>(parent);
 	auto &tracker = sharedTracker;
 	auto addMediaButton = [&](
@@ -257,7 +258,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 		auto result = Media::AddButton(
 			content,
 			_controller,
-			_peer,
+			peer,
 			_topic ? _topic->rootId() : MsgId(),
 			_sublist ? _sublist->sublistPeer()->id : PeerId(),
 			_migrated,
@@ -342,9 +343,9 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	};
 
 	if (!_topic) {
-		addStoriesButton(_peer, st::infoIconMediaStories);
-		addPeerGiftsButton(_peer, st::infoIconMediaGifts);
-		addSavedSublistButton(_peer, st::infoIconMediaSaved);
+		addStoriesButton(peer, st::infoIconMediaStories);
+		addPeerGiftsButton(peer, st::infoIconMediaGifts);
+		addSavedSublistButton(peer, st::infoIconMediaSaved);
 	}
 	addMediaButton(MediaType::Photo, st::infoIconMediaPhoto);
 	addMediaButton(MediaType::Video, st::infoIconMediaVideo);
@@ -353,12 +354,12 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	addMediaButton(MediaType::Link, st::infoIconMediaLink);
 	addMediaButton(MediaType::RoundVoiceFile, st::infoIconMediaVoice);
 	addMediaButton(MediaType::GIF, st::infoIconMediaGif);
-	if (const auto bot = _peer->asBot()) {
+	if (const auto bot = peer->asBot()) {
 		addCommonGroupsButton(bot, st::infoIconMediaGroup);
 		addSimilarPeersButton(bot, st::infoIconMediaBot);
-	} else if (const auto channel = _peer->asBroadcast()) {
+	} else if (const auto channel = peer->asBroadcast()) {
 		addSimilarPeersButton(channel, st::infoIconMediaChannel);
-	} else if (const auto user = _peer->asUser()) {
+	} else if (const auto user = peer->asUser()) {
 		addCommonGroupsButton(user, st::infoIconMediaGroup);
 	}
 
@@ -449,6 +450,7 @@ base::weak_qptr<Ui::RpWidget> InnerWidget::createPinnedToTop(
 			.controller = _controller->parentController(),
 			.key = _controller->key(),
 			.wrap = _controller->wrapValue(),
+			.peer = _sublist ? _sublist->sublistPeer().get() : nullptr,
 			.backToggles = _backToggles.value(),
 			.showFinished = _showFinished.events(),
 		});

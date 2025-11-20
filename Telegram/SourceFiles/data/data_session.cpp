@@ -1892,6 +1892,14 @@ rpl::producer<GiftsUpdate> Session::giftsUpdates() const {
 	return _giftsUpdates.events();
 }
 
+void Session::notifyGiftAuctionGot(GiftAuctionGot &&update) {
+	_giftAuctionGots.fire(std::move(update));
+}
+
+rpl::producer<GiftAuctionGot> Session::giftAuctionGots() const {
+	return _giftAuctionGots.events();
+}
+
 HistoryItem *Session::changeMessageId(PeerId peerId, MsgId wasId, MsgId nowId) {
 	const auto list = messagesListForInsert(peerId);
 	const auto i = list->find(wasId);

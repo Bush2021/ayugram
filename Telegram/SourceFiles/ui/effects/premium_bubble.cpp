@@ -56,7 +56,6 @@ Bubble::Bubble(
 , _icon(icon)
 , _numberAnimation(_st.font, _updateCallback)
 , _height(_st.height + _st.tailSize.height())
-, _textTop((_height - _st.tailSize.height() - _st.font->height) / 2)
 , _hasTail(hasTail) {
 	_numberAnimation.setDisabledMonospace(true);
 	_numberAnimation.setWidthChangedCallback([=] {
@@ -83,7 +82,7 @@ int Bubble::height() const {
 }
 
 int Bubble::bubbleRadius() const {
-	return (_height - _st.tailSize.height()) / 2 - kBubbleRadiusSubtractor;
+	return (_st.height / 2) - kBubbleRadiusSubtractor;
 }
 
 int Bubble::filledWidth() const {
@@ -93,7 +92,7 @@ int Bubble::filledWidth() const {
 		+ _st.padding.right();
 }
 
-int Bubble::width() const {
+int Bubble::topTextWidth() const {
 	return filledWidth()
 		+ _numberAnimation.countWidth()
 		+ (_additional.isEmpty()
@@ -101,21 +100,16 @@ int Bubble::width() const {
 			: (_st.additionalSkip + _additional.maxWidth()));
 }
 
-int Bubble::countMaxWidth(int maxPossibleCounter) const {
-	auto numbers = Ui::NumbersAnimation(_st.font, [] {});
-	numbers.setDisabledMonospace(true);
-	numbers.setDuration(0);
-	const auto textsZero = _textFactory(0);
-	const auto textsMax = _textFactory(maxPossibleCounter);
-	numbers.setText(textsZero.counter, 0);
-	numbers.setText(textsMax.counter, maxPossibleCounter);
-	numbers.finishAnimating();
-	return filledWidth()
-		+ numbers.maxWidth()
-		+ (_additional.isEmpty()
-			? 0
-			: (_st.additionalSkip
-				+ _st.additionalStyle.font->width(textsMax.additional)));
+int Bubble::bottomTextWidth() const {
+	return _subtext.isEmpty()
+		? 0
+		: (_st.subtextPadding.left()
+			+ _subtext.maxWidth()
+			+ _st.subtextPadding.right());
+}
+
+int Bubble::width() const {
+	return std::max(topTextWidth(), bottomTextWidth());
 }
 
 int Bubble::countTargetWidth(int targetCounter) const {
@@ -125,12 +119,13 @@ int Bubble::countTargetWidth(int targetCounter) const {
 	const auto texts = _textFactory(targetCounter);
 	numbers.setText(texts.counter, targetCounter);
 	numbers.finishAnimating();
-	return filledWidth()
+	const auto top = filledWidth()
 		+ numbers.maxWidth()
 		+ (_additional.isEmpty()
 			? 0
 			: (_st.additionalSkip
 				+ _st.additionalStyle.font->width(texts.additional)));
+	return std::max(top, bottomTextWidth());
 }
 
 void Bubble::setCounter(int value) {
@@ -210,6 +205,18 @@ QPainterPath Bubble::bubblePath(const QRect &r) const {
 	return result;
 }
 
+void Bubble::setSubtext(QString subtext) {
+	if (_subtext.toString() == subtext) {
+		return;
+	} else if (subtext.isEmpty()) {
+		_subtext = {};
+	} else {
+		_subtext.setText(_st.subtextStyle, subtext);
+	}
+	_widthChanges.fire({});
+	_updateCallback();
+}
+
 void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
 	if (!_counter.has_value()) {
 		return;
@@ -230,12 +237,25 @@ void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
 	}
 	p.setPen(st::activeButtonFg);
 	p.setFont(_st.font);
-	const auto iconLeft = r.x() + _st.padding.left();
+	const auto withSubtext = !_subtext.isEmpty();
+	const auto height = withSubtext
+		? (_st.font->height
+			+ _st.subtextPadding.top()
+			+ _st.subtextStyle.font->height)
+		: _st.font->height;
+	const auto topWidth = withSubtext ? topTextWidth() : 0;
+	const auto bottomWidth = withSubtext ? bottomTextWidth() : 0;
+	const auto iconShift = (topWidth >= bottomWidth)
+		? 0
+		: (bottomWidth - topWidth) / 2;
+	const auto iconLeft = r.x() + _st.padding.left() + iconShift;
+	const auto topShift = (_st.font->height - height) / 2;
 	const auto iconTop = bubbleRect.y()
+		+ topShift
 		+ (bubbleRect.height() - _icon->height()) / 2;
 	_icon->paint(p, iconLeft, iconTop, bubbleRect.width());
 	const auto numberLeft = iconLeft + _icon->width() + _st.textSkip;
-	const auto numberTop = r.y() + _textTop;
+	const auto numberTop = r.y() + (_st.height - height) / 2;
 	_numberAnimation.paint(p, numberLeft, numberTop, width());
 	if (!_additional.isEmpty()) {
 		p.setOpacity(0.7);
@@ -248,6 +268,22 @@ void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
 		_additional.draw(p, {
 			.position = { additionalLeft, additionalTop },
 			.availableWidth = _additional.maxWidth(),
+		});
+	}
+	if (withSubtext) {
+		p.setOpacity(1.);
+		const auto subtextShift = (bottomWidth >= topWidth)
+			? 0
+			: (topWidth - bottomWidth) / 2;
+		const auto subtextLeft = r.x()
+			+ _st.subtextPadding.left()
+			+ subtextShift;
+		const auto subtextTop = numberTop
+			+ _st.font->height
+			+ _st.subtextPadding.top();
+		_subtext.draw(p, {
+			.position = { subtextLeft, subtextTop },
+			.availableWidth = _subtext.maxWidth(),
 		});
 	}
 }
@@ -265,7 +301,7 @@ BubbleWidget::BubbleWidget(
 	rpl::producer<> showFinishes,
 	const style::icon *icon,
 	const style::margins &outerPadding)
-: RpWidget(parent)
+: AbstractButton(parent)
 , _st(st)
 , _state(std::move(state))
 , _bubble(
@@ -494,6 +530,10 @@ void BubbleWidget::setBrushOverride(std::optional<QBrush> brushOverride) {
 	update();
 }
 
+void BubbleWidget::setSubtext(QString subtext) {
+	_bubble.setSubtext(subtext);
+}
+
 void BubbleWidget::paintEvent(QPaintEvent *e) {
 	if (!_bubble.counter().has_value()) {
 		return;
@@ -615,6 +655,7 @@ not_null<BubbleWidget*> AddBubbleRow(
 		std::move(showFinishes),
 		icon,
 		outerPadding);
+	bubble->setAttribute(Qt::WA_TransparentForMouseEvents);
 	rpl::combine(
 		container->sizeValue(),
 		bubble->sizeValue()

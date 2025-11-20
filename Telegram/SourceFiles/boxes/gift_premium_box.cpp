@@ -1328,6 +1328,15 @@ void AddStarGiftTable(
 					PeerId(entry.bareEntryOwnerId)),
 				st::giveawayGiftCodePeerMargin);
 		}
+	} else if (entry.auction && entry.bareGiftOwnerId) {
+		AddTableRow(
+			table,
+			tr::lng_credits_box_history_entry_peer(),
+			MakePeerTableValue(
+				table,
+				show,
+				PeerId(entry.bareGiftOwnerId)),
+			st::giveawayGiftCodePeerMargin);
 	} else if (peerId && !giftToSelf) {
 		const auto user = session->data().peer(peerId)->asUser();
 		const auto withSendButton = entry.in && user && !user->isBot();
