@@ -220,18 +220,6 @@ StarsTonPriceInput AddStarsTonPriceInput(
 
 	const auto session = args.session;
 	const auto added = st::boxRowPadding - st::defaultSubsectionTitlePadding;
-	auto helper = Ui::Text::CustomEmojiHelper();
-	const auto makeIcon = [&](
-			not_null<QWidget*> parent,
-			Ui::Text::PaletteDependentEmoji emoji) {
-		auto text = helper.paletteDependent(std::move(emoji));
-		return Ui::CreateChild<Ui::FlatLabel>(
-			parent,
-			rpl::single(std::move(text)),
-			st::defaultFlatLabel,
-			st::defaultPopupMenu,
-			helper.context());
-	};
 
 	const auto starsWrap = container->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(

@@ -210,11 +210,6 @@ void FlexibleScrollHelper::setupScrollHandling() {
 }
 
 void FlexibleScrollHelper::setupScrollHandlingWithFilter() {
-	const auto heightDiff = [=] {
-		return _pinnedToTop->maximumHeight()
-			- _pinnedToTop->minimumHeight();
-	};
-
 	rpl::combine(
 		_pinnedToTop->heightValue(),
 		_inner->heightValue()

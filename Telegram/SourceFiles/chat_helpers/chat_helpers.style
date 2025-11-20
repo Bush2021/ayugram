@@ -452,6 +452,8 @@ emojiPanSlideDuration: 180;
 emojiPanArea: size(34px, 32px);
 emojiPanRadius: 8px;
 emojiPanReactionsPreviewPadding: margins(10px, 20px, 10px, 20px);
+emojiPanEmojiPreviewMinHeight: 160px;
+emojiPanEmojiPreviewRadius: 8px + 8px + 4px;
 
 defaultTabbedSearchCancel: CrossButton {
 	width: 33px;
