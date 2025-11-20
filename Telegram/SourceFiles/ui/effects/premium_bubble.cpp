@@ -217,6 +217,10 @@ void Bubble::setSubtext(QString subtext) {
 	_updateCallback();
 }
 
+void Bubble::finishAnimating() {
+	_numberAnimation.finishAnimating();
+}
+
 void Bubble::paintBubble(QPainter &p, const QRect &r, const QBrush &brush) {
 	if (!_counter.has_value()) {
 		return;
@@ -332,6 +336,10 @@ BubbleWidget::BubbleWidget(
 		resizeTo(_bubble.width(), _bubble.height());
 	}, lifetime());
 
+	const auto instant = !showFinishes;
+	if (instant) {
+		showFinishes = rpl::single(rpl::empty);
+	}
 	std::move(
 		showFinishes
 	) | rpl::take(1) | rpl::start_with_next([=] {
@@ -339,15 +347,27 @@ BubbleWidget::BubbleWidget(
 		) | rpl::start_with_next([=](BubbleRowState state) {
 			animateTo(state);
 		}, lifetime());
+		if (instant) {
+			_appearanceAnimation.stop();
+			if (const auto onstack = base::take(_appearanceCallback)) {
+				onstack(1.);
+			}
+			_bubble.finishAnimating();
+		}
 
 		parent->widthValue() | rpl::start_with_next([=](int w) {
 			if (!_appearanceAnimation.animating()) {
-				const auto x = base::SafeRound(
-					w * _state.current().ratio - width() / 2);
-				const auto padding = _spaceForDeflection.width();
-				moveToLeft(
-					std::clamp(int(x), -padding, w - width() + padding),
-					y());
+				const auto available = w
+					- _outerPadding.left()
+					- _outerPadding.right();
+				const auto x = (available * _animatingFromResultRatio);
+				moveToLeft(-_spaceForDeflection.width()
+					+ std::max(
+						int(base::SafeRound(x
+							- (_bubble.width() / 2)
+							+ _outerPadding.left())),
+						0),
+					0);
 			}
 		}, lifetime());
 	}, lifetime());
@@ -482,11 +502,12 @@ void BubbleWidget::animateTo(BubbleRowState state) {
 		_animatingFromResultRatio = 0.;
 		_animatingFromBubbleEdge = 0.;
 	}
-	_appearanceAnimation.start([=](float64 value) {
+	_appearanceCallback = [=](float64 value) {
 		if (!_appearanceAnimation.animating()) {
 			_animatingFrom = state;
 			_animatingFromResultRatio = resultMoveEndPoint;
 			_animatingFromBubbleEdge = finalEdge;
+			_appearanceCallback = nullptr;
 		}
 		value = std::abs(value);
 		const auto moveProgress = std::clamp(
@@ -518,11 +539,13 @@ void BubbleWidget::animateTo(BubbleRowState state) {
 		_bubble.setFlipHorizontal(nowBubbleEdge < 0);
 		_bubble.setTailEdge(std::abs(nowBubbleEdge));
 		update();
-	},
-	0.,
-	(state.ratio >= _animatingFrom.ratio) ? 1. : -1.,
-	duration,
-	anim::easeOutCirc);
+	};
+	_appearanceAnimation.start(
+		_appearanceCallback,
+		0.,
+		(state.ratio >= _animatingFrom.ratio) ? 1. : -1.,
+		duration,
+		anim::easeOutCirc);
 }
 
 void BubbleWidget::setBrushOverride(std::optional<QBrush> brushOverride) {
@@ -646,6 +669,8 @@ not_null<BubbleWidget*> AddBubbleRow(
 		const style::margins &outerPadding) {
 	const auto container = parent->add(
 		object_ptr<Ui::FixedHeightWidget>(parent, 0));
+	container->show();
+
 	const auto bubble = Ui::CreateChild<BubbleWidget>(
 		container,
 		st,

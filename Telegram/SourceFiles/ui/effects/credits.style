@@ -452,6 +452,7 @@ auctionCenteredSubtitle: FlatLabel(defaultFlatLabel) {
 		font: font(10px);
 	}
 }
+auctionChangeRecipientPadding: margins(0px, 0px, 0px, 10px);
 
 auctionBidPlace: FlatLabel(defaultFlatLabel) {
 	style: semiboldTextStyle;

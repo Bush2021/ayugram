@@ -9,7 +9,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_text_entities.h"
 #include "base/unixtime.h"
+#include "boxes/peers/replace_boost_box.h"
 #include "boxes/send_credits_box.h" // CreditsEmojiSmall
+#include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
 #include "calls/group/calls_group_common.h"
 #include "core/credits_amount.h"
@@ -41,8 +43,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/number_input.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/wrap/table_layout.h"
 #include "ui/color_int_conversion.h"
 #include "ui/dynamic_thumbnails.h"
@@ -58,6 +61,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 #include "styles/style_settings.h"
+
+#include <QtWidgets/QApplication>
+#include <QtGui/QClipboard>
 
 namespace Ui {
 namespace {
@@ -83,6 +89,16 @@ struct BidRowData {
 	friend inline bool operator==(
 		const BidRowData &,
 		const BidRowData &) = default;
+};
+
+struct BidSliderValues {
+	int min = 0;
+	int explicitlyAllowed = 0;
+	int max = 0;
+
+	friend inline bool operator==(
+		const BidSliderValues &,
+		const BidSliderValues &) = default;
 };
 
 [[nodiscard]] std::optional<QColor> BidColorOverride(int position, int per) {
@@ -253,6 +269,37 @@ struct BidRowData {
 	}, raw->lifetime());
 
 	return result;
+}
+
+Fn<void()> MakeAuctionMenuCallback(
+		not_null<QWidget*> parent,
+		std::shared_ptr<ChatHelpers::Show> show,
+		const Data::GiftAuctionState &state) {
+	const auto url = show->session().createInternalLinkFull(
+		u"auction/"_q + state.gift->auctionSlug);
+	const auto rounds = state.totalRounds;
+	const auto perRound = state.gift->auctionGiftsPerRound;;
+	const auto menu = std::make_shared<base::unique_qptr<PopupMenu>>();
+	return [=] {
+		*menu = base::make_unique_q<Ui::PopupMenu>(
+			parent,
+			st::popupMenuWithIcons);
+
+		(*menu)->addAction(tr::lng_auction_menu_about(tr::now), [=] {
+			show->show(Box(AuctionAboutBox, rounds, perRound, nullptr));
+		}, &st::menuIconInfo);
+
+		(*menu)->addAction(tr::lng_auction_menu_copy_link(tr::now), [=] {
+			QApplication::clipboard()->setText(url);
+			show->showToast(tr::lng_username_copied(tr::now));
+		}, &st::menuIconLink);
+
+		(*menu)->addAction(tr::lng_auction_menu_share(tr::now), [=] {
+			FastShareLink(show, url);
+		}, &st::menuIconShare);
+
+		(*menu)->popup(QCursor::pos());
+	};
 }
 
 void PlaceAuctionBid(
@@ -538,8 +585,6 @@ void EditCustomBid(
 }
 
 void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
-	const auto weak = base::make_weak(box);
-
 	using namespace Info::PeerGifts;
 	struct State {
 		State(rpl::producer<Data::GiftAuctionState> value)
@@ -547,47 +592,61 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 		}
 
 		rpl::variable<Data::GiftAuctionState> value;
+		rpl::variable<BidSliderValues> sliderValues;
 		rpl::variable<int> chosen;
 		rpl::variable<QString> subtext;
+		bool placing = false;
 	};
 	const auto state = box->lifetime().make_state<State>(
 		std::move(args.state));
-	const auto &now = state->value.current();
-	const auto mine = int(now.my.bid);
-	const auto min = std::max(
-		int(now.my.minBidAmount ? now.my.minBidAmount : now.minBidAmount),
-		1);
-	const auto last = now.bidLevels.empty()
-		? 0
-		: now.bidLevels.front().amount;
-	const auto max = std::max({
-		min + 1,
-		kMaxShownBid,
-		int(base::SafeRound(mine * 1.2)),
-		int(base::SafeRound(last * 1.2)),
+	state->sliderValues = state->value.value(
+	) | rpl::map([=](const Data::GiftAuctionState &value) {
+		const auto mine = int(value.my.bid);
+		const auto min = std::max(1, int(value.my.minBidAmount
+			? value.my.minBidAmount
+			: value.minBidAmount));
+		const auto last = value.bidLevels.empty()
+			? 0
+			: value.bidLevels.front().amount;
+		auto max = std::max({
+			min + 1,
+			kMaxShownBid,
+			int(base::SafeRound(mine * 1.2)),
+		});
+		if (max < last * 1.05) {
+			max = int(base::SafeRound(last * 1.2));
+		}
+		return BidSliderValues{
+			.min = min,
+			.explicitlyAllowed = mine,
+			.max = max,
+		};
 	});
-	const auto chosen = mine ? mine : std::clamp(mine, min, max);
-	state->chosen = chosen;
+
+	const auto show = args.show;
+	const auto giftId = state->value.current().gift->id;
+	const auto &sliderValues = state->sliderValues.current();
+	state->chosen = sliderValues.explicitlyAllowed
+		? sliderValues.explicitlyAllowed
+		: sliderValues.min;
 
 	state->subtext = rpl::combine(
 		state->value.value(),
 		state->chosen.value()
 	) | rpl::map([=](
-			const Data::GiftAuctionState &state,
+			const Data::GiftAuctionState &value,
 			int chosen) {
-		if (state.my.bid == chosen) {
+		if (value.my.bid == chosen) {
 			return tr::lng_auction_bid_your(tr::now);
-		} else if (chosen == max) {
+		} else if (chosen == state->sliderValues.current().max) {
 			return tr::lng_auction_bid_custom(tr::now);
-		} else if (state.my.bid && chosen > state.my.bid) {
-			const auto delta = chosen - state.my.bid;
+		} else if (value.my.bid && chosen > value.my.bid) {
+			const auto delta = chosen - value.my.bid;
 			return '+' + Lang::FormatCountDecimal(delta);
 		}
 		return QString();
 	});
 
-	const auto giftId = now.gift->id;
-	const auto show = args.show;
 	args.peer->owner().giftAuctionGots(
 	) | rpl::start_with_next([=](const Data::GiftAuctionGot &update) {
 		if (update.giftId == giftId) {
@@ -602,36 +661,6 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 	const auto details = args.details
 		? *args.details
 		: std::optional<GiftSendDetails>();
-	const auto save = [=, peer = args.peer](int amount) {
-		const auto &current = state->value.current();
-		if (amount > current.my.bid) {
-			const auto was = (current.my.bid > 0);
-			const auto perRound = current.gift->auctionGiftsPerRound;
-			const auto done = [=](Payments::CheckoutResult result) {
-				if (result == Payments::CheckoutResult::Paid) {
-					show->showToast({
-						.title = (was
-							? tr::lng_auction_bid_increased_title
-							: tr::lng_auction_bid_placed_title)(
-								tr::now),
-						.text = tr::lng_auction_bid_done_text(
-							tr::now,
-							lt_count,
-							perRound,
-							tr::rich),
-						.duration = kBidPlacedToastDuration,
-					});
-				}
-			};
-			auto owned = details
-				? std::make_unique<GiftSendDetails>(*details)
-				: nullptr;
-			PlaceAuctionBid(show, peer, amount, now, std::move(owned), done);
-		}
-		if (const auto strong = weak.get()) {
-			strong->closeBox();
-		}
-	};
 	const auto colorings = show->session().appConfig().groupCallColorings();
 
 	box->setWidth(st::boxWideWidth);
@@ -647,40 +676,63 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 			count);
 		return ColorFromSerialized(coloring.bgLight);
 	};
-	const auto bubble = AddStarSelectBubble(
-		box,
-		state->chosen.value(),
-		max,
-		activeFgOverride);
-	bubble->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-	bubble->setClickedCallback([=, show = args.show] {
-		auto min = state->value.value(
-		) | rpl::map([=](const Data::GiftAuctionState &state) {
-			return std::max(1, int(state.my.minBidAmount
-				? state.my.minBidAmount
-				: state.minBidAmount));
-		});
-		show->show(Box(EditCustomBid, show, crl::guard(box, [=](int value) {
-			state->chosen = value;
-		}), std::move(min), state->chosen.current()));
-	});
-	state->subtext.value() | rpl::start_with_next([=](QString &&text) {
-		bubble->setSubtext(std::move(text));
-	}, bubble->lifetime());
+	const auto sliderWrap = content->add(
+		object_ptr<VerticalLayout>(content));
+	state->sliderValues.value(
+	) | rpl::start_with_next([=](const BidSliderValues &values) {
+		const auto initial = !sliderWrap->count();
+		if (!initial) {
+			while (sliderWrap->count()) {
+				delete sliderWrap->widgetAt(0);
+			}
+			while (!sliderWrap->children().isEmpty()) {
+				delete sliderWrap->children().front();
+			}
+		}
 
-	PaidReactionSlider(
-		content,
-		st::paidReactSlider,
-		min,
-		mine,
-		state->chosen.value(),
-		max,
-		[=](int count) { state->chosen = count; },
-		activeFgOverride);
+		const auto bubble = AddStarSelectBubble(
+			sliderWrap,
+			initial ? BoxShowFinishes(box) : nullptr,
+			state->chosen.value(),
+			values.max,
+			activeFgOverride);
+		bubble->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+		bubble->setClickedCallback([=] {
+			auto min = state->value.value(
+			) | rpl::map([=](const Data::GiftAuctionState &state) {
+				return std::max(1, int(state.my.minBidAmount
+					? state.my.minBidAmount
+					: state.minBidAmount));
+			});
+			show->show(Box(EditCustomBid, show, crl::guard(box, [=](int v) {
+				state->chosen = v;
+			}), std::move(min), state->chosen.current()));
+		});
+		state->subtext.value() | rpl::start_with_next([=](QString &&text) {
+			bubble->setSubtext(std::move(text));
+		}, bubble->lifetime());
+
+		PaidReactionSlider(
+			sliderWrap,
+			st::paidReactSlider,
+			values.min,
+			values.explicitlyAllowed,
+			state->chosen.value(),
+			values.max,
+			[=](int count) { state->chosen = count; },
+			activeFgOverride);
+
+		sliderWrap->resizeToWidth(st::boxWideWidth);
+	}, sliderWrap->lifetime());
 
 	box->addTopButton(
 		st::boxTitleClose,
 		[=] { box->closeBox(); });
+	if (const auto now = state->value.current(); !now.finished()) {
+		box->addTopButton(
+			st::boxTitleMenu,
+			MakeAuctionMenuCallback(box, show, now));
+	}
 
 	const auto skip = st::paidReactTitleSkip;
 	box->addRow(
@@ -723,8 +775,40 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 	AddSkip(content);
 	AddSkip(content);
 
+	const auto peer = args.peer;
 	const auto button = box->addButton(rpl::single(QString()), [=] {
-		save(state->chosen.current());
+		const auto &current = state->value.current();
+		const auto amount = state->chosen.current();
+		if (amount <= current.my.bid) {
+			box->closeBox();
+			return;
+		} else if (state->placing) {
+			return;
+		}
+		state->placing = true;
+		const auto was = (current.my.bid > 0);
+		const auto perRound = current.gift->auctionGiftsPerRound;
+		const auto done = [=](Payments::CheckoutResult result) {
+			state->placing = false;
+			if (result == Payments::CheckoutResult::Paid) {
+				show->showToast({
+					.title = (was
+						? tr::lng_auction_bid_increased_title
+						: tr::lng_auction_bid_placed_title)(
+							tr::now),
+					.text = tr::lng_auction_bid_done_text(
+						tr::now,
+						lt_count,
+						perRound,
+						tr::rich),
+					.duration = kBidPlacedToastDuration,
+				});
+			}
+		};
+		auto owned = details
+			? std::make_unique<GiftSendDetails>(*details)
+			: nullptr;
+		PlaceAuctionBid(show, peer, amount, current, std::move(owned), done);
 	});
 
 	button->setText(rpl::combine(
@@ -982,16 +1066,19 @@ void AuctionInfoBox(
 
 		std::vector<Data::GiftAcquired> acquired;
 		bool acquiredRequested = false;
+
+		base::unique_qptr<PopupMenu> menu;
 	};
 	const auto show = window->uiShow();
 	const auto state = box->lifetime().make_state<State>(&show->session());
 	state->value = std::move(value);
-	state->minutesLeft = MinutesLeftTillValue(
-		state->value.current().endDate);
+	const auto &now = state->value.current();
+
+	state->minutesLeft = MinutesLeftTillValue(now.endDate);
 
 	box->setStyle(st::giftBox);
 
-	const auto name = state->value.current().gift->resellTitle;
+	const auto name = now.gift->resellTitle;
 	const auto extend = st::defaultDropdownMenu.wrap.shadow.extend;
 	const auto side = st::giftBoxGiftSmall;
 	const auto size = QSize(side, side).grownBy(extend);
@@ -1001,7 +1088,7 @@ void AuctionInfoBox(
 	const auto gift = CreateChild<GiftButton>(preview, &state->delegate);
 	gift->setAttribute(Qt::WA_TransparentForMouseEvents);
 	gift->setDescriptor(GiftTypeStars{
-		.info = *state->value.current().gift,
+		.info = *now.gift,
 	}, GiftButtonMode::Minimal);
 
 	preview->widthValue() | rpl::start_with_next([=](int width) {
@@ -1136,25 +1223,39 @@ void AuctionInfoBox(
 		AuctionButtonCountdownType::Join,
 		state->value.value());
 
+	box->setNoContentMargin(true);
+	const auto close = CreateChild<IconButton>(
+		box->verticalLayout(),
+		st::boxTitleClose);
+	close->setClickedCallback([=] { box->closeBox(); });
+
+	const auto menu = CreateChild<IconButton>(
+		box->verticalLayout(),
+		st::boxTitleMenu);
+	menu->setClickedCallback(MakeAuctionMenuCallback(menu, show, now));
+	const auto weakMenu = base::make_weak(menu);
+
+	box->verticalLayout()->widthValue() | rpl::start_with_next([=](int) {
+		close->moveToRight(0, 0);
+		if (const auto strong = weakMenu.get()) {
+			strong->moveToRight(close->width(), 0);
+		}
+	}, close->lifetime());
+
 	rpl::combine(
 		state->value.value(),
 		state->minutesLeft.value()
 	) | rpl::start_with_next([=](
 			const Data::GiftAuctionState &state,
 			int minutes) {
-		about->setTextColorOverride((state.finished() || minutes <= 0)
+		const auto finished = state.finished() || (minutes <= 0);
+		about->setTextColorOverride(finished
 			? st::attentionButtonFg->c
 			: std::optional<QColor>());
+		if (const auto strong = finished ? weakMenu.get() : nullptr) {
+			delete strong;
+		}
 	}, box->lifetime());
-
-	box->setNoContentMargin(true);
-	const auto close = CreateChild<IconButton>(
-		box->verticalLayout(),
-		st::boxTitleClose);
-	close->setClickedCallback([=] { box->closeBox(); });
-	box->verticalLayout()->widthValue() | rpl::start_with_next([=](int) {
-		close->moveToRight(0, 0);
-	}, close->lifetime());
 }
 
 base::weak_qptr<BoxContent> ChooseAndShowAuctionBox(
@@ -1194,12 +1295,13 @@ base::weak_qptr<BoxContent> ChooseAndShowAuctionBox(
 			sendBox->boxClosing(
 			) | rpl::start_with_next(close, sendBox->lifetime());
 		};
-		const auto text = (now.my.to->isSelf()
+		const auto from = now.my.to;
+		const auto text = (from->isSelf()
 			? tr::lng_auction_change_already_me(tr::now, tr::rich)
 			: tr::lng_auction_change_already(
 				tr::now,
 				lt_name,
-				tr::bold(now.my.to->name()),
+				tr::bold(from->name()),
 				tr::rich)).append(' ').append(peer->isSelf()
 					? tr::lng_auction_change_to_me(tr::now, tr::rich)
 					: tr::lng_auction_change_to(
@@ -1207,11 +1309,22 @@ base::weak_qptr<BoxContent> ChooseAndShowAuctionBox(
 						lt_name,
 						tr::bold(peer->name()),
 						tr::rich));
-		box = window->show(MakeConfirmBox({
-			.text = text,
-			.confirmed = change,
-			.confirmText = tr::lng_auction_change_button(),
-			.title = tr::lng_auction_change_title(),
+		box = window->show(Box([=](not_null<GenericBox*> box) {
+			box->addRow(
+				CreateUserpicsTransfer(
+					box,
+					rpl::single(std::vector{ not_null<PeerData*>(from) }),
+					peer,
+					UserpicsTransferType::AuctionRecipient),
+				st::boxRowPadding + st::auctionChangeRecipientPadding
+			)->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+			ConfirmBox(box, {
+				.text = text,
+				.confirmed = change,
+				.confirmText = tr::lng_auction_change_button(),
+				.title = tr::lng_auction_change_title(),
+			});
 		}));
 	} else if (showInfoBox) {
 		box = window->show(Box(

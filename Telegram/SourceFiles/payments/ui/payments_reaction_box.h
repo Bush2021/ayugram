@@ -99,7 +99,8 @@ void AddStarSelectBalance(
 	bool dark = false);
 
 not_null<Premium::BubbleWidget*> AddStarSelectBubble(
-	not_null<GenericBox*> box,
+	not_null<VerticalLayout*> container,
+	rpl::producer<> showFinishes,
 	rpl::producer<int> value,
 	int max,
 	Fn<QColor(int)> activeFgOverride = nullptr);

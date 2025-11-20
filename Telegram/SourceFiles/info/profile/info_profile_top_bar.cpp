@@ -1247,8 +1247,9 @@ void TopBar::setupUserpicButton(
 						false);
 				}
 			}
-
-			(*menu)->popup(QCursor::pos());
+			if (!(*menu)->empty()) {
+				(*menu)->popup(QCursor::pos());
+			}
 		} else if (button == Qt::LeftButton) {
 			if (_topicIconView && _topic && _topic->iconId()) {
 				const auto document = _peer->owner().document(

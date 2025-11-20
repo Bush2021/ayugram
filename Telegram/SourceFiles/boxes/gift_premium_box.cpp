@@ -316,8 +316,17 @@ void AddUniqueGiftPropertyRows(
 		const Data::CreditsHistoryEntry &entry,
 		Fn<void()> convertToStars) {
 	auto helper = Ui::Text::CustomEmojiHelper();
+	const auto addUpgradeToValue = !entry.credits.ton()
+		&& !entry.giftUpgradeGifted
+		&& !entry.giftUpgradeSeparate
+		&& entry.starsUpgradedBySender;
+	const auto amount = addUpgradeToValue
+		? CreditsAmount(
+			entry.credits.whole() + entry.starsUpgradedBySender,
+			entry.credits.nano())
+		: entry.credits;
 	const auto price = helper.paletteDependent(Ui::Earn::IconCreditsEmoji(
-	)).append(' ').append(Lang::FormatCreditsAmountDecimal(entry.credits));
+	)).append(' ').append(Lang::FormatCreditsAmountDecimal(amount));
 	auto label = object_ptr<Ui::FlatLabel>(
 		table,
 		rpl::single(price),

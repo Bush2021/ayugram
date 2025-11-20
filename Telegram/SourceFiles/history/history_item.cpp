@@ -6835,6 +6835,7 @@ void HistoryItem::applyAction(const MTPMessageAction &action) {
 			.starsBid = bid,
 			.type = Data::GiftType::StarGift,
 			.upgradeSeparate = data.is_upgrade_separate(),
+			.upgradeGifted = data.is_prepaid_upgrade(),
 			.upgradable = data.is_can_upgrade(),
 			.anonymous = data.is_name_hidden(),
 			.converted = data.is_converted(),

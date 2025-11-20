@@ -6304,6 +6304,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_export_option_contacts_about" = "If you allow access, contacts are continuously synced with Telegram. You can adjust this in Settings > Privacy & Security on mobile devices.";
 "lng_export_option_stories" = "Story archive";
 "lng_export_option_stories_about" = "All stories you posted from Telegram mobile apps.";
+"lng_export_option_profile_music" = "Music on Profiles";
+"lng_export_option_profile_music_about" = "All tracks you saved to your playlist.";
 "lng_export_option_sessions" = "Active sessions";
 "lng_export_option_sessions_about" = "We may store this to display your connected devices in Settings > Privacy & Security > Show all sessions.";
 "lng_export_header_other" = "Other";

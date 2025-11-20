@@ -363,6 +363,10 @@ QSize MediaPreviewWidget::currentDimensions() const {
 		result = result.scaled(box, Qt::KeepAspectRatio);
 	}
 
+	result = QSize(
+		std::max(result.width(), 1),
+		std::max(result.height(), 1));
+
 	if (_photo) {
 		_cachedSize = result;
 	}

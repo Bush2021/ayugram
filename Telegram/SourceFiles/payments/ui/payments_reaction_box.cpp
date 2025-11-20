@@ -515,7 +515,8 @@ void PaidReactionsBox(
 		return Ui::ColorFromSerialized(coloring.bgLight);
 	};
 	AddStarSelectBubble(
-		box,
+		content,
+		BoxShowFinishes(box),
 		state->chosen.value(),
 		args.max,
 		videoStream ? activeFgOverride : Fn<QColor(int)>());
@@ -938,7 +939,8 @@ void AddStarSelectBalance(
 }
 
 not_null<Premium::BubbleWidget*> AddStarSelectBubble(
-		not_null<GenericBox*> box,
+		not_null<VerticalLayout*> container,
+		rpl::producer<> showFinishes,
 		rpl::producer<int> value,
 		int max,
 		Fn<QColor(int)> activeFgOverride) {
@@ -958,14 +960,15 @@ not_null<Premium::BubbleWidget*> AddStarSelectBubble(
 	});
 
 	const auto bubble = Premium::AddBubbleRow(
-		box->verticalLayout(),
+		container,
 		st::boostBubble,
-		BoxShowFinishes(box),
+		std::move(showFinishes),
 		std::move(bubbleRowState),
 		Premium::BubbleType::Credits,
 		nullptr,
 		&st::paidReactBubbleIcon,
 		st::boxRowPadding);
+	bubble->show();
 	if (activeFgOverride) {
 		std::move(value) | rpl::start_with_next([=](int count) {
 			bubble->setBrushOverride(activeFgOverride(count));

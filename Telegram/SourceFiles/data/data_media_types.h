@@ -168,6 +168,7 @@ struct GiftCode {
 	bool viaGiveaway : 1 = false;
 	bool transferred : 1 = false;
 	bool upgradeSeparate : 1 = false;
+	bool upgradeGifted : 1 = false;
 	bool upgradable : 1 = false;
 	bool unclaimed : 1 = false;
 	bool anonymous : 1 = false;

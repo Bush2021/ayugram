@@ -19,6 +19,7 @@ class Image;
 class HistoryItem;
 struct WebPageCollage;
 struct WebPageStickerSet;
+struct WebPageAuction;
 enum class WebPageType : uint8;
 enum class NewMessageType;
 
@@ -1022,6 +1023,7 @@ private:
 		std::unique_ptr<Iv::Data> iv,
 		std::unique_ptr<WebPageStickerSet> stickerSet,
 		std::shared_ptr<UniqueGift> uniqueGift,
+		std::unique_ptr<WebPageAuction> auction,
 		int duration,
 		const QString &author,
 		bool hasLargeMedia,

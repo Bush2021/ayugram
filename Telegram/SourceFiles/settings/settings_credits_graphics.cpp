@@ -2722,6 +2722,7 @@ void ShowStarGiftViewBox(
 		.giftTransferred = data.transferred,
 		.giftRefunded = data.refunded,
 		.giftUpgradeSeparate = data.upgradeSeparate,
+		.giftUpgradeGifted = data.upgradeGifted,
 		.savedToProfile = data.saved,
 		.canUpgradeGift = data.upgradable,
 		.hasGiftComment = !data.message.empty(),

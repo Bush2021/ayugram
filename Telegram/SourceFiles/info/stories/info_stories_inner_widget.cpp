@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/vertical_list.h"
+#include "ui/ui_utility.h"
 #include "styles/style_credits.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_info.h"
@@ -577,6 +578,7 @@ void InnerWidget::createAboutArchive() {
 void InnerWidget::visibleTopBottomUpdated(
 		int visibleTop,
 		int visibleBottom) {
+	_visibleRange = { visibleTop, visibleBottom };
 	setChildVisibleTopBottom(_list, visibleTop, visibleBottom);
 }
 
@@ -632,6 +634,10 @@ void InnerWidget::setupList() {
 	_listTops.fire(raw->topValue());
 
 	raw->show();
+
+	Ui::PostponeCall(crl::guard(this, [=] {
+		visibleTopBottomUpdated(_visibleRange.top, _visibleRange.bottom);
+	}));
 }
 
 void InnerWidget::setupEmpty() {

@@ -66,6 +66,8 @@ public:
 	[[nodiscard]] QPainterPath bubblePath(const QRect &r) const;
 	void setSubtext(QString subtext);
 
+	void finishAnimating();
+
 	[[nodiscard]] rpl::producer<> widthChanges() const;
 
 private:
@@ -153,6 +155,7 @@ private:
 	const style::margins _outerPadding;
 
 	Ui::Animations::Simple _appearanceAnimation;
+	Fn<void(float64)> _appearanceCallback;
 	QSize _spaceForDeflection;
 
 	QLinearGradient _cachedGradient;
