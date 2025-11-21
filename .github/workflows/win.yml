@@ -7,7 +7,7 @@ jobs:
 
   windows:
     name: Windows
-    runs-on: windows-2022
+    runs-on: windows-latest
 
     strategy:
       matrix:
@@ -78,7 +78,6 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           sdk: ${{ env.SDK }}
-          toolset: ${{ case(matrix.arch == 'arm64', '', '14.44') }}
 
       - name: NuGet sources.
         run: |
@@ -90,8 +89,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ env.TBUILD }}\ThirdParty
-          key: ${{ runner.OS }}-${{ matrix.arch }}-third-party-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-third-party-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-vs2026-third-party-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-vs2026-third-party-
 
       - name: Libraries cache.
         id: cache-libs
@@ -103,8 +102,8 @@ jobs:
             !${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\*
             !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-vs2026-libs-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-vs2026-libs-
 
       - name: Qt cache.
         id: cache-qt
@@ -113,10 +112,13 @@ jobs:
           path: |
             ${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-${{ matrix.arch }}-${{ matrix.qt || 'qt' }}-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-${{ matrix.qt || 'qt' }}-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-vs2026-${{ matrix.qt || 'qt' }}-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-vs2026-${{ matrix.qt || 'qt' }}-
 
       - name: Libraries.
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\18\Enterprise\'
+          GYP_MSVS_VERSION: 2026
         run: |
           cd %TBUILD%
           %REPO_NAME%\Telegram\build\prepare\win.bat silent skip-debug ${{ matrix.qt }}
@@ -164,14 +166,6 @@ jobs:
       - name: Free up some disk space.
         shell: bash
         run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
-
-      - name: Configure pagefile.
-        if: env.ONLY_CACHE == 'false'
-        uses: al-cheb/configure-pagefile-action@v1.5
-        with:
-          minimum-size: 16GB
-          maximum-size: 32GB
-          disk-root: "D:"
 
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
