@@ -502,7 +502,7 @@ if not mac or 'build-stackwalk' in options:
 win:
     git clone https://github.com/desktop-app/gyp.git
     cd gyp
-    git checkout 5e2425c47b
+    git checkout b5ef901cf1
 mac:
     python3 -m pip install \\
         --ignore-installed \\
@@ -514,9 +514,9 @@ stage('lzma', """
 win:
     git clone https://github.com/desktop-app/lzma.git
     cd lzma\\C\\Util\\LzmaLib
-    msbuild -m LzmaLib.sln /property:Configuration=Debug /property:Platform="$X8664"
+    msbuild -m LzmaLib.sln /property:Configuration=Debug /property:Platform="$X8664" /property:PlatformToolset=v145
 release:
-    msbuild -m LzmaLib.sln /property:Configuration=Release /property:Platform="$X8664"
+    msbuild -m LzmaLib.sln /property:Configuration=Release /property:Platform="$X8664" /property:PlatformToolset=v145
 """)
 
 stage('xz', """
@@ -1042,10 +1042,10 @@ mac:
 """)
 
 stage('libvpx', """
-    git clone https://github.com/webmproject/libvpx.git
+    git clone https://github.com/Bush2021/libvpx.git
 depends:patches/libvpx/*.patch
     cd libvpx
-    git checkout v1.14.1
+    git checkout 56202fa06526367004e777750bf5c9126ed64a00
 win:
     for /r %%i in (..\\patches\\libvpx\\*) do git apply %%i
 
@@ -1056,7 +1056,7 @@ win:
 win32:
     SET "TOOLCHAIN=x86-win32-vs17"
 win64:
-    SET "TOOLCHAIN=x86_64-win64-vs17"
+    SET "TOOLCHAIN=x86_64-win64-vs18"
 winarm:
     SET "TOOLCHAIN=arm64-win64-vs17"
 win:
