@@ -7,7 +7,7 @@ jobs:
 
   windows:
     name: Windows
-    runs-on: windows-2022
+    runs-on: windows-2025-vs2026
 
     strategy:
       matrix:
@@ -116,6 +116,9 @@ jobs:
           restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-${{ matrix.qt || 'qt' }}-
 
       - name: Libraries.
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\18\Enterprise\'
+          GYP_MSVS_VERSION: 2026
         run: |
           cd %TBUILD%
           %REPO_NAME%\Telegram\build\prepare\win.bat silent skip-debug ${{ matrix.qt }}
@@ -163,14 +166,6 @@ jobs:
       - name: Free up some disk space.
         shell: bash
         run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
-
-      - name: Configure pagefile.
-        if: env.ONLY_CACHE == 'false'
-        uses: al-cheb/configure-pagefile-action@v1.5
-        with:
-          minimum-size: 16GB
-          maximum-size: 32GB
-          disk-root: "D:"
 
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
