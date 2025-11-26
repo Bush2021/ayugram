@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/message_bubble.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/reaction_fly_animation.h"
+#include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
@@ -419,17 +420,21 @@ void BottomInfo::layoutDateText() {
 	const auto &settings = AyuSettings::getInstance();
 
 	const auto makeDateString = [&] {
-		return formatMessageTime(_data.date.time());
+		return (_data.flags & Data::Flag::ForwardedDate)
+			? Ui::FormatDateTimeSavedFrom(_data.date, true)
+			: QLocale().toString(_data.date.time(), QLocale::ShortFormat);
 	};
 
 	if (!settings.replaceBottomInfoWithIcons) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
-								? (settings.deletedMark + ' ')
-								: QString();
+			? (settings.deletedMark + ' ')
+			: QString();
 		const auto edited = (_data.flags & Data::Flag::Edited)
-								? (settings.editedMark + ' ')
-								: (_data.flags & Data::Flag::EstimateDate)
+			? (settings.editedMark + ' ')
+			: (_data.flags & Data::Flag::EstimateDate)
 			? (tr::lng_approximate(tr::now) + ' ')
+			: _data.scheduleRepeatPeriod
+			? (SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ')
 			: QString();
 		const auto author = _data.author;
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
@@ -476,11 +481,15 @@ void BottomInfo::layoutDateText() {
 			edited = Ui::Text::IconEmoji(&st::editedIcon);
 			edited.append(' ');
 		} else if (_data.flags & Data::Flag::EstimateDate) {
-		    edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
+			edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
+		} else if (_data.scheduleRepeatPeriod) {
+			edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
 		}
 
 		const auto author = _data.author;
-		const auto prefix = !author.isEmpty() ? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q) : QString();
+		const auto prefix = !author.isEmpty()
+			? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q)
+			: QString();
 
 		const auto date = TextWithEntities{}
 			.append(edited)
@@ -690,6 +699,17 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (item->isDeleted()) {
 		result.flags |= Flag::AyuDeleted;
+	}
+	if (item->isScheduled()) {
+		result.scheduleRepeatPeriod = item->scheduleRepeatPeriod();
+	}
+	if (forwarded
+			&& ((forwarded->savedFromPeer && forwarded->savedFromMsgId)
+				|| forwarded->savedFromHiddenSenderInfo
+				|| forwarded->originalHiddenSenderInfo)
+			&& !item->externalReply()) {
+		result.date = base::unixtime::parse(forwarded->originalDate);
+		result.flags |= Flag::ForwardedDate;
 	}
 	// We don't want to pass and update it in Data for now.
 	//if (item->unread()) {

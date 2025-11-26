@@ -388,11 +388,11 @@ public:
 	void setUserpicPhoto(const MTPPhoto &data);
 
 	void paintUserpic(
-		Painter &p,
+		QPainter &p,
 		Ui::PeerUserpicView &view,
 		PaintUserpicContext context) const;
 	void paintUserpic(
-			Painter &p,
+			QPainter &p,
 			Ui::PeerUserpicView &view,
 			int x,
 			int y,
@@ -407,7 +407,7 @@ public:
 		});
 	}
 	void paintUserpicLeft(
-			Painter &p,
+			QPainter &p,
 			Ui::PeerUserpicView &view,
 			int x,
 			int y,
