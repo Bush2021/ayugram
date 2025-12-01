@@ -232,7 +232,7 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 					tr::now,
 					lt_amount,
 					_delegate->ministar().append(' ' + starsText),
-					Ui::Text::WithEntities),
+					tr::marked),
 				kMarkupTextOptions,
 				_delegate->textContext());
 		}
@@ -274,13 +274,11 @@ void GiftButton::setDescriptor(const GiftDescriptor &descriptor, Mode mode) {
 				: (small() && unique && unique->starsForResale)
 				? Data::FormatGiftResaleAsked(*unique)
 				: unique
-				? tr::lng_gift_transfer_button(
-					tr::now,
-					Ui::Text::WithEntities)
-				: (data.info.auction() && !data.info.soldOut)
-				? tr::lng_gift_stars_auction_join(
-					tr::now,
-					Ui::Text::WithEntities)
+				? tr::lng_gift_transfer_button(tr::now, tr::marked)
+				: data.info.auction()
+				? (data.info.soldOut
+					? tr::lng_gift_stars_auction_view
+					: tr::lng_gift_stars_auction_join)(tr::now, tr::marked)
 				: _delegate->star().append(' ' + format(data.info.stars))),
 			kMarkupTextOptions,
 			_delegate->textContext());
@@ -807,10 +805,10 @@ void GiftButton::paintEvent(QPaintEvent *e) {
 					? ('#' + QString::number(unique->number))
 					: data.resale
 					? tr::lng_gift_stars_resale(tr::now)
-					: (!unique && data.info.auction())
-					? tr::lng_gift_stars_auction(tr::now)
 					: soldOut
 					? tr::lng_gift_stars_sold_out(tr::now)
+					: (!unique && data.info.auction())
+					? tr::lng_gift_stars_auction(tr::now)
 					: (!data.userpic
 						&& !data.info.unique
 						&& data.info.requirePremium)
@@ -1358,7 +1356,7 @@ void SelectGiftToUnpin(
 		});
 		const auto label = Ui::SetButtonMarkedLabel(
 			button,
-			tr::lng_context_unpin_from_top(Ui::Text::WithEntities),
+			tr::lng_context_unpin_from_top(tr::marked),
 			&show->session(),
 			st::creditsBoxButtonLabel,
 			&st::giftTooManyPinnedBox.button.textFg);

@@ -3692,6 +3692,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_gift_stars_premium" = "premium";
 "lng_gift_stars_auction" = "auction";
 "lng_gift_stars_auction_join" = "Join";
+"lng_gift_stars_auction_view" = "View";
 "lng_gift_stars_your_left#one" = "{count} left";
 "lng_gift_stars_your_left#other" = "{count} left";
 "lng_gift_stars_your_finished" = "none left";
