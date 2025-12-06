@@ -347,7 +347,7 @@ HistoryMessageSuggestInfo::HistoryMessageSuggestInfo(
 }
 
 HistoryMessageSuggestInfo::HistoryMessageSuggestInfo(
-		SuggestPostOptions options) {
+		SuggestOptions options) {
 	if (!options.exists) {
 		return;
 	}

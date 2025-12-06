@@ -3341,12 +3341,12 @@ void HistoryWidget::refreshSendGiftToggle() {
 }
 
 void HistoryWidget::applySuggestOptions(
-		SuggestPostOptions suggest,
+		SuggestOptions suggest,
 		HistoryView::SuggestMode mode) {
 	Expects(suggest.exists);
 
 	using namespace HistoryView;
-	_suggestOptions = std::make_unique<SuggestOptions>(
+	_suggestOptions = std::make_unique<SuggestOptionsBar>(
 		controller()->uiShow(),
 		_peer,
 		suggest,
@@ -6975,13 +6975,13 @@ FullReplyTo HistoryWidget::replyTo() const {
 		: FullReplyTo();
 }
 
-SuggestPostOptions HistoryWidget::suggestOptions(
+SuggestOptions HistoryWidget::suggestOptions(
 		bool skipNoAdminCheck) const {
 	const auto checked = skipNoAdminCheck
 		|| (_history && _history->suggestDraftAllowed());
 	return (checked && _suggestOptions)
 		? _suggestOptions->values()
-		: SuggestPostOptions();
+		: SuggestOptions();
 }
 
 bool HistoryWidget::hasSavedScroll() const {
@@ -8941,12 +8941,12 @@ void HistoryWidget::setReplyFieldsFromProcessing() {
 	if (_editMsgId) {
 		if (const auto localDraft = _history->localDraft({}, {})) {
 			localDraft->reply = id;
-			localDraft->suggest = SuggestPostOptions();
+			localDraft->suggest = SuggestOptions();
 		} else {
 			_history->setLocalDraft(std::make_unique<Data::Draft>(
 				TextWithTags(),
 				id,
-				SuggestPostOptions(),
+				SuggestOptions(),
 				MessageCursor(),
 				Data::WebPageDraft()));
 		}
@@ -9012,7 +9012,7 @@ void HistoryWidget::editMessage(
 	_history->setLocalEditDraft(std::make_unique<Data::Draft>(
 		editData,
 		FullReplyTo{ item->fullId() },
-		SuggestPostOptions(),
+		SuggestOptions(),
 		cursor,
 		previewDraft));
 	applyDraft();
