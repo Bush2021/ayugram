@@ -153,31 +153,31 @@ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
 								  tr::now,
 								  lt_item,
 								  TextWithEntities{peer->name()},
-								  Ui::Text::RichLangValue)
+								  tr::rich)
 							  : tr::ayu_SupporterPopup(
 								  tr::now,
 								  lt_item,
 								  TextWithEntities{peer->name()},
-								  Ui::Text::RichLangValue))
-					   : Ui::Text::RichLangValue(custom.text);
+								  tr::rich))
+					   : tr::rich(custom.text);
 		} else if (isExtera) {
 			text = peer->isUser()
 					   ? tr::ayu_DeveloperPopup(
 						   tr::now,
 						   lt_item,
 						   TextWithEntities{peer->name()},
-						   Ui::Text::RichLangValue)
+						   tr::rich)
 					   : tr::ayu_OfficialResourcePopup(
 						   tr::now,
 						   lt_item,
 						   TextWithEntities{peer->name()},
-						   Ui::Text::RichLangValue);
+						   tr::rich);
 		} else if (isSupporter) {
 			text = tr::ayu_SupporterPopup(
 				tr::now,
 				lt_item,
 				TextWithEntities{peer->name()},
-				Ui::Text::RichLangValue);
+				tr::rich);
 		} else {
 			return;
 		}

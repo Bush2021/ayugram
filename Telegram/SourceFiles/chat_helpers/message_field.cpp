@@ -1315,7 +1315,7 @@ std::unique_ptr<Ui::AbstractButton> AyuForwardWriteRestriction(
 	subtitle->show();
 
 
-	raw->sizeValue() | rpl::start_with_next([=](QSize size) {
+	raw->sizeValue() | rpl::on_next([=](QSize size) {
 
 		const auto toggle = [&](auto &&widget, bool shown) {
 			if (widget->isHidden() == shown) {

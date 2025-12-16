@@ -32,9 +32,9 @@ QString IDString(MsgId topicRootId) {
 }
 
 rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer) {
-	return rpl::single(IDString(peer)) | Ui::Text::ToWithEntities();
+	return rpl::single(IDString(peer)) | rpl::map(&Ui::Text::WithEntities);
 }
 
 rpl::producer<TextWithEntities> IDValue(MsgId topicRootId) {
-	return rpl::single(IDString(topicRootId)) | Ui::Text::ToWithEntities();
+	return rpl::single(IDString(topicRootId)) | rpl::map(&Ui::Text::WithEntities);
 }

@@ -2190,7 +2190,7 @@ void ComposeControls::init() {
 		updateAttachBotsMenu();
 	}, _wrap->lifetime());
 
-	AyuSettings::get_historyUpdateReactive() | rpl::start_with_next([=]
+	AyuSettings::get_historyUpdateReactive() | rpl::on_next([=]
 	{
 		updateSendButtonType();
 		updateControlsVisibility();

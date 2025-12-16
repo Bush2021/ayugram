@@ -82,12 +82,8 @@ bool PreviewDelegate::elementAnimationsPaused() {
 not_null<Ui::PathShiftGradient*> PreviewDelegate::elementPathShiftGradient() {
 	return _pathGradient.get();
 }
-					? (settings.saveDeletedMessages
-						? tr::ayu_ExpiringVideoMessageNote
-						: tr::lng_ttl_round_tooltip_in)
-					: (settings.saveDeletedMessages
-						? tr::ayu_ExpiringVoiceMessageNote
-						: tr::lng_ttl_voice_tooltip_in))(tr::rich);
+
+HistoryView::Context PreviewDelegate::elementContext() {
 	return HistoryView::Context::TTLViewer;
 }
 

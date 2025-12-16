@@ -206,7 +206,7 @@ ScheduledWidget::ScheduledWidget(
 		confirmDeleteSelected();
 	}, _topBar->lifetime());
 	_topBar->messageShotSelectionRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		AyuFeatures::MessageShot::Wrapper(_inner, [=] { clearSelected(); });
 	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(

@@ -115,7 +115,7 @@ not_null<Ui::SlideWrap<Ui::FlatLabel>*> AddError(
 				st::settingLocalPasscodeError), st::settingsCheckboxPadding));
 	error->hide(anim::type::instant);
 	if (input) {
-		input->changes() | rpl::start_with_next(
+		input->changes() | rpl::on_next(
 			[=]
 			{
 				error->hide(anim::type::normal);
@@ -232,10 +232,7 @@ void RegexEditBuilder(
 					// todo: custom toast with "Move to shared" button
 					// based on `PaidReactionToast`
 					Ui::Toast::Show(Ui::Toast::Config{
-						.text = tr::ayu_RegexFilterBulletinText(
-							tr::now,
-							Ui::Text::RichLangValue
-						),
+						.text = tr::ayu_RegexFilterBulletinText(tr::now),
 						.filter = onClick,
 						.adaptive = true
 					});
@@ -244,7 +241,7 @@ void RegexEditBuilder(
 		});
 	};
 
-	regexValue->submits() | rpl::start_with_next(saveAndClose, regexValue->lifetime());
+	regexValue->submits() | rpl::on_next(saveAndClose, regexValue->lifetime());
 	box->addButton(tr::lng_settings_save(), saveAndClose);
 	box->addButton(tr::lng_cancel(),
 				   [=]

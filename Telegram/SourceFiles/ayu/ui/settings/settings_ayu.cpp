@@ -97,7 +97,7 @@ void SetupGhostEssentials(
 		[=](bool enabled)
 		{
 			return (enabled != settings->markReadAfterAction);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_markReadAfterAction(enabled);
@@ -130,7 +130,7 @@ void SetupScheduleMessages(
 		[=](bool enabled)
 		{
 			return (enabled != settings->useScheduledMessages);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_useScheduledMessages(enabled);
@@ -161,7 +161,7 @@ void SetupSendWithoutSound(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->sendWithoutSound);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_sendWithoutSound(enabled);
@@ -188,7 +188,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->saveDeletedMessages);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_saveDeletedMessages(enabled);
@@ -207,7 +207,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->saveMessagesHistory);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_saveMessagesHistory(enabled);
@@ -230,7 +230,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->saveForBots);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_saveForBots(enabled);
@@ -255,7 +255,7 @@ void SetupOther(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->localPremium);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_localPremium(enabled);
@@ -274,7 +274,7 @@ void SetupOther(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->disableAds);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_disableAds(enabled);

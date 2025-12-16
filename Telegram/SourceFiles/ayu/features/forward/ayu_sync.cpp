@@ -122,7 +122,7 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 		session->downloaderTaskFinished() | rpl::filter([=]
 		{
 			return !data || data->status == FileDownloadFailed || fileSize(item) == data->size;
-		}) | rpl::start_with_next([=]() mutable
+		}) | rpl::on_next([=]() mutable
 								  {
 									  latch->countDown();
 								  },
@@ -213,7 +213,7 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 			session->downloaderTaskFinished() | rpl::filter([=]
 			{
 				return finalCheck();
-			}) | rpl::start_with_next([=]() mutable
+			}) | rpl::on_next([=]() mutable
 									  {
 										  saveToFiles();
 										  latch->countDown();
@@ -249,7 +249,7 @@ void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &act
 			| rpl::filter([=](const Data::Session::IdChange &update)
 			{
 				return action.history->peer->id == update.newId.peer;
-			}) | rpl::start_with_next([=]
+			}) | rpl::on_next([=]
 									  {
 										  latch->countDown();
 									  },

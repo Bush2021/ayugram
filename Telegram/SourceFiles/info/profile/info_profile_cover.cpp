@@ -607,7 +607,7 @@ void Cover::setupSavedMusic() {
 		1
 	) | rpl::map([=](const Data::SavedMusicSlice &data) {
 		return data.size() ? data[0].get() : nullptr;
-	}) | rpl::start_with_next([=](HistoryItem *item) {
+	}) | rpl::on_next([=](HistoryItem *item) {
 		const auto media = item ? item->media() : nullptr;
 		const auto document = media ? media->document() : nullptr;
 		if (!document) {
@@ -631,7 +631,7 @@ void Cover::setupSavedMusic() {
 			_musicButton->entity()->clicks() | rpl::filter([=](Qt::MouseButton mouseButton)
 			{
 				return mouseButton == Qt::RightButton;
-			}) | rpl::start_with_next([=] {
+			}) | rpl::on_next([=] {
 				const auto &settings = AyuSettings::getInstance();
 
 				const auto contextMenu = new Ui::PopupMenu(nullptr, st::popupMenuWithIcons);
@@ -659,7 +659,7 @@ void Cover::setupSavedMusic() {
 
 			const auto weak = base::make_weak(this);
 
-			_musicButton->entity()->onReady() | rpl::start_with_next(
+			_musicButton->entity()->onReady() | rpl::on_next(
 				[=]
 				{
 					// fix animation glitch
@@ -674,7 +674,7 @@ void Cover::setupSavedMusic() {
 				},
 				_musicButton->lifetime());
 
-			widthValue() | rpl::start_with_next(
+			widthValue() | rpl::on_next(
 				[=](int newWidth)
 				{
 					if (_musicButton) {
@@ -684,7 +684,7 @@ void Cover::setupSavedMusic() {
 					}
 				},
 				_musicButton->lifetime());
-			_musicButton->heightValue() | rpl::start_with_next(
+			_musicButton->heightValue() | rpl::on_next(
 				[=]
 				{
 					if (_musicButton) {

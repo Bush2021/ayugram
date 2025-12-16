@@ -128,7 +128,7 @@ void FillImportFiltersBox(not_null<Ui::GenericBox*> box, bool import) {
 	actionButton->widthValue() | rpl::filter([=]
 	{
 		return (actionButton->widthNoMargins() != buttonWidth);
-	}) | rpl::start_with_next([=]
+	}) | rpl::on_next([=]
 							  {
 								  actionButton->resizeToWidth(buttonWidth);
 							  },

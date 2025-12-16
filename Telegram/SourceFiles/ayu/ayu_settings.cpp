@@ -70,7 +70,7 @@ void initialize() {
 		[=](bool val)
 		{
 			return (val != settings->sendReadMessages);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool val)
 		{
 			ghostModeEnabled =
@@ -82,7 +82,7 @@ void initialize() {
 		[=](bool val)
 		{
 			return (val != settings->sendReadStories);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool val)
 		{
 			ghostModeEnabled =
@@ -94,7 +94,7 @@ void initialize() {
 		[=](bool val)
 		{
 			return (val != settings->sendOnlinePackets);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool val)
 		{
 			ghostModeEnabled =
@@ -107,7 +107,7 @@ void initialize() {
 		[=](bool val)
 		{
 			return (val != settings->sendUploadProgress);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool val)
 		{
 			ghostModeEnabled =
@@ -121,7 +121,7 @@ void initialize() {
 		{
 			return (val
 				!= settings->sendOfflinePacketAfterOnline);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool val)
 		{
 			ghostModeEnabled =

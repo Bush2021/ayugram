@@ -750,7 +750,7 @@ void WrapWidget::finishShowContent() {
 		updateContentGeometry();
 	}, _content->lifetime());
 
-	AyuSettings::get_filtersUpdate() | rpl::start_with_next([=]
+	AyuSettings::get_filtersUpdate() | rpl::on_next([=]
 	{
 		auto contentMemento = _content->createMemento();
 		if (!contentMemento) {

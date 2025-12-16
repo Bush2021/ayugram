@@ -347,7 +347,7 @@ void CloudList::setup() {
 	});
 
 	if (AyuFeatures::MessageShot::isChoosingTheme()) {
-		AyuFeatures::MessageShot::resetCustomSelectedEvents() | rpl::start_with_next([=] {
+		AyuFeatures::MessageShot::resetCustomSelectedEvents() | rpl::on_next([=] {
 			_group->setValue(-1);
 		}, _outer->lifetime());
 	}

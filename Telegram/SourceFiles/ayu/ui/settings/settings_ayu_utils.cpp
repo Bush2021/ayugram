@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2025
 #include "settings_ayu_utils.h"
 
+#include "lang/lang_keys.h"
 #include "settings/settings_common.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
@@ -80,7 +81,7 @@ not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
 	};
 	for (const auto &innerCheck : state->innerChecks) {
 		innerCheck->checkedChanges(
-		) | rpl::to_empty | start_to_stream(
+		) | rpl::to_empty | rpl::start_to_stream(
 			state->anyChanges,
 			button->lifetime());
 	}
@@ -88,79 +89,79 @@ not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
 	{
 		const auto separator = Ui::CreateChild<Ui::RpWidget>(container.get());
 		separator->paintRequest(
-		) | start_with_next([=, bg = st.textBgOver]
-							{
-								auto p = QPainter(separator);
-								p.fillRect(separator->rect(), bg);
-							},
-							separator->lifetime());
+		) | rpl::on_next([=, bg = st.textBgOver]
+						{
+							auto p = QPainter(separator);
+							p.fillRect(separator->rect(), bg);
+						},
+						separator->lifetime());
 		const auto separatorHeight = 2 * st.toggle.border
 			+ st.toggle.diameter;
 		button->geometryValue(
-		) | start_with_next([=](const QRect &r)
-							{
-								const auto w = st::rightsButtonToggleWidth;
-								constexpr auto kLineWidth = 1;
-								toggleButton->setGeometry(
-									r.x() + r.width() - w,
-									r.y(),
-									w,
-									r.height());
-								separator->setGeometry(
-									toggleButton->x() - kLineWidth,
-									r.y() + (r.height() - separatorHeight) / 2,
-									kLineWidth,
-									separatorHeight);
-							},
-							toggleButton->lifetime());
+		) | rpl::on_next([=](const QRect &r)
+					{
+						const auto w = st::rightsButtonToggleWidth;
+						constexpr auto kLineWidth = 1;
+						toggleButton->setGeometry(
+							r.x() + r.width() - w,
+							r.y(),
+							w,
+							r.height());
+						separator->setGeometry(
+							toggleButton->x() - kLineWidth,
+							r.y() + (r.height() - separatorHeight) / 2,
+							kLineWidth,
+							separatorHeight);
+					},
+					toggleButton->lifetime());
 
 		const auto checkWidget = Ui::CreateChild<Ui::RpWidget>(toggleButton);
 		checkWidget->resize(checkView->getSize());
 		checkWidget->paintRequest(
-		) | start_with_next([=]
-							{
-								auto p = QPainter(checkWidget);
-								checkView->paint(p, 0, 0, checkWidget->width());
-							},
-							checkWidget->lifetime());
+		) | rpl::on_next([=]
+						{
+							auto p = QPainter(checkWidget);
+							checkView->paint(p, 0, 0, checkWidget->width());
+						},
+						checkWidget->lifetime());
 		toggleButton->sizeValue(
-		) | start_with_next([=](const QSize &s)
-							{
-								checkWidget->moveToRight(
-									st.toggleSkip,
-									(s.height() - checkWidget->height()) / 2);
-							},
-							toggleButton->lifetime());
+		) | rpl::on_next([=](const QSize &s)
+					{
+						checkWidget->moveToRight(
+							st.toggleSkip,
+							(s.height() - checkWidget->height()) / 2);
+					},
+					toggleButton->lifetime());
 	}
 
 	const auto totalInnerChecks = state->innerChecks.size();
 
 	state->anyChanges.events_starting_with(
 		rpl::empty_value()
-	) | rpl::map(countChecked) | start_with_next([=](int count)
-												 {
-													 if (toggledWhenAll) {
-														 checkView->setChecked(count == totalInnerChecks,
-																			   anim::type::normal);
-													 } else {
-														 checkView->setChecked(count != 0,
-																			   anim::type::normal);
-													 }
-												 },
-												 toggleButton->lifetime());
+	) | rpl::map(countChecked) | rpl::on_next([=](int count)
+									 {
+									 	 if (toggledWhenAll) {
+									 		 checkView->setChecked(count == totalInnerChecks,
+									 				   anim::type::normal);
+									 	 } else {
+									 		 checkView->setChecked(count != 0,
+									 				   anim::type::normal);
+									 	 }
+									 },
+									 toggleButton->lifetime());
 	checkView->setLocked(false);
 	checkView->finishAnimating();
 
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
 		button,
-		combine(
+		rpl::combine(
 			std::move(buttonLabel),
 			state->anyChanges.events_starting_with(
 				rpl::empty_value()
 			) | rpl::map(countChecked)
 		) | rpl::map([=](const QString &t, int checked)
 		{
-			auto count = Ui::Text::Bold("  "
+			auto count = tr::bold("  "
 				+ QString::number(checked)
 				+ '/'
 				+ QString::number(totalInnerChecks));
@@ -173,74 +174,74 @@ not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
 		const auto &icon = st::permissionsExpandIcon;
 		arrow->resize(icon.size());
 		arrow->paintRequest(
-		) | start_with_next([=, &icon]
-							{
-								auto p = QPainter(arrow);
-								const auto center = QPointF(
-									icon.width() / 2.,
-									icon.height() / 2.);
-								const auto progress = state->animation.value(
-									wrap->toggled() ? 1. : 0.);
-								auto hq = std::optional<PainterHighQualityEnabler>();
-								if (progress > 0.) {
-									hq.emplace(p);
-									p.translate(center);
-									p.rotate(progress * 180.);
-									p.translate(-center);
-								}
-								icon.paint(p, 0, 0, arrow->width());
-							},
-							arrow->lifetime());
+		) | rpl::on_next([=, &icon]
+						{
+							auto p = QPainter(arrow);
+							const auto center = QPointF(
+								icon.width() / 2.,
+								icon.height() / 2.);
+							const auto progress = state->animation.value(
+								wrap->toggled() ? 1. : 0.);
+							auto hq = std::optional<PainterHighQualityEnabler>();
+							if (progress > 0.) {
+								hq.emplace(p);
+								p.translate(center);
+								p.rotate(progress * 180.);
+								p.translate(-center);
+							}
+							icon.paint(p, 0, 0, arrow->width());
+						},
+						arrow->lifetime());
 	}
 	button->sizeValue(
-	) | start_with_next([=, &st](const QSize &s)
-						{
-							const auto labelLeft = st.padding.left();
-							const auto labelRight = s.width() - toggleButton->width();
+	) | rpl::on_next([=, &st](const QSize &s)
+					{
+						const auto labelLeft = st.padding.left();
+						const auto labelRight = s.width() - toggleButton->width();
 
-							label->resizeToWidth(labelRight - labelLeft - arrow->width());
-							label->moveToLeft(
-								labelLeft,
-								(s.height() - label->height()) / 2);
-							arrow->moveToLeft(
-								std::min(
-									labelLeft + label->naturalWidth(),
-									labelRight - arrow->width()),
-								(s.height() - arrow->height()) / 2);
-						},
-						button->lifetime());
+						label->resizeToWidth(labelRight - labelLeft - arrow->width());
+						label->moveToLeft(
+							labelLeft,
+							(s.height() - label->height()) / 2);
+						arrow->moveToLeft(
+							std::min(
+								labelLeft + label->naturalWidth(),
+								labelRight - arrow->width()),
+							(s.height() - arrow->height()) / 2);
+					},
+					button->lifetime());
 	wrap->toggledValue(
-	) | rpl::skip(1) | start_with_next([=](bool toggled)
-									   {
-										   state->animation.start(
-											   [=]
-											   {
-												   arrow->update();
-											   },
-											   toggled ? 0. : 1.,
-											   toggled ? 1. : 0.,
-											   st::slideWrapDuration,
-											   anim::easeOutCubic);
-									   },
-									   button->lifetime());
+	) | rpl::skip(1) | rpl::on_next([=](bool toggled)
+						   {
+						   	   state->animation.start(
+						   	   	   [=]
+						   	   	   {
+						   	   	   	   arrow->update();
+						   	   	   },
+						   	   	   toggled ? 0. : 1.,
+						   	   	   toggled ? 1. : 0.,
+						   	   	   st::slideWrapDuration,
+						   	   	   anim::easeOutCubic);
+						   },
+						   button->lifetime());
 	wrap->ease = anim::easeOutCubic;
 
 	button->clicks(
-	) | start_with_next([=]
-						{
-							wrap->toggle(!wrap->toggled(), anim::type::normal);
-						},
-						button->lifetime());
+	) | rpl::on_next([=]
+					{
+						wrap->toggle(!wrap->toggled(), anim::type::normal);
+					},
+					button->lifetime());
 
 	toggleButton->clicks(
-	) | start_with_next([=]
-						{
-							const auto checked = !checkView->checked();
-							for (const auto &innerCheck : state->innerChecks) {
-								innerCheck->setChecked(checked, anim::type::normal);
-							}
-						},
-						toggleButton->lifetime());
+	) | rpl::on_next([=]
+					{
+						const auto checked = !checkView->checked();
+						for (const auto &innerCheck : state->innerChecks) {
+							innerCheck->setChecked(checked, anim::type::normal);
+						}
+					},
+					toggleButton->lifetime());
 
 	return button;
 }
@@ -267,10 +268,10 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 				verticalLayout.get(),
 				st::defaultRippleAnimation);
 			button->stackUnder(checkbox);
-			combine(
+			rpl::combine(
 				verticalLayout->widthValue(),
 				checkbox->geometryValue()
-			) | start_with_next([=](int w, const QRect &r)
+			) | rpl::on_next([=](int w, const QRect &r)
 								{
 									button->setGeometry(0, r.y(), w, r.height());
 								},
@@ -287,10 +288,10 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 			return checkView;
 		}();
 		checkView->checkedChanges(
-		) | start_with_next([=](bool checked)
-							{
-							},
-							verticalLayout->lifetime());
+		) | rpl::on_next([=](bool checked)
+						{
+						},
+						verticalLayout->lifetime());
 
 		return checkView;
 	};
@@ -303,7 +304,7 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 	for (const auto &entry : checkboxes) {
 		const auto c = addCheckbox(verticalLayout, entry.checkboxLabel, entry.initial);
 		c->checkedValue(
-		) | start_with_next([=](bool enabled)
+		) | rpl::on_next([=](bool enabled)
 							{
 								entry.callback(enabled);
 							},
@@ -322,7 +323,7 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 		toggledWhenAll);
 	container->add(std::move(wrap));
 	container->widthValue(
-	) | start_with_next([=](int w)
+	) | rpl::on_next([=](int w)
 						{
 							raw->resizeToWidth(w);
 						},

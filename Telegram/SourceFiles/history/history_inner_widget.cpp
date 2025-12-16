@@ -460,7 +460,7 @@ HistoryInner::HistoryInner(
 	}, _scroll->lifetime());
 
 	_controller->window().widget()->globalForceClicks() |
-		rpl::start_with_next(
+		rpl::on_next(
 			[=](QPoint globalPosition)
 			{
 				auto mousePos = mapFromGlobal(globalPosition);

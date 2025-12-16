@@ -119,7 +119,7 @@ void GenerateItems(
 	};
 
 	const auto text = QString::fromStdString(message.text);
-	auto textAndEntities = Ui::Text::WithEntities(text);
+	auto textAndEntities = tr::marked(text);
 	const auto entities = AyuMapper::deserializeTextWithEntities(message.textEntities);
 	textAndEntities.entities = Api::EntitiesFromMTP(&history->session(), entities.v);
 	addSimpleTextMessage(std::move(textAndEntities));

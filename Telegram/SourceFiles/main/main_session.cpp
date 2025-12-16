@@ -126,7 +126,7 @@ void InitializeBlockedPeers(not_null<Main::Session*> session) {
 	session->api().blockedPeers().slice(
 	) | rpl::take(
 		1
-	) | rpl::start_with_next([=](const Api::BlockedPeers::Slice &result) {
+	) | rpl::on_next([=](const Api::BlockedPeers::Slice &result) {
 		applySlice(result, applySlice);
 	}, session->lifetime());
 }

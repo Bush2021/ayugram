@@ -2049,7 +2049,7 @@ void SendFilesBox::setupDragForBlock(not_null<Ui::RpWidget*> w, int index) {
 	const auto pressPos = w->lifetime().make_state<rpl::variable<QPoint>>();
 
 	w->events(
-	) | rpl::start_with_next(
+	) | rpl::on_next(
 			[=](not_null<QEvent *> e)
 			{
 				switch (e->type()) {

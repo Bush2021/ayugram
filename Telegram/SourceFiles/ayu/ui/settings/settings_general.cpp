@@ -155,7 +155,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->disableStories);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_disableStories(enabled);
@@ -193,7 +193,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 	) | rpl::filter([=](bool enabled)
 	{
 		return (enabled != settings->disableNotificationsDelay);
-	}) | start_with_next([=](bool enabled)
+	}) | on_next([=](bool enabled)
 						 {
 							 AyuSettings::set_disableNotificationsDelay(enabled);
 							 AyuSettings::save();
@@ -215,7 +215,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->showMessageSeconds);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showMessageSeconds(enabled);
@@ -242,7 +242,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->spoofWebviewAsAndroid);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_spoofWebviewAsAndroid(enabled);
@@ -287,7 +287,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->stickerConfirmation);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_stickerConfirmation(enabled);
@@ -306,7 +306,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->gifConfirmation);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_gifConfirmation(enabled);
@@ -325,7 +325,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->voiceConfirmation);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_voiceConfirmation(enabled);

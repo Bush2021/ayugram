@@ -138,7 +138,7 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->filtersEnabled);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_filtersEnabled(enabled);
@@ -160,7 +160,7 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->filtersEnabledInChats);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_filtersEnabledInChats(enabled);
@@ -183,7 +183,7 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->hideFromBlocked);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_hideFromBlocked(enabled);
@@ -266,7 +266,7 @@ void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->hideFromBlocked);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_hideFromBlocked(enabled);

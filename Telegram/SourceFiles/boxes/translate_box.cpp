@@ -262,7 +262,7 @@ void TranslateBox(
 				tr::italic(tr::lng_translate_box_error(tr::now)));
 		}).send();
 
-		box->boxClosing() | rpl::start_with_next([=]
+		box->boxClosing() | rpl::on_next([=]
 		{
 			Ayu::Translator::TranslateManager::currentInstance()->cancel(reqId);
 		}, box->lifetime());

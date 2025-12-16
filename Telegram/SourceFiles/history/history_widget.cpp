@@ -406,7 +406,7 @@ HistoryWidget::HistoryWidget(
 	}
 	_unblock->addClickHandler([=] { unblockUser(); });
 	_botStart->setAcceptBoth(true);
-	_botStart->clicks() | rpl::start_with_next(
+	_botStart->clicks() | rpl::on_next(
 		[=](Qt::MouseButton button)
 		{
 			if (button == Qt::LeftButton) {
@@ -665,7 +665,7 @@ HistoryWidget::HistoryWidget(
 			Data::PeerUpdate::Flag::IsBlocked
 		) | rpl::to_empty,
 		AyuSettings::get_filtersUpdate()
-	) | rpl::start_with_next(
+	) | rpl::on_next(
 		[=]
 		{
 			crl::on_main(
@@ -796,7 +796,7 @@ HistoryWidget::HistoryWidget(
 		}
 	}, lifetime());
 
-	AyuSettings::get_historyUpdateReactive() | rpl::start_with_next([=]
+	AyuSettings::get_historyUpdateReactive() | rpl::on_next([=]
 	{
 		refreshAttachBotsMenu();
 		updateHistoryGeometry();
@@ -1045,7 +1045,7 @@ HistoryWidget::HistoryWidget(
 		confirmDeleteSelected();
 	}, _topBar->lifetime());
 	_topBar->messageShotSelectionRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		messageShotSelected();
 	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
@@ -9394,7 +9394,7 @@ void HistoryWidget::messageShotSelected() {
 		messages
 	};
 	auto box = Box<MessageShotBox>(config);
-	box->boxClosing() | rpl::start_with_next([=]
+	box->boxClosing() | rpl::on_next([=]
 	{
 		clearSelected();
 	}, box->lifetime());

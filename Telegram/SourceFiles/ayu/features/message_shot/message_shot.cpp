@@ -460,7 +460,7 @@ void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected
 		messages,
 	};
 	auto box = Box<MessageShotBox>(config);
-	box->boxClosing() | rpl::start_with_next([=]
+	box->boxClosing() | rpl::on_next([=]
 	{
 		clearSelected();
 	}, box->lifetime());

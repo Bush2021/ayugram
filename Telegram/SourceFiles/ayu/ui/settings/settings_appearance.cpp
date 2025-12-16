@@ -74,7 +74,7 @@ void SetupAppIcon(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->hideNotificationBadge);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_hideNotificationBadge(enabled);
@@ -103,7 +103,7 @@ void SetupAppearance(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->materialSwitches);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_materialSwitches(enabled);
@@ -122,7 +122,7 @@ void SetupAppearance(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->removeMessageTail);
-		}) | start_with_next(
+		}) | on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_removeMessageTail(enabled);
@@ -141,7 +141,7 @@ void SetupAppearance(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		[=](bool enabled)
 		{
 			return (enabled != settings->disableCustomBackgrounds);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_disableCustomBackgrounds(enabled);
@@ -191,7 +191,7 @@ void SetupChatFolders(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->hideNotificationCounters);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_hideNotificationCounters(enabled);
@@ -210,7 +210,7 @@ void SetupChatFolders(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->hideAllChatsFolder);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_hideAllChatsFolder(enabled);
@@ -240,7 +240,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showMyProfileInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showMyProfileInDrawer(enabled);
@@ -261,7 +261,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 			[=](bool enabled)
 			{
 				return (enabled != settings->showBotsInDrawer);
-			}) | rpl::start_with_next(
+			}) | rpl::on_next(
 			[=](bool enabled)
 			{
 				AyuSettings::set_showBotsInDrawer(enabled);
@@ -282,7 +282,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showNewGroupInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showNewGroupInDrawer(enabled);
@@ -302,7 +302,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showNewChannelInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showNewChannelInDrawer(enabled);
@@ -322,7 +322,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showContactsInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showContactsInDrawer(enabled);
@@ -342,7 +342,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showCallsInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showCallsInDrawer(enabled);
@@ -362,7 +362,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showSavedMessagesInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showSavedMessagesInDrawer(enabled);
@@ -382,7 +382,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showLReadToggleInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showLReadToggleInDrawer(enabled);
@@ -402,7 +402,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showSReadToggleInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showSReadToggleInDrawer(enabled);
@@ -422,7 +422,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showNightModeToggleInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showNightModeToggleInDrawer(enabled);
@@ -442,7 +442,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showGhostToggleInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showGhostToggleInDrawer(enabled);
@@ -463,7 +463,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		[=](bool enabled)
 		{
 			return (enabled != settings->showStreamerToggleInDrawer);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showStreamerToggleInDrawer(enabled);
@@ -491,7 +491,7 @@ void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->showGhostToggleInTray);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showGhostToggleInTray(enabled);
@@ -511,7 +511,7 @@ void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			return (enabled != settings->showStreamerToggleInTray);
-		}) | rpl::start_with_next(
+		}) | rpl::on_next(
 		[=](bool enabled)
 		{
 			AyuSettings::set_showStreamerToggleInTray(enabled);

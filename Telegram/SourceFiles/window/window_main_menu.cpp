@@ -838,7 +838,7 @@ void MainMenu::setupMenu() {
 		)->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
 
 		ghostModeToggle->toggledChanges(
-		) | rpl::start_with_next(
+		) | rpl::on_next(
 			[=](bool ghostMode)
 			{
 				AyuSettings::set_ghostModeEnabled(ghostMode);
@@ -854,7 +854,7 @@ void MainMenu::setupMenu() {
 		)->toggleOn(rpl::single(AyuFeatures::StreamerMode::isEnabled()));
 
 		streamerModeToggle->toggledChanges(
-		) | rpl::start_with_next(
+		) | rpl::on_next(
 			[=](bool enabled)
 			{
 				if (enabled) {

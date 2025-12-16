@@ -63,7 +63,7 @@ object_ptr<Ui::RpWidget> CreateTopLogoWidget(
 	const auto logo = MakeSupportLogo();
 
 	raw->paintRequest(
-	) | rpl::start_with_next(
+	) | rpl::on_next(
 		[=](QRect)
 		{
 			QPainter p(raw);
@@ -104,7 +104,7 @@ object_ptr<Ui::RpWidget> InfoRow(
 	raw->add(
 		object_ptr<Ui::FlatLabel>(
 			raw,
-			rpl::single(title) | Ui::Text::ToBold(),
+			rpl::single(title) | rpl::map(&Ui::Text::Bold),
 			st::defaultFlatLabel),
 		st::settingsPremiumRowTitlePadding);
 
@@ -152,7 +152,7 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 		object_ptr<Ui::FlatLabel>(
 			box->verticalLayout(),
 			tr::ayu_SupportBoxHeader()
-			| Ui::Text::ToBold(),
+			| rpl::map(&Ui::Text::Bold),
 			st::boxTitle),
 		st::boxRowPadding,
 		style::al_top);
@@ -190,7 +190,7 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 		TextWithEntities{dollarAmount},
 		lt_amount2,
 		innerText,
-		Ui::Text::RichLangValue
+		tr::rich
 	);
 
 	box->verticalLayout()->add(InfoRow(
@@ -211,8 +211,8 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 	const TextWithEntities proofText = tr::ayu_SupportBoxSendProofInfo(
 		tr::now,
 		lt_item,
-		Ui::Text::Link(username, controller->session().createInternalLinkFull(usernameTrimmed)),
-		Ui::Text::RichLangValue);
+		tr::link(username, controller->session().createInternalLinkFull(usernameTrimmed)),
+		tr::rich);
 	box->verticalLayout()->add(InfoRow(
 		box->verticalLayout(),
 		&controller->session(),
@@ -243,7 +243,7 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 	closeButton->widthValue() | rpl::filter([=]
 	{
 		return (closeButton->widthNoMargins() != buttonWidth);
-	}) | rpl::start_with_next([=]
+	}) | rpl::on_next([=]
 							  {
 								  closeButton->resizeToWidth(buttonWidth);
 							  },

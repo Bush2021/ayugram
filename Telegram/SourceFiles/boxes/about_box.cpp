@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "core/update_checker.h"
 #include "lang/lang_keys.h"
+#include "lang/lang_instance.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
@@ -33,6 +34,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "window/window_session_controller.h"
 #include "window/window_session_controller_link_info.h"
+
+QString telegramFaqLink();
 
 namespace {
 
@@ -111,6 +114,23 @@ void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controll
 		});
 
 	box->setWidth(st::aboutWidth);
+}
+
+QString telegramFaqLink() {
+	const auto result = u"https://telegram.org/faq"_q;
+	const auto langpacked = [&](const char *language) {
+		return result + '/' + language;
+	};
+	const auto current = Lang::Id();
+	for (const auto language : { "de", "es", "it", "ko" }) {
+		if (current.startsWith(QLatin1String(language))) {
+			return langpacked(language);
+		}
+	}
+	if (current.startsWith(u"pt-br"_q)) {
+		return langpacked("br");
+	}
+	return result;
 }
 
 QString currentVersionText() {

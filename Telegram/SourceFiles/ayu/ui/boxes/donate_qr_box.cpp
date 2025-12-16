@@ -114,7 +114,7 @@ void FillDonateQrBox(
 	recompute();
 
 	qrWidget->paintRequest(
-	) | rpl::start_with_next([=](QRect) {
+	) | rpl::on_next([=](QRect) {
 		QPainter p(qrWidget);
 		PainterHighQualityEnabler hq(p);
 
@@ -154,7 +154,7 @@ void FillDonateQrBox(
 	- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
 	copyButton->widthValue() | rpl::filter([=] {
 		return (copyButton->widthNoMargins() != buttonWidth);
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		copyButton->resizeToWidth(buttonWidth);
 	}, copyButton->lifetime());
 

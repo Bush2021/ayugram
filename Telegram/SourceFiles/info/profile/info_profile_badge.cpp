@@ -203,7 +203,7 @@ void Badge::setContent(Content content) {
 			icon->width() + skip,
 			icon->height());
 		_view->paintRequest(
-		) | rpl::start_with_next([=, check = _view.data()]{
+		) | rpl::on_next([=, check = _view.data()]{
 			Painter p(check);
 			icon->paint(p, skip, 0, check->width());
 		}, _view->lifetime());
