@@ -282,8 +282,8 @@ EffectPreview::EffectPreview(
 			this,
 			tr::lng_effect_premium(
 				lt_link,
-				tr::lng_effect_premium_link() | Ui::Text::ToLink(),
-				Ui::Text::WithEntities),
+				tr::lng_effect_premium_link(tr::link),
+				tr::marked),
 			st::effectPreviewPromoLabel),
 		st::effectPreviewPromoPadding))
 , _bottom(_send ? ((Ui::RpWidget*)_send.get()) : _premiumPromoLabel.get())
@@ -410,7 +410,7 @@ void EffectPreview::setupBackground() {
 		QImage::Format_ARGB32_Premultiplied);
 	_bg.setDevicePixelRatio(ratio);
 	repaintBackground();
-	_theme->repaintBackgroundRequests() | rpl::start_with_next([=] {
+	_theme->repaintBackgroundRequests() | rpl::on_next([=] {
 		repaintBackground();
 		update();
 	}, lifetime());
@@ -489,7 +489,7 @@ void EffectPreview::setupLottie() {
 	}
 	rpl::single(rpl::empty) | rpl::then(
 		_show->session().downloaderTaskFinished()
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		if (checkLoaded()) {
 			_readyCheckLifetime.destroy();
 			createLottie();
@@ -505,7 +505,7 @@ void EffectPreview::createLottie() {
 		Stickers::EffectType::MessageEffect);
 	const auto raw = _lottie.get();
 	raw->updates(
-	) | rpl::start_with_next([=](Lottie::Update update) {
+	) | rpl::on_next([=](Lottie::Update update) {
 		v::match(update.data, [&](const Lottie::Information &information) {
 		}, [&](const Lottie::DisplayFrameRequest &request) {
 			this->update();
@@ -645,7 +645,7 @@ FillMenuResult AttachSendMenuEffect(
 	}
 
 	(*selector)->chosen(
-	) | rpl::start_with_next([=](ChosenReaction chosen) {
+	) | rpl::on_next([=](ChosenReaction chosen) {
 		const auto &reactions = show->session().data().reactions();
 		const auto &effects = reactions.list(Data::Reactions::Type::Effects);
 		const auto i = ranges::find(effects, chosen.id, &Data::Reaction::id);
@@ -851,7 +851,7 @@ void SetupMenuAndShortcuts(
 	Shortcuts::Requests(
 	) | rpl::filter([=] {
 		return button->isActiveWindow();
-	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
+	}) | rpl::on_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 
 		const auto now = details().type;

@@ -360,7 +360,7 @@ auto GenerateUniqueGiftMedia(
 			st::chatUniqueStickerPadding));
 		const auto peer = parent->history()->peer;
 		pushText(
-			Ui::Text::Bold(peer->isSelf()
+			tr::bold(peer->isSelf()
 				? tr::lng_action_gift_self_subtitle(tr::now)
 				: peer->isServiceUser()
 				? tr::lng_gift_link_label_gift(tr::now)
@@ -374,7 +374,7 @@ auto GenerateUniqueGiftMedia(
 			white,
 			st::chatUniqueTitlePadding);
 		pushText(
-			Ui::Text::Bold(Data::UniqueGiftName(*gift)),
+			tr::bold(Data::UniqueGiftName(*gift)),
 			st::chatUniqueTextStyle,
 			gift->backdrop.textColor,
 			st::chatUniqueTextPadding);
@@ -387,20 +387,20 @@ auto GenerateUniqueGiftMedia(
 				tr::lng_gift_released_by(
 					tr::now,
 					lt_name,
-					Ui::Text::Link('@' + by->username()),
-					Ui::Text::WithEntities),
+					tr::link('@' + by->username()),
+					tr::marked),
 				st::giftBoxReleasedByMargin,
 				gift->backdrop,
 				handler));
 		}
 
 		const auto name = [](const Data::UniqueGiftAttribute &value) {
-			return Ui::Text::Bold(value.name);
+			return tr::bold(value.name);
 		};
 		auto attributes = std::vector<AttributeTable::Entry>{
 			{ tr::lng_gift_unique_model(tr::now), name(gift->model) },
-			{ tr::lng_gift_unique_backdrop(tr::now), name(gift->backdrop) },
 			{ tr::lng_gift_unique_symbol(tr::now), name(gift->pattern) },
+			{ tr::lng_gift_unique_backdrop(tr::now), name(gift->backdrop) },
 		};
 		const auto tableAddedMargins = gift->releasedBy
 			? QMargins(0, st::chatUniqueAuthorSkip, 0, 0)
@@ -568,7 +568,7 @@ auto GenerateAuctionPreview(
 			: gift->resellTitle;
 		if (!name.isEmpty()) {
 			push(std::make_unique<TextPartColored>(
-				Ui::Text::Bold(name),
+				tr::bold(name),
 				QMargins(0, 0, 0, st::defaultVerticalListSkip),
 				[c = backdrop.textColor](const auto&) { return c; },
 				st::chatUniqueTitle));

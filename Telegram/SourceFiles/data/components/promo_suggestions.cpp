@@ -54,7 +54,7 @@ PromoSuggestions::PromoSuggestions(
 , _topPromotionTimer([=] { refreshTopPromotion(); })
 , _firstPromoLoaded(std::move(firstPromoLoaded)) {
 	Core::App().settings().proxy().connectionTypeValue(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		refreshTopPromotion();
 	}, _lifetime);
 }

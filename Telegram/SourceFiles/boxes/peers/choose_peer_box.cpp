@@ -202,10 +202,10 @@ object_ptr<Ui::BoxContent> MakeConfirmBox(
 	auto text = tr::lng_request_peer_confirm(
 		tr::now,
 		lt_chat,
-		Ui::Text::Bold(name),
+		tr::bold(name),
 		lt_bot,
-		Ui::Text::Bold(botName),
-		Ui::Text::WithEntities);
+		tr::bold(botName),
+		tr::marked);
 	if (!peer->isUser()) {
 		const auto rights = peer->isBroadcast()
 			? BroadcastRightsText(query.botRights)
@@ -215,12 +215,12 @@ object_ptr<Ui::BoxContent> MakeConfirmBox(
 				tr::lng_request_peer_confirm_rights(
 					tr::now,
 					lt_bot,
-					Ui::Text::Bold(botName),
+					tr::bold(botName),
 					lt_chat,
-					Ui::Text::Bold(name),
+					tr::bold(name),
 					lt_rights,
 					TextWithEntities{ rights },
-					Ui::Text::WithEntities));
+					tr::marked));
 		} else if (!peer->isBroadcast() && query.isBotParticipant) {
 			const auto common = bot->session().api().botCommonGroups(bot);
 			if (!common || !ranges::contains(*common, peer)) {
@@ -228,10 +228,10 @@ object_ptr<Ui::BoxContent> MakeConfirmBox(
 					tr::lng_request_peer_confirm_add(
 						tr::now,
 						lt_bot,
-						Ui::Text::Bold(botName),
+						tr::bold(botName),
 						lt_chat,
-						Ui::Text::Bold(name),
-						Ui::Text::WithEntities));
+						tr::bold(name),
+						tr::marked));
 			}
 		}
 	}
@@ -373,7 +373,7 @@ void ChoosePeerBoxController::prepareRestrictions() {
 			st,
 			QPoint());
 		button->heightValue(
-		) | rpl::start_with_next([=](int height) {
+		) | rpl::on_next([=](int height) {
 			icon->moveToLeft(
 				st::choosePeerCreateIconLeft,
 				(height - st::inviteViaLinkIcon.height()) / 2);
@@ -387,7 +387,7 @@ void ChoosePeerBoxController::prepareRestrictions() {
 		button->events(
 		) | rpl::filter([=](not_null<QEvent*> e) {
 			return (e->type() == QEvent::Enter);
-		}) | rpl::start_with_next([=] {
+		}) | rpl::on_next([=] {
 			delegate()->peerListMouseLeftGeometry();
 		}, button->lifetime());
 		return button;
@@ -522,7 +522,7 @@ void ShowChoosePeerBox(
 		query,
 		std::move(callback));
 	auto initBox = [=, ptr = controller.get()](not_null<PeerListBox*> box) {
-		ptr->selectedCountValue() | rpl::start_with_next([=](int count) {
+		ptr->selectedCountValue() | rpl::on_next([=](int count) {
 			box->clearButtons();
 			if (limit > 1) {
 				box->setAdditionalTitle(rpl::single(u"%1 / %2"_q.arg(count).arg(limit)));

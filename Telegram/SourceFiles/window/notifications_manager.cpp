@@ -198,7 +198,7 @@ System::System()
 , _waitForAllGroupedTimer([=] { showGrouped(); })
 , _manager(std::make_unique<DummyManager>(this)) {
 	settingsChanged(
-	) | rpl::start_with_next([=](ChangeType type) {
+	) | rpl::on_next([=](ChangeType type) {
 		if (type == ChangeType::DesktopEnabled) {
 			clearAll();
 		} else if (type == ChangeType::ViewParams) {
@@ -294,7 +294,9 @@ System::SkipState System::skipNotification(
 	const auto item = notification.item;
 	const auto type = notification.type;
 	const auto messageType = (type == Data::ItemNotificationType::Message);
-	if (!item->notificationThread()->currentNotification()
+	const auto thread = item->maybeNotificationThread();
+	if (!thread
+		|| !thread->currentNotification()
 		|| (messageType && item->skipNotification())
 		|| (type == Data::ItemNotificationType::Reaction
 			&& skipReactionNotification(item))) {
@@ -397,7 +399,7 @@ void System::registerThread(not_null<Data::Thread*> thread) {
 	if (const auto topic = thread->asTopic()) {
 		const auto &[i, ok] = _watchedTopics.emplace(topic, rpl::lifetime());
 		if (ok) {
-			topic->destroyed() | rpl::start_with_next([=] {
+			topic->destroyed() | rpl::on_next([=] {
 				clearFromTopic(topic);
 			}, i->second);
 		}
@@ -406,7 +408,7 @@ void System::registerThread(not_null<Data::Thread*> thread) {
 			sublist,
 			rpl::lifetime());
 		if (ok) {
-			sublist->destroyed() | rpl::start_with_next([=] {
+			sublist->destroyed() | rpl::on_next([=] {
 				clearFromSublist(sublist);
 			}, i->second);
 		}
@@ -1122,7 +1124,7 @@ TextWithEntities Manager::ComposeReactionNotification(
 			tr::now,
 			lt_reaction,
 			reactionWithEntities,
-			Ui::Text::WithEntities);
+			tr::marked);
 	};
 	if (hideContent) {
 		return simple(tr::lng_reaction_notext);
@@ -1135,7 +1137,7 @@ TextWithEntities Manager::ComposeReactionNotification(
 			reactionWithEntities,
 			lt_text,
 			item->notificationText(),
-			Ui::Text::WithEntities);
+			tr::marked);
 	};
 	if (!media || media->webpage()) {
 		return text();
@@ -1156,8 +1158,8 @@ TextWithEntities Manager::ComposeReactionNotification(
 				lt_reaction,
 				reactionWithEntities,
 				lt_emoji,
-				Ui::Text::WithEntities(sticker->alt),
-				Ui::Text::WithEntities);
+				tr::marked(sticker->alt),
+				tr::marked);
 		}
 		return simple(tr::lng_reaction_document);
 	} else if (const auto contact = media->sharedContact()) {
@@ -1176,8 +1178,8 @@ TextWithEntities Manager::ComposeReactionNotification(
 			lt_reaction,
 			reactionWithEntities,
 			lt_name,
-			Ui::Text::WithEntities(name),
-			Ui::Text::WithEntities);
+			tr::marked(name),
+			tr::marked);
 	} else if (media->location()) {
 		return simple(tr::lng_reaction_location);
 		// lng_reaction_live_location not used right now :(
@@ -1190,7 +1192,7 @@ TextWithEntities Manager::ComposeReactionNotification(
 				reactionWithEntities,
 				lt_title,
 				poll->question,
-				Ui::Text::WithEntities);
+				tr::marked);
 	} else if (media->game()) {
 		return simple(tr::lng_reaction_game);
 	} else if (media->invoice()) {

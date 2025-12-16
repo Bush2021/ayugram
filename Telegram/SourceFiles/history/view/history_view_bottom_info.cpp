@@ -456,8 +456,8 @@ void BottomInfo::layoutDateText() {
 
 	const auto makeDateString = [&] {
 		return (_data.flags & Data::Flag::ForwardedDate)
-			? Ui::FormatDateTimeSavedFrom(_data.date, true)
-			: formatMessageTime(_data.date.time());
+			? Ui::FormatDateTimeSavedFrom(_data.date)
+			: QLocale().toString(_data.date.time(), QLocale::ShortFormat);
 	};
 
 	if (!settings.replaceBottomInfoWithIcons) {
@@ -490,18 +490,20 @@ void BottomInfo::layoutDateText() {
 			: name.isEmpty()
 			? (deleted + date)
 			: (deleted + name + afterAuthor);
+
 		auto marked = TextWithEntities();
-	if (const auto count = _data.stars) {
-		marked.append(
-			Ui::Text::IconEmoji(&st::starIconEmojiSmall)
-		).append(Lang::FormatCountToShort(count).string).append(u", "_q);
-	}
-	marked.append(full);
-	_authorEditedDate.setMarkedText(
+		if (const auto count = _data.stars) {
+			marked.append(Ui::Text::IconEmoji(&st::starIconEmojiSmall))
+				.append(Lang::FormatCountToShort(count).string)
+				.append(u", "_q);
+		}
+		marked.append(full);
+
+		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
 			marked,
 			Ui::NameTextOptions(),
-		Core::TextContext({ .session = &_reactionsOwner->session() }));
+			Core::TextContext({ .session = &_reactionsOwner->session() }));
 	} else {
 		TextWithEntities deleted;
 		if (_data.flags & Data::Flag::AyuDeleted) {
@@ -551,6 +553,14 @@ void BottomInfo::layoutDateText() {
 			full.append(deleted).append(name).append(afterAuthor);
 		}
 
+		auto marked = TextWithEntities();
+		if (const auto count = _data.stars) {
+			marked.append(Ui::Text::IconEmoji(&st::starIconEmojiSmall))
+				.append(Lang::FormatCountToShort(count).string)
+				.append(u", "_q);
+		}
+		marked.append(full);
+
 		const auto context = Core::TextContext({
 			.session = &_reactionsOwner->session(),
 			.repaint = [] {},
@@ -559,7 +569,7 @@ void BottomInfo::layoutDateText() {
 
 		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
-			full,
+			marked,
 			Ui::NameTextOptions(),
 			context);
 	}

@@ -228,7 +228,7 @@ void TopicIconView::setupPlayer(not_null<Data::ForumTopic*> topic) {
 			return result;
 		});
 	}) | rpl::flatten_latest(
-	) | rpl::start_with_next([=](std::shared_ptr<StickerPlayer> player) {
+	) | rpl::on_next([=](std::shared_ptr<StickerPlayer> player) {
 		_player = std::move(player);
 		if (!_player) {
 			_update();
@@ -241,7 +241,7 @@ void TopicIconView::setupImage(not_null<Data::ForumTopic*> topic) {
 	if (topic->isGeneral()) {
 		rpl::single(rpl::empty) | rpl::then(
 			style::PaletteChanged()
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			_image = ForumTopicGeneralIconFrame(
 				st::infoForumTopicIcon.size,
 				_generalIconFg->c);
@@ -254,7 +254,7 @@ void TopicIconView::setupImage(not_null<Data::ForumTopic*> topic) {
 		ColorIdValue(topic)
 	) | rpl::map([=](const QString &title, int32 colorId) {
 		return ForumTopicIconFrame(colorId, title, st::infoForumTopicIcon);
-	}) | rpl::start_with_next([=](QImage &&image) {
+	}) | rpl::on_next([=](QImage &&image) {
 		_image = std::move(image);
 		_update();
 	}, _lifetime);
@@ -277,7 +277,7 @@ TopicIconButton::TopicIconButton(
 , _view(topic, paused, [=] { update(); }) {
 	resize(st::infoTopicCover.photo.size);
 	paintRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		auto p = QPainter(this);
 		_view.paintInRect(p, rect());
 	}, lifetime());
@@ -442,7 +442,7 @@ Cover::Cover(
 		_status->setAttribute(Qt::WA_TransparentForMouseEvents);
 		if (const auto rating = _starsRating.get()) {
 			_statusShift = rating->widthValue();
-			_statusShift.changes() | rpl::start_with_next([=] {
+			_statusShift.changes() | rpl::on_next([=] {
 				refreshStatusGeometry(width());
 			}, _status->lifetime());
 			rating->raise();
@@ -487,7 +487,7 @@ Cover::Cover(
 			std::move(badgeUpdates),
 			_exteraBadge->updated());
 	}
-	std::move(badgeUpdates) | rpl::start_with_next([=] {
+	std::move(badgeUpdates) | rpl::on_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
 
@@ -531,7 +531,7 @@ void Cover::setupShowLastSeen() {
 				user,
 				Data::PeerUpdate::Flag::OnlineStatus),
 			Data::AmPremiumValue(&user->session())
-		) | rpl::start_with_next([=](auto, bool premium) {
+		) | rpl::on_next([=](auto, bool premium) {
 			const auto wasShown = !_showLastSeen->isHidden();
 			const auto hiddenByMe = user->lastseen().isHiddenByMe();
 			const auto shown = hiddenByMe
@@ -548,7 +548,7 @@ void Cover::setupShowLastSeen() {
 			Api::UserPrivacy::Key::LastSeen
 		) | rpl::filter([=](Api::UserPrivacy::Rule rule) {
 			return (rule.option == Api::UserPrivacy::Option::Everyone);
-		}) | rpl::start_with_next([=] {
+		}) | rpl::on_next([=] {
 			if (user->lastseen().isHiddenByMe()) {
 				user->updateFullForced();
 			}
@@ -576,7 +576,7 @@ void Cover::setupShowLastSeen() {
 
 void Cover::setupChildGeometry() {
 	widthValue(
-	) | rpl::start_with_next([this](int newWidth) {
+	) | rpl::on_next([this](int newWidth) {
 		if (_userpic) {
 			_userpic->moveToLeft(_st.photoLeft, _st.photoTop, newWidth);
 		} else {
@@ -699,7 +699,7 @@ void Cover::setupSavedMusic() {
 }
 
 Cover *Cover::setOnlineCount(rpl::producer<int> &&count) {
-	std::move(count) | rpl::start_with_next([=](int value) {
+	std::move(count) | rpl::on_next([=](int value) {
 		if (_statusLabel) {
 			_statusLabel->setOnlineCount(value);
 			refreshStatusGeometry(width());
@@ -716,7 +716,7 @@ void Cover::initViewers(rpl::producer<QString> title) {
 	using Flag = Data::PeerUpdate::Flag;
 	std::move(
 		title
-	) | rpl::start_with_next([=](const QString &title) {
+	) | rpl::on_next([=](const QString &title) {
 		_name->setText(title);
 		refreshNameGeometry(width());
 	}, lifetime());
@@ -728,7 +728,7 @@ void Cover::initViewers(rpl::producer<QString> title) {
 	_peer->session().changes().peerFlagsValue(
 		_peer,
 		Flag::OnlineStatus | Flag::Members
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		_statusLabel->refresh();
 		refreshStatusGeometry(width());
 	}, lifetime());
@@ -736,7 +736,7 @@ void Cover::initViewers(rpl::producer<QString> title) {
 	_peer->session().changes().peerFlagsValue(
 		_peer,
 		(_peer->isUser() ? Flag::IsContact : Flag::Rights)
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		refreshUploadPhotoOverlay();
 	}, lifetime());
 
@@ -839,7 +839,7 @@ void Cover::refreshUploadPhotoOverlay() {
 
 	if (const auto user = _peer->asUser()) {
 		_userpic->resetPersonalRequests(
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			user->session().api().peerPhoto().clearPersonal(user);
 			_userpic->showSource(Ui::UserpicButton::Source::PeerPhoto);
 		}, lifetime());
@@ -852,7 +852,7 @@ void Cover::setupChangePersonal() {
 	}
 
 	_changePersonal->chosenImages(
-	) | rpl::start_with_next([=](Ui::UserpicButton::ChosenImage &&chosen) {
+	) | rpl::on_next([=](Ui::UserpicButton::ChosenImage &&chosen) {
 		if (chosen.type == Ui::UserpicButton::ChosenType::Suggest) {
 			_peer->session().api().peerPhoto().suggest(
 				_peer,
@@ -871,7 +871,7 @@ void Cover::setupChangePersonal() {
 	}, _changePersonal->lifetime());
 
 	_changePersonal->resetPersonalRequests(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		_personalChosen = QImage();
 		_userpic->showSource(
 			Ui::UserpicButton::Source::NonPersonalPhoto);
@@ -968,7 +968,7 @@ void Cover::hideBadgeTooltip() {
 		raw->shownValue(
 		) | rpl::filter(
 			!rpl::mappers::_1
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			const auto i = ranges::find(
 				_badgeOldTooltips,
 				raw,
@@ -986,7 +986,7 @@ void Cover::setupUniqueBadgeTooltip() {
 	}
 	base::timer_once(kWaitBeforeGiftBadge) | rpl::then(
 		_badge->updated()
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		const auto widget = _badge->widget();
 		const auto &content = _badgeContent.current();
 		const auto &collectible = content.emojiStatusId.collectible;

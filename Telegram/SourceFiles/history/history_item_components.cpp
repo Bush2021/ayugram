@@ -85,7 +85,7 @@ base::options::toggle FastButtonsModeOption({
 			tr::now,
 			lt_count,
 			fullCount,
-			Ui::Text::WithEntities);
+			tr::marked);
 	} else if (count == 1) {
 		return names.front();
 	}
@@ -97,7 +97,7 @@ base::options::toggle FastButtonsModeOption({
 			full,
 			lt_task,
 			names[i],
-			Ui::Text::WithEntities);
+			tr::marked);
 	}
 	return tr::lng_action_todo_tasks_and_last(
 		tr::now,
@@ -105,7 +105,7 @@ base::options::toggle FastButtonsModeOption({
 		full,
 		lt_task,
 		names.back(),
-		Ui::Text::WithEntities);
+		tr::marked);
 }
 
 } // namespace
@@ -276,7 +276,7 @@ void HistoryMessageForwarded::create(
 				name,
 				lt_user,
 				{ .text = originalPostAuthor },
-				Ui::Text::WithEntities));
+				tr::marked));
 	} else {
 		phrase.append(name);
 	}
@@ -285,9 +285,9 @@ void HistoryMessageForwarded::create(
 			tr::now,
 			lt_user,
 			Ui::Text::Wrapped(phrase, EntityType::CustomUrl, QString()), // Link 1.
-			Ui::Text::WithEntities);
+			tr::marked);
 	} else if (via && psaType.isEmpty()) {
-		const auto linkData = Ui::Text::Link(
+		const auto linkData = tr::link(
 			QString(),
 			1).entities.front().data(); // Link 1.
 		if (fromChannel) {
@@ -296,16 +296,16 @@ void HistoryMessageForwarded::create(
 				lt_channel,
 				Ui::Text::Wrapped(phrase, EntityType::CustomUrl, linkData), // Link 1.
 				lt_inline_bot,
-				Ui::Text::Link('@' + via->bot->username(), 2), // Link 2.
-				Ui::Text::WithEntities);
+				tr::link('@' + via->bot->username(), 2), // Link 2.
+				tr::marked);
 		} else {
 			phrase = tr::lng_forwarded_via(
 				tr::now,
 				lt_user,
 				Ui::Text::Wrapped(phrase, EntityType::CustomUrl, linkData), // Link 1.
 				lt_inline_bot,
-				Ui::Text::Link('@' + via->bot->username(), 2), // Link 2.
-				Ui::Text::WithEntities);
+				tr::link('@' + via->bot->username(), 2), // Link 2.
+				tr::marked);
 		}
 	} else {
 		if (fromChannel || !psaType.isEmpty()) {
@@ -331,14 +331,14 @@ void HistoryMessageForwarded::create(
 							phrase,
 							EntityType::CustomUrl,
 							QString()), // Link 1.
-						Ui::Text::WithEntities);
+						tr::marked);
 			}
 		} else {
 			phrase = tr::lng_forwarded(
 				tr::now,
 				lt_user,
 				Ui::Text::Wrapped(phrase, EntityType::CustomUrl, QString()), // Link 1.
-				Ui::Text::WithEntities);
+				tr::marked);
 		}
 	}
 	text.setMarkedText(st::fwdTextStyle, phrase, kMarkupTextOptions, context);

@@ -873,7 +873,7 @@ void SessionNavigation::resolveBoostState(
 			.group = channel->isMegagroup(),
 		}, submit));
 		if (lifting) {
-			box->boxClosing() | rpl::start_with_next([=] {
+			box->boxClosing() | rpl::on_next([=] {
 				if (*boosted) {
 					channel->updateFullForced();
 				}
@@ -1554,14 +1554,14 @@ SessionController::SessionController(
 
 	pushDefaultChatBackground();
 	Theme::Background()->updates(
-	) | rpl::start_with_next([=](const Theme::BackgroundUpdate &update) {
+	) | rpl::on_next([=](const Theme::BackgroundUpdate &update) {
 		if (update.type == Theme::BackgroundUpdate::Type::New
 			|| update.type == Theme::BackgroundUpdate::Type::Changed) {
 			pushDefaultChatBackground();
 		}
 	}, _lifetime);
 	style::PaletteChanged(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		for (auto &[key, value] : _customChatThemes) {
 			if (!key.theme.id) {
 				value.theme.reset();
@@ -1592,7 +1592,7 @@ SessionController::SessionController(
 		}
 		return (update.flags & Data::PeerUpdate::Flag::FullInfo)
 			&& (update.peer == _showEditPeer);
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		show(Box<EditPeerInfoBox>(this, base::take(_showEditPeer)));
 	}, lifetime());
 
@@ -1602,7 +1602,7 @@ SessionController::SessionController(
 			&& (folder == _openedFolder.current())
 			&& folder->chatsList()->indexed()->empty()
 			&& !folder->storiesCount();
-	}) | rpl::start_with_next([=](Data::Folder *folder) {
+	}) | rpl::on_next([=](Data::Folder *folder) {
 		folder->updateChatListSortPosition();
 		closeFolder();
 	}, lifetime());
@@ -1623,7 +1623,7 @@ SessionController::SessionController(
 		enoughSpaceForFiltersValue() | rpl::skip(1) | rpl::to_empty,
 		Core::App().settings().chatFiltersHorizontalChanges() | rpl::to_empty,
 		session->data().chatsFilters().changed()
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		if (!_filtersActivated) {
 			processFiltersMenu();
 		}
@@ -1632,7 +1632,7 @@ SessionController::SessionController(
 	}, lifetime());
 
 	session->data().itemIdChanged(
-	) | rpl::start_with_next([=](Data::Session::IdChange change) {
+	) | rpl::on_next([=](Data::Session::IdChange change) {
 		const auto current = _activeChatEntry.current();
 		if (const auto topic = current.key.topic()) {
 			if (topic->rootId() == change.oldId) {
@@ -1653,7 +1653,7 @@ SessionController::SessionController(
 	}, lifetime());
 
 	session->api().globalPrivacy().suggestArchiveAndMute(
-	) | rpl::take(1) | rpl::start_with_next([=] {
+	) | rpl::take(1) | rpl::on_next([=] {
 		session->api().globalPrivacy().reload(crl::guard(this, [=] {
 			if (!session->api().globalPrivacy().archiveAndMuteCurrent()) {
 				suggestArchiveAndMute();
@@ -1662,12 +1662,12 @@ SessionController::SessionController(
 	}, _lifetime);
 
 	session->downloader().nonPremiumDelays(
-	) | rpl::start_with_next([=](DocumentId id) {
+	) | rpl::on_next([=](DocumentId id) {
 		checkNonPremiumLimitToastDownload(id);
 	}, _lifetime);
 
 	session->uploader().nonPremiumDelays(
-	) | rpl::start_with_next([=](FullMsgId id) {
+	) | rpl::on_next([=](FullMsgId id) {
 		checkNonPremiumLimitToastUpload(id);
 	}, _lifetime);
 
@@ -1729,14 +1729,14 @@ void SessionController::suggestArchiveAndMute() {
 		box->setTitle(tr::lng_suggest_hide_new_title());
 		box->addRow(object_ptr<Ui::FlatLabel>(
 			box,
-			tr::lng_suggest_hide_new_about(Ui::Text::RichLangValue),
+			tr::lng_suggest_hide_new_about(tr::rich),
 			st::boxLabel));
 		box->addButton(tr::lng_suggest_hide_new_to_settings(), [=] {
 			showSettings(Settings::PrivacySecurity::Id());
 		});
 		box->setCloseByOutsideClick(false);
 		box->boxClosing(
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			crl::on_main(weak, [=] {
 				auto &privacy = session().api().globalPrivacy();
 				privacy.dismissArchiveAndMuteSuggestion();
@@ -1808,7 +1808,7 @@ void SessionController::setupShortcuts() {
 			&& (_chatSwitchProcess
 				|| (request.started
 					&& (Core::App().activeWindow() == &window())));
-	}) | rpl::start_with_next([=](const ChatSwitchRequest &request) {
+	}) | rpl::on_next([=](const ChatSwitchRequest &request) {
 		if (!_chatSwitchProcess) {
 			_chatSwitchProcess = std::make_unique<ChatSwitchProcess>(
 				widget()->bodyWidget(),
@@ -1821,7 +1821,7 @@ void SessionController::setupShortcuts() {
 			};
 
 			_chatSwitchProcess->chosen(
-			) | rpl::start_with_next([=](not_null<Data::Thread*> thread) {
+			) | rpl::on_next([=](not_null<Data::Thread*> thread) {
 				close();
 
 				const auto id = SeparateId(thread);
@@ -1833,7 +1833,7 @@ void SessionController::setupShortcuts() {
 			}, _chatSwitchProcess->lifetime());
 
 			_chatSwitchProcess->closeRequests(
-			) | rpl::start_with_next(close, _chatSwitchProcess->lifetime());
+			) | rpl::on_next(close, _chatSwitchProcess->lifetime());
 		}
 		_chatSwitchProcess->process(request);
 	}, _lifetime);
@@ -1843,7 +1843,7 @@ void SessionController::setupShortcuts() {
 		return (Core::App().activeWindow() == &window())
 			&& !isLayerShown()
 			&& !window().locked();
-	}) | rpl::start_with_next([=](not_null<Request*> request) {
+	}) | rpl::on_next([=](not_null<Request*> request) {
 		using C = Command;
 
 		const auto app = &Core::App();
@@ -2048,14 +2048,14 @@ void SessionController::showForum(
 	}
 
 	forum->destroyed(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		closeAndShowHistory(false);
 	}, _shownForumLifetime);
 	if (!forced) {
 		using FlagChange = Data::Flags<ChannelDataFlags>::Change;
 		if (const auto channel = forum->channel()) {
 			channel->flagsValue(
-			) | rpl::start_with_next([=](FlagChange change) {
+			) | rpl::on_next([=](FlagChange change) {
 				if (change.diff & ChannelDataFlag::ForumTabs) {
 					if (HistoryView::SubsectionTabs::UsedFor(history)) {
 						closeAndShowHistory(true);
@@ -2098,7 +2098,7 @@ void SessionController::setupPremiumToast() {
 	) | rpl::filter([=](bool premium) {
 		session().mtp().requestConfig();
 		return premium;
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		MainWindowShow(this).showToast({
 			.text = { tr::lng_premium_success(tr::now) },
 			.adaptive = true,
@@ -2135,7 +2135,7 @@ void SessionController::setActiveChatEntry(Dialogs::RowDescriptor row) {
 				ChannelData::Flag::Forum
 			) | rpl::filter([=](bool forum) {
 				return forum && !channel->useSubsectionTabs();
-			}) | rpl::start_with_next([=] {
+			}) | rpl::on_next([=] {
 				clearSectionStack(
 					{ anim::type::normal, anim::activation::background });
 				showForum(channel->forum(),
@@ -3414,7 +3414,7 @@ void SessionController::cacheChatThemeDone(
 			rpl::merge(
 				session().downloaderTaskFinished(),
 				((giftSymbol && !giftSymbol->ready())
-					? (_giftSymbolLoaded.events() | rpl::type_erased())
+					? (_giftSymbolLoaded.events() | rpl::type_erased)
 					: rpl::never<rpl::empty_value>())
 			) | rpl::filter([=] {
 				const auto i = _customChatThemes.find(key);
@@ -3423,7 +3423,7 @@ void SessionController::cacheChatThemeDone(
 				const auto giftSymbol = i->second.giftSymbol.get();
 				return (!media || media->loaded(true))
 					&& (!giftSymbol || giftSymbol->ready());
-			}) | rpl::start_with_next([=] {
+			}) | rpl::on_next([=] {
 				const auto i = _customChatThemes.find(key);
 				Assert(i != end(_customChatThemes));
 				updateCustomThemeBackground(i->second);
@@ -3625,7 +3625,7 @@ void SessionController::saveSubsectionTabs(
 	_savedSubsectionTabsLifetime.destroy();
 	_savedSubsectionTabs = std::move(tabs);
 	_savedSubsectionTabs->extractToParent(widget());
-	_savedSubsectionTabs->removeRequests() | rpl::start_with_next([=] {
+	_savedSubsectionTabs->removeRequests() | rpl::on_next([=] {
 		_savedSubsectionTabs = nullptr;
 	}, _savedSubsectionTabsLifetime);
 }

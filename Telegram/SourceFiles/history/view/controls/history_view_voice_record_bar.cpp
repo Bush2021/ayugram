@@ -102,7 +102,7 @@ SoundedPreview::SoundedPreview(
 	not_null<DocumentData*> document,
 	rpl::producer<> repaints)
 : _document(document) {
-	std::move(repaints) | rpl::start_with_next([=] {
+	std::move(repaints) | rpl::on_next([=] {
 		if (const auto onstack = _repaint) {
 			onstack();
 		}
@@ -405,7 +405,7 @@ TTLButton::TTLButton(
 			st::universalDuration);
 	});
 
-	Ui::RpWidget::shownValue() | rpl::start_with_next([=](bool shown) {
+	Ui::RpWidget::shownValue() | rpl::on_next([=](bool shown) {
 		if (!shown) {
 			_tooltip = nullptr;
 			return;
@@ -417,9 +417,9 @@ TTLButton::TTLButton(
 			(recordingVideo
 				? tr::lng_record_once_active_video
 				: tr::lng_record_once_active_tooltip)(
-					Ui::Text::RichLangValue),
+					tr::rich),
 			tr::lng_record_once_first_tooltip(
-				Ui::Text::RichLangValue));
+				tr::rich));
 		_tooltip.reset(Ui::CreateChild<Ui::ImportantTooltip>(
 			parent.get(),
 			object_ptr<Ui::PaddingWrap<Ui::FlatLabel>>(
@@ -432,7 +432,7 @@ TTLButton::TTLButton(
 				st::defaultImportantTooltip.padding),
 			st::historyRecordTooltip));
 		Ui::RpWidget::geometryValue(
-		) | rpl::start_with_next([=](const QRect &r) {
+		) | rpl::on_next([=](const QRect &r) {
 			if (r.isEmpty()) {
 				return;
 			}
@@ -451,7 +451,7 @@ TTLButton::TTLButton(
 		_tooltip->show();
 		if (!Core::App().settings().ttlVoiceClickTooltipHidden()) {
 			clicks(
-			) | rpl::take(1) | rpl::start_with_next([=] {
+			) | rpl::take(1) | rpl::on_next([=] {
 				Core::App().settings().setTtlVoiceClickTooltipHidden(true);
 			}, _tooltip->lifetime());
 			_tooltip->toggleAnimated(true);
@@ -460,7 +460,7 @@ TTLButton::TTLButton(
 		}
 
 		clicks(
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			const auto toggled = !Ui::AbstractButton::isDisabled();
 			_tooltip->toggleAnimated(toggled);
 
@@ -474,7 +474,7 @@ TTLButton::TTLButton(
 		) | rpl::map([=](const QRect &r) {
 			return (r.left() + r.width() > parentWidget()->width());
 		}) | rpl::distinct_until_changed(
-		) | rpl::start_with_next([=](bool toHide) {
+		) | rpl::on_next([=](bool toHide) {
 			const auto isFirstTooltip
 				= !Core::App().settings().ttlVoiceClickTooltipHidden();
 			if (isFirstTooltip || toHide) {
@@ -484,7 +484,7 @@ TTLButton::TTLButton(
 	}, lifetime());
 
 	paintRequest(
-	) | rpl::start_with_next([=](const QRect &clip) {
+	) | rpl::on_next([=](const QRect &clip) {
 		auto p = QPainter(this);
 
 		const auto inner = DrawLockCircle(p, rect(), _st.lock, 1.);
@@ -625,7 +625,7 @@ void ListenWrap::init() {
 	rpl::combine(
 		_parent->sizeValue(),
 		_send->widthValue()
-	) | rpl::start_with_next([=](QSize size, int send) {
+	) | rpl::on_next([=](QSize size, int send) {
 		_waveformBgRect = QRect({ 0, 0 }, size)
 			.marginsRemoved(st::historyRecordWaveformBgMargins);
 		{
@@ -646,7 +646,7 @@ void ListenWrap::init() {
 	}, _lifetime);
 
 	_parent->paintRequest(
-	) | rpl::start_with_next([=](const QRect &clip) {
+	) | rpl::on_next([=](const QRect &clip) {
 		auto p = QPainter(_parent);
 		auto hq = PainterHighQualityEnabler(p);
 		const auto progress = _showProgress.current();
@@ -762,7 +762,7 @@ void ListenWrap::initPlayButton() {
 	_playPauseButton->show();
 
 	_playPauseButton->paintRequest(
-	) | rpl::start_with_next([=](const QRect &clip) {
+	) | rpl::on_next([=](const QRect &clip) {
 		auto p = QPainter(_playPauseButton);
 
 		const auto progress = _showProgress.current();
@@ -780,14 +780,14 @@ void ListenWrap::initPlayButton() {
 
 	const auto showPause = _lifetime.make_state<rpl::variable<bool>>(false);
 	showPause->changes(
-	) | rpl::start_with_next([=](bool pause) {
+	) | rpl::on_next([=](bool pause) {
 		_playPause.setState(pause
 			? PlayButtonLayout::State::Pause
 			: PlayButtonLayout::State::Play);
 	}, _lifetime);
 
 	instance()->updatedNotifier(
-	) | rpl::start_with_next([=](const State &state) {
+	) | rpl::on_next([=](const State &state) {
 		if (isInPlayer(state)) {
 			*showPause = ShowPauseIcon(state.state);
 			if (!_data->minithumbs.isNull()) {
@@ -800,7 +800,7 @@ void ListenWrap::initPlayButton() {
 
 	instance()->stops(
 		AudioMsgId::Type::Voice
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		*showPause = false;
 	}, _lifetime);
 
@@ -827,13 +827,13 @@ void ListenWrap::initPlayProgress() {
 	rpl::merge(
 		instance()->startsPlay(voice) | rpl::map_to(true),
 		instance()->stops(voice) | rpl::map_to(false)
-	) | rpl::start_with_next([=](bool play) {
+	) | rpl::on_next([=](bool play) {
 		_parent->setMouseTracking(isInPlayer() && play);
 		updateCursor(_parent->mapFromGlobal(QCursor::pos()));
 	}, _lifetime);
 
 	instance()->updatedNotifier(
-	) | rpl::start_with_next([=](const State &state) {
+	) | rpl::on_next([=](const State &state) {
 		if (!isInPlayer(state)) {
 			return;
 		}
@@ -869,7 +869,7 @@ void ListenWrap::initPlayProgress() {
 	const auto isPressed = _lifetime.make_state<bool>(false);
 
 	isPointer->changes(
-	) | rpl::start_with_next([=](bool pointer) {
+	) | rpl::on_next([=](bool pointer) {
 		_parent->setCursor(pointer ? style::cur_pointer : style::cur_default);
 	}, _lifetime);
 
@@ -878,7 +878,7 @@ void ListenWrap::initPlayProgress() {
 		return (e->type() == QEvent::MouseMove
 			|| e->type() == QEvent::MouseButtonPress
 			|| e->type() == QEvent::MouseButtonRelease);
-	}) | rpl::start_with_next([=](not_null<QEvent*> e) {
+	}) | rpl::on_next([=](not_null<QEvent*> e) {
 		if (!isInPlayer()) {
 			return;
 		}
@@ -1028,7 +1028,7 @@ void RecordLock::setRecordingVideo(bool value) {
 
 void RecordLock::init() {
 	shownValue(
-	) | rpl::start_with_next([=](bool shown) {
+	) | rpl::on_next([=](bool shown) {
 		resize(
 			st::historyRecordLockTopShadow.width(),
 			st::historyRecordLockSize.height());
@@ -1043,7 +1043,7 @@ void RecordLock::init() {
 	}, lifetime());
 
 	paintRequest(
-	) | rpl::start_with_next([=](const QRect &clip) {
+	) | rpl::on_next([=](const QRect &clip) {
 		if (!_visibleTopPart) {
 			return;
 		}
@@ -1315,12 +1315,12 @@ CancelButton::CancelButton(
 void CancelButton::init() {
 	_showProgress.value(
 	) | rpl::map(rpl::mappers::_1 > 0.) | rpl::distinct_until_changed(
-	) | rpl::start_with_next([=](bool hasProgress) {
+	) | rpl::on_next([=](bool hasProgress) {
 		setVisible(hasProgress);
 	}, lifetime());
 
 	paintRequest(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		auto p = QPainter(this);
 
 		p.setOpacity(_showProgress.current());
@@ -1482,19 +1482,19 @@ void VoiceRecordBar::init() {
 		) | rpl::filter([](not_null<QEvent*> e) {
 			return e->type() == QEvent::ZOrderChange;
 		}) | rpl::to_empty
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		orderControls();
 	}, lifetime());
 
 	shownValue(
-	) | rpl::start_with_next([=](bool show) {
+	) | rpl::on_next([=](bool show) {
 		if (!show) {
 			finish();
 		}
 	}, lifetime());
 
 	sizeValue(
-	) | rpl::start_with_next([=](QSize size) {
+	) | rpl::on_next([=](QSize size) {
 		_centerY = size.height() / 2;
 		{
 			const auto maxD = st::historyRecordSignalRadius * 2;
@@ -1517,7 +1517,7 @@ void VoiceRecordBar::init() {
 	}, lifetime());
 
 	paintRequest(
-	) | rpl::start_with_next([=](const QRect &clip) {
+	) | rpl::on_next([=](const QRect &clip) {
 		auto p = QPainter(this);
 		if (_showAnimation.animating()) {
 			p.setOpacity(showAnimationRatio());
@@ -1551,12 +1551,12 @@ void VoiceRecordBar::init() {
 	}, lifetime());
 
 	_inField.changes(
-	) | rpl::start_with_next([=](bool value) {
+	) | rpl::on_next([=](bool value) {
 		activeAnimate(value);
 	}, lifetime());
 
 	_lockShowing.changes(
-	) | rpl::start_with_next([=](bool show) {
+	) | rpl::on_next([=](bool show) {
 		const auto to = show ? 1. : 0.;
 		const auto from = show ? 0. : 1.;
 		const auto &duration = st::historyRecordLockShowDuration;
@@ -1579,7 +1579,7 @@ void VoiceRecordBar::init() {
 		_level->setType(VoiceRecordButton::Type::Send);
 
 		_level->clicks(
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			stop(true);
 		}, _recordingLifetime);
 
@@ -1587,7 +1587,7 @@ void VoiceRecordBar::init() {
 			false
 		) | rpl::then(
 			_level->actives()
-		) | rpl::start_with_next([=](bool enter) {
+		) | rpl::on_next([=](bool enter) {
 			_inField = enter;
 		}, _recordingLifetime);
 	};
@@ -1624,7 +1624,7 @@ void VoiceRecordBar::init() {
 	});
 
 	_paused.value() | rpl::distinct_until_changed(
-	) | rpl::start_with_next([=](bool paused) {
+	) | rpl::on_next([=](bool paused) {
 		if (!paused) {
 			return;
 		}
@@ -1645,7 +1645,7 @@ void VoiceRecordBar::init() {
 	}, lifetime());
 
 	_lock->locks(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		if (_hasTTLFilter && _hasTTLFilter()) {
 			if (!_ttlButton) {
 				_ttlButton = std::make_unique<TTLButton>(
@@ -1680,7 +1680,7 @@ void VoiceRecordBar::init() {
 			&& !_lock->isLocked()
 			&& (e->type() == QEvent::MouseButtonPress
 				|| e->type() == QEvent::MouseButtonRelease);
-	}) | rpl::start_with_next([=](not_null<QEvent*> e) {
+	}) | rpl::on_next([=](not_null<QEvent*> e) {
 		if (e->type() == QEvent::MouseButtonPress) {
 			if (_startRecordingFilter && _startRecordingFilter()) {
 				return;
@@ -1696,9 +1696,9 @@ void VoiceRecordBar::init() {
 	_listenChanges.events(
 	) | rpl::filter([=] {
 		return _listen != nullptr;
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		_listen->stopRequests(
-		) | rpl::take(1) | rpl::start_with_next([=] {
+		) | rpl::take(1) | rpl::on_next([=] {
 			hideAnimated();
 		}, _listen->lifetime());
 
@@ -1789,11 +1789,11 @@ void VoiceRecordBar::initLockGeometry() {
 		_lock->heightValue() | rpl::to_empty,
 		geometryValue() | rpl::to_empty,
 		parent->geometryValue() | rpl::to_empty
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		updateLockGeometry();
 	}, lifetime());
 	parent->geometryValue(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		updateTTLGeometry(TTLAnimationType::RightLeft, 1.);
 	}, lifetime());
 }
@@ -1803,7 +1803,7 @@ void VoiceRecordBar::initLevelGeometry() {
 		_send->geometryValue(),
 		geometryValue(),
 		static_cast<Ui::RpWidget*>(parentWidget())->geometryValue()
-	) | rpl::start_with_next([=](QRect send, auto, auto) {
+	) | rpl::on_next([=](QRect send, auto, auto) {
 		const auto mapped = Ui::MapFrom(
 			_outerContainer,
 			_send->parentWidget(),
@@ -1868,14 +1868,14 @@ void VoiceRecordBar::startRecording() {
 				: nullptr);
 		}
 		instance()->updated(
-		) | rpl::start_with_next_error([=](const Update &update) {
+		) | rpl::on_next_error([=](const Update &update) {
 			recordUpdated(update.level, update.samples);
 		}, [=] {
 			stop(false);
 		}, _recordingLifetime);
 		if (_videoRecorder) {
 			_videoRecorder->updated(
-			) | rpl::start_with_next_error([=](const Update &update) {
+			) | rpl::on_next_error([=](const Update &update) {
 				recordUpdated(update.level, update.samples);
 				if (update.finished) {
 					_fullRecord = true;
@@ -1909,7 +1909,7 @@ void VoiceRecordBar::startRecording() {
 			std::make_unique<FloatingState>());
 	const auto state = stateOwned->get();
 
-	_lock->locks() | rpl::start_with_next([=] {
+	_lock->locks() | rpl::on_next([=] {
 		stateOwned->reset();
 	}, state->lifetime);
 
@@ -1948,7 +1948,7 @@ void VoiceRecordBar::startRecording() {
 			|| e->type() == QEvent::MouseButtonRelease)
 			&& isTypeRecord()
 			&& !_lock->isLocked();
-	}) | rpl::start_with_next([=](not_null<QEvent*> e) {
+	}) | rpl::on_next([=](not_null<QEvent*> e) {
 		const auto type = e->type();
 		if (type == QEvent::MouseMove) {
 			const auto mouse = static_cast<QMouseEvent*>(e.get());
@@ -1976,7 +1976,7 @@ void VoiceRecordBar::startRecording() {
 		rpl::empty_value()
 	) | rpl::filter([=] {
 		return _listen == nullptr;
-	}) | rpl::start_with_next([=] {
+	}) | rpl::on_next([=] {
 		auto keyFilterCallback = [=](not_null<QEvent*> e) {
 			using Result = base::EventFilterResult;
 			if (_send->type() != Ui::SendButton::Type::Record
@@ -2565,7 +2565,7 @@ bool VoiceRecordBar::createVideoRecorder() {
 	capturer->setOutput(track->sink());
 	capturer->setPreferredAspectRatio(1.);
 	_videoCapturerLifetime = track->stateValue(
-	) | rpl::start_with_next([=](Webrtc::VideoState state) {
+	) | rpl::on_next([=](Webrtc::VideoState state) {
 		capturer->setState((state == Webrtc::VideoState::Active)
 			? tgcalls::VideoState::Active
 			: tgcalls::VideoState::Inactive);
@@ -2580,7 +2580,7 @@ bool VoiceRecordBar::createVideoRecorder() {
 			.placeholder = _show->session().local().readRoundPlaceholder(),
 		});
 	_videoRecorder->placeholderUpdates(
-	) | rpl::start_with_next([=](QImage &&placeholder) {
+	) | rpl::on_next([=](QImage &&placeholder) {
 		_show->session().local().writeRoundPlaceholder(placeholder);
 	}, _videoCapturerLifetime);
 

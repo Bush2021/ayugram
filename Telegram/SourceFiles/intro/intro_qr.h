@@ -41,6 +41,7 @@ private:
 
 	void sendCheckPasswordRequest();
 	void setupControls();
+	void setupPasskeyLink();
 	void refreshCode();
 	void checkForTokenUpdate(const MTPUpdates &updates);
 	void checkForTokenUpdate(const MTPUpdate &update);
@@ -56,7 +57,6 @@ private:
 	base::Timer _refreshTimer;
 	mtpRequestId _requestId = 0;
 	bool _forceRefresh = false;
-	bool _passkeyPossible = false;
 
 };
 

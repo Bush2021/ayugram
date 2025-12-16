@@ -206,7 +206,7 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 		_session->data().chatsFilters().changed(
 		) | rpl::filter([=] {
 			return _session->data().chatsFilters().archiveNeeded();
-		}) | rpl::start_with_next([=] {
+		}) | rpl::on_next([=] {
 			requestMoreDialogsIfNeeded();
 		}, _session->lifetime());
 
@@ -255,7 +255,7 @@ void ApiWrap::setupSupportMode() {
 	}
 
 	_session->settings().supportChatsTimeSliceValue(
-	) | rpl::start_with_next([=](int seconds) {
+	) | rpl::on_next([=](int seconds) {
 		_dialogsLoadTill = seconds ? std::max(base::unixtime::now() - seconds, 0) : 0;
 		refreshDialogsLoadBlocked();
 	}, _session->lifetime());
@@ -505,7 +505,7 @@ void ApiWrap::sendMessageFail(
 				PeerFloodErrorText(&session(), PeerFloodType::Send)),
 			Ui::LayerOption::CloseOther);
 	} else if (show && error == u"USER_BANNED_IN_CHANNEL"_q) {
-		const auto link = Ui::Text::Link(
+		const auto link = tr::link(
 			tr::lng_cant_more_info(tr::now),
 			session().createInternalLinkFull(u"spambot"_q));
 		show->showBox(
@@ -514,7 +514,7 @@ void ApiWrap::sendMessageFail(
 					tr::now,
 					lt_more_info,
 					link,
-					Ui::Text::WithEntities)),
+					tr::marked)),
 			Ui::LayerOption::CloseOther);
 	} else if (error.startsWith(u"SLOWMODE_WAIT_"_q)) {
 		const auto chop = u"SLOWMODE_WAIT_"_q.size();
@@ -1941,7 +1941,7 @@ void ApiWrap::updateNotifySettingsDelayed(
 	}
 	if (_updateNotifyTopics.emplace(topic).second) {
 		topic->destroyed(
-		) | rpl::start_with_next([=] {
+		) | rpl::on_next([=] {
 			_updateNotifyTopics.remove(topic);
 		}, _updateNotifyQueueLifetime);
 		_updateNotifyTimer.callOnce(kNotifySettingSaveTimeout);
@@ -4878,7 +4878,7 @@ rpl::producer<bool> ApiWrap::contactSignupSilent() const {
 	return _contactSignupSilent
 		? _contactSignupSilentChanges.events_starting_with_copy(
 			*_contactSignupSilent)
-		: (_contactSignupSilentChanges.events() | rpl::type_erased());
+		: (_contactSignupSilentChanges.events() | rpl::type_erased);
 }
 
 std::optional<bool> ApiWrap::contactSignupSilentCurrent() const {

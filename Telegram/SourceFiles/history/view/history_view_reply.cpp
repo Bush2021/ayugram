@@ -1035,7 +1035,7 @@ TextWithEntities Reply::ComposePreviewName(
 				tr::now,
 				lt_title,
 				todolist->title,
-				Ui::Text::WithEntities);
+				tr::marked);
 		}
 	}
 	const auto toPeer = to->history()->peer;
@@ -1062,7 +1062,7 @@ TextWithEntities Reply::ComposePreviewName(
 			tr::now,
 			lt_name,
 			nameFull,
-			Ui::Text::WithEntities);
+			tr::marked);
 
 }
 

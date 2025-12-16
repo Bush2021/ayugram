@@ -99,8 +99,8 @@ void ConfirmExportBox(
 		box,
 		tr::lng_gift_transfer_confirm_text(
 			lt_name,
-			rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
-			Ui::Text::WithEntities),
+			rpl::single(tr::bold(UniqueGiftName(*gift))),
+			tr::marked),
 		st::boxLabel));
 	box->addButton(tr::lng_gift_transfer_confirm_button(), [=] {
 		confirmed([weak = base::make_weak(box)] {
@@ -148,7 +148,7 @@ void ExportOnBlockchain(
 		state->lifetime = session->api().cloudPassword().state(
 		) | rpl::take(
 			1
-		) | rpl::start_with_next([=](const Core::CloudPasswordState &pass) {
+		) | rpl::on_next([=](const Core::CloudPasswordState &pass) {
 			state->lifetime.destroy();
 
 			auto fields = PasscodeBox::CloudFields::From(pass);
@@ -584,13 +584,13 @@ void BuyResaleGift(
 					tr::now,
 					lt_price,
 					Ui::Text::Wrapped(cost, EntityType::Bold),
-					Ui::Text::WithEntities),
+					tr::marked),
 				.confirmed = [=](Fn<void()> close) { close(); submit(); },
 				.cancelled = cancelled,
 				.confirmText = tr::lng_gift_buy_resale_button(
 					lt_cost,
 					rpl::single(cost),
-					Ui::Text::WithEntities),
+					tr::marked),
 				.title = tr::lng_gift_buy_price_change_title(),
 			}));
 		} else {
@@ -617,8 +617,8 @@ void ShowTransferToBox(
 				).append(Lang::FormatCreditsAmountDecimal(
 					CreditsAmount(stars)
 				))),
-				Ui::Text::WithEntities)
-			: tr::lng_gift_transfer_button(Ui::Text::WithEntities);
+				tr::marked)
+			: tr::lng_gift_transfer_button(tr::marked);
 
 		struct State {
 			bool sent = false;
@@ -659,21 +659,21 @@ void ShowTransferToBox(
 			.text = (stars > 0)
 				? tr::lng_gift_transfer_sure_for(
 					lt_name,
-					rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+					rpl::single(tr::bold(UniqueGiftName(*gift))),
 					lt_recipient,
-					rpl::single(Ui::Text::Bold(peer->shortName())),
+					rpl::single(tr::bold(peer->shortName())),
 					lt_price,
 					tr::lng_action_gift_for_stars(
 						lt_count,
 						rpl::single(stars * 1.),
-						Ui::Text::Bold),
-					Ui::Text::WithEntities)
+						tr::bold),
+					tr::marked)
 				: tr::lng_gift_transfer_sure(
 					lt_name,
-					rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+					rpl::single(tr::bold(UniqueGiftName(*gift))),
 					lt_recipient,
-					rpl::single(Ui::Text::Bold(peer->shortName())),
-					Ui::Text::WithEntities),
+					rpl::single(tr::bold(peer->shortName())),
+					tr::marked),
 			.confirmed = std::move(callback),
 			.confirmText = std::move(transfer),
 		});
@@ -703,7 +703,7 @@ void ShowTransferGiftBox(
 
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 
-		box->noSearchSubmits() | rpl::start_with_next([=] {
+		box->noSearchSubmits() | rpl::on_next([=] {
 			controllerRaw->noSearchSubmit();
 		}, box->lifetime());
 	};
@@ -990,7 +990,7 @@ void ShowBuyResaleGiftBox(
 				object_ptr<Ui::FlatLabel>(
 					box,
 					tr::lng_gift_buy_resale_only_ton(
-						Ui::Text::RichLangValue),
+						tr::rich),
 					st::resaleConfirmTonOnly),
 				st::boxRowPadding + st::resaleConfirmTonOnlyMargin);
 		} else {
@@ -1009,17 +1009,17 @@ void ShowBuyResaleGiftBox(
 							u"stars"_q,
 							tr::lng_gift_buy_resale_pay_stars(
 								tr::now,
-								Ui::Text::WithEntities),
+								tr::marked),
 						},
 						{
 							u"ton"_q,
 							tr::lng_gift_buy_resale_pay_ton(
 								tr::now,
-								Ui::Text::WithEntities),
+								tr::marked),
 						},
 					}),
 				st::boxRowPadding + st::resaleConfirmTonOnlyMargin);
-			tabs->activated() | rpl::start_with_next([=](QString id) {
+			tabs->activated() | rpl::on_next([=](QString id) {
 				tabs->setActiveTab(id);
 				state->ton = (id == u"ton"_q);
 			}, tabs->lifetime());
@@ -1031,7 +1031,7 @@ void ShowBuyResaleGiftBox(
 				rpl::single(ton
 					? Data::FormatGiftResaleTon(*gift)
 					: Data::FormatGiftResaleStars(*gift)),
-				Ui::Text::WithEntities);
+				tr::marked);
 		}) | rpl::flatten_latest();
 
 		auto callback = [=](Fn<void()> close) {
@@ -1063,28 +1063,28 @@ void ShowBuyResaleGiftBox(
 					lt_count_decimal,
 					rpl::single(gift->nanoTonForResale
 						/ float64(Ui::kNanosInOne)),
-					Ui::Text::Bold)
+					tr::bold)
 				: tr::lng_action_gift_for_stars(
 					lt_count_decimal,
 					rpl::single(gift->starsForResale * 1.),
-					Ui::Text::Bold);
+					tr::bold);
 		}) | rpl::flatten_latest();
 		Ui::ConfirmBox(box, {
 			.text = to->isSelf()
 				? tr::lng_gift_buy_resale_confirm_self(
 					lt_name,
-					rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+					rpl::single(tr::bold(UniqueGiftName(*gift))),
 					lt_price,
 					std::move(price),
-					Ui::Text::WithEntities)
+					tr::marked)
 				: tr::lng_gift_buy_resale_confirm(
 					lt_name,
-					rpl::single(Ui::Text::Bold(UniqueGiftName(*gift))),
+					rpl::single(tr::bold(UniqueGiftName(*gift))),
 					lt_price,
 					std::move(price),
 					lt_user,
-					rpl::single(Ui::Text::Bold(to->shortName())),
-					Ui::Text::WithEntities),
+					rpl::single(tr::bold(to->shortName())),
+					tr::marked),
 			.confirmed = std::move(callback),
 			.confirmText = std::move(transfer),
 		});

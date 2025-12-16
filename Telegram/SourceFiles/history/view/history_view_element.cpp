@@ -1549,18 +1549,18 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 		.arg(peerToChannel(peerId).bare)
 		.arg(topicRootId.bare);
 	const auto fromLink = [&](int index) {
-		return Ui::Text::Link(from->name(), index);
+		return tr::link(from->name(), index);
 	};
 	const auto placeholderLink = [&] {
 		const auto linkText = history()->peer->isBot()
 			? tr::lng_action_topic_bot_thread(tr::now)
 			: tr::lng_action_topic_placeholder(tr::now);
-		return Ui::Text::Link(linkText, topicUrl);
+		return tr::link(linkText, topicUrl);
 	};
 	const auto wrapTopic = [&](
 			const QString &title,
 			std::optional<DocumentId> iconId) {
-		return Ui::Text::Link(
+		return tr::link(
 			Data::ForumTopicIconWithTitle(
 				topicRootId,
 				iconId.value_or(0),
@@ -1592,7 +1592,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 				tr::now,
 				lt_topic,
 				wrapParentTopic(),
-				Ui::Text::WithEntities),
+				tr::marked),
 		};
 	} else if (info->reopened) {
 		return {
@@ -1600,7 +1600,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 				tr::now,
 				lt_topic,
 				wrapParentTopic(),
-				Ui::Text::WithEntities),
+				tr::marked),
 		};
 	} else if (info->hidden) {
 		return {
@@ -1608,7 +1608,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 				tr::now,
 				lt_topic,
 				wrapParentTopic(),
-				Ui::Text::WithEntities),
+				tr::marked),
 		};
 	} else if (info->unhidden) {
 		return {
@@ -1616,7 +1616,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 				tr::now,
 				lt_topic,
 				wrapParentTopic(),
-				Ui::Text::WithEntities),
+				tr::marked),
 		};
 	} else if (info->renamed) {
 		return {
@@ -1632,7 +1632,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 					(info->reiconed
 						? info->iconId
 						: std::optional<DocumentId>())),
-				Ui::Text::WithEntities),
+				tr::marked),
 			{ from->createOpenLink() },
 		};
 	} else if (info->reiconed) {
@@ -1646,7 +1646,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 					placeholderLink(),
 					lt_emoji,
 					Data::SingleCustomEmoji(iconId),
-					Ui::Text::WithEntities),
+					tr::marked),
 				{ from->createOpenLink() },
 			};
 		} else {
@@ -1657,7 +1657,7 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 					fromLink(1),
 					lt_link,
 					placeholderLink(),
-					Ui::Text::WithEntities),
+					tr::marked),
 				{ from->createOpenLink() },
 			};
 		}
@@ -1677,7 +1677,7 @@ void Element::validateText() {
 		_textItem = item;
 		if (!storyMention) {
 			if (_text.isEmpty()) {
-				setTextWithLinks(Ui::Text::Italic(storyUnsupported
+				setTextWithLinks(tr::italic(storyUnsupported
 					? tr::lng_stories_unsupported(tr::now)
 					: tr::lng_forwarded_story_expired(tr::now)));
 			}
@@ -1726,7 +1726,7 @@ void Element::validateText() {
 	} else {
 		const auto unavailable = item->computeUnavailableReason();
 		if (!unavailable.isEmpty()) {
-			setTextWithLinks(Ui::Text::Italic(unavailable));
+			setTextWithLinks(tr::italic(unavailable));
 		} else {
 			setTextWithLinks(_textItem->translatedTextWithLocalEntities());
 		}
@@ -1915,7 +1915,7 @@ void Element::createUnreadBar(rpl::producer<QString> text) {
 	const auto bar = Get<UnreadBar>();
 	std::move(
 		text
-	) | rpl::start_with_next([=](const QString &text) {
+	) | rpl::on_next([=](const QString &text) {
 		if (const auto bar = Get<UnreadBar>()) {
 			bar->init(text);
 		}

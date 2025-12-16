@@ -140,7 +140,7 @@ void StartRtmpProcess::start(
 			.done = std::move(done),
 		});
 	session->account().sessionChanges(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		_request = nullptr;
 	}, _request->lifetime);
 
@@ -214,7 +214,7 @@ void StartRtmpProcess::createBox() {
 		_request->show,
 		_request->data.value());
 	object->boxClosing(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		_request = nullptr;
 	}, _request->lifetime);
 	_request->box = base::make_weak(object.data());
@@ -272,7 +272,7 @@ void StartRtmpProcess::FillRtmpRows(
 		const auto weak = container->add(std::move(wrap), rowPadding);
 		Ui::AddSkip(container, st::groupCallRtmpCopyButtonBottomSkip);
 		button->heightValue(
-		) | rpl::start_with_next([=](int height) {
+		) | rpl::on_next([=](int height) {
 			weak->resize(weak->width(), height);
 		}, container->lifetime());
 		return weak;
@@ -335,7 +335,7 @@ void StartRtmpProcess::FillRtmpRows(
 		if (button == Qt::LeftButton) {
 			show->showBox(Ui::MakeConfirmBox({
 				.text = tr::lng_group_call_rtmp_key_warning(
-					Ui::Text::RichLangValue),
+					tr::rich),
 				.confirmed = [=](Fn<void()> &&close) {
 					handler->onClick({});
 					close();

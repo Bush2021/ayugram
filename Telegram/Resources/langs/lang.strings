@@ -22,7 +22,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_menu_my_stories" = "My Stories";
 "lng_menu_my_groups" = "My Groups";
 "lng_menu_my_channels" = "My Channels";
-"lng_open_menu" = "Open navigation menu";
+"lng_main_menu" = "Main menu";
+"lng_filter_unread_chats#one" = "{text} ({count} unread chat)";
+"lng_filter_unread_chats#other" = "{text} ({count} unread chats)";
 
 "lng_disable_notifications_from_tray" = "Disable notifications";
 "lng_enable_notifications_from_tray" = "Enable notifications";
@@ -795,6 +797,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_channel_label" = "Personal channel";
 "lng_settings_channel_add" = "Add";
 "lng_settings_channel_remove" = "Remove";
+"lng_settings_channel_menu_remove" = "Remove Personal Channel";
 "lng_settings_channel_no_yet" = "You don't have any public channels yet.";
 "lng_settings_channel_start" = "Start a Channel";
 "lng_settings_channel_saved" = "Your personal channel was updated.";
@@ -1270,10 +1273,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_passkeys_none_info3_title" = "Store Passkey securely";
 "lng_settings_passkeys_none_info3_about" = "Your passkey is stored safely in the cloud service you choose.";
 "lng_settings_passkeys_none_button" = "Create Passkey";
+"lng_settings_passkeys_none_button_unsupported" = "Unsupported";
 "lng_settings_passkeys_created" = "Created {date}";
 "lng_settings_passkeys_last_used" = "Last used {date}";
 "lng_settings_passkeys_unsigned_error" = "Passkeys are not available in unsigned builds. Please use an official signed version of Telegram Desktop.";
-
+"lng_settings_passkey_unknown" = "Passkey";
 
 "lng_settings_quick_dialog_action_title" = "Chat list quick action";
 "lng_settings_quick_dialog_action_about" = "Choose the action you want to perform when you middle-click or swipe left in the chat list.";
@@ -4094,8 +4098,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_auction_rounds_label" = "Rounds";
 "lng_auction_rounds_exact" = "Round {n}";
 "lng_auction_rounds_range" = "Rounds {n}-{last}";
-"lng_auction_rounds_seconds#one" = "{count} minute each";
-"lng_auction_rounds_seconds#other" = "{count} minutes each";
+"lng_auction_rounds_seconds#one" = "{count} second each";
+"lng_auction_rounds_seconds#other" = "{count} seconds each";
 "lng_auction_rounds_minutes#one" = "{count} minute each";
 "lng_auction_rounds_minutes#other" = "{count} minutes each";
 "lng_auction_rounds_hours#one" = "{count} hour each";
@@ -5175,6 +5179,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_edit_channel_status_about" = "Choose a status that will be shown next to the channel's name.";
 "lng_edit_channel_status_group" = "Set Group Emoji Status";
 "lng_edit_channel_status_about_group" = "Choose a status that will be shown next to the group's name.";
+"lng_edit_channel_personal_channel" = "Set as Personal Channel";
 "lng_edit_self_title" = "Edit your name";
 "lng_confirm_contact_data" = "New Contact";
 "lng_add_contact" = "Create";
