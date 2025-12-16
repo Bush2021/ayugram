@@ -457,7 +457,7 @@ void BottomInfo::layoutDateText() {
 	const auto makeDateString = [&] {
 		return (_data.flags & Data::Flag::ForwardedDate)
 			? Ui::FormatDateTimeSavedFrom(_data.date)
-			: QLocale().toString(_data.date.time(), QLocale::ShortFormat);
+			: formatMessageTime(_data.date.time()); // AyuGram change
 	};
 
 	if (!settings.replaceBottomInfoWithIcons) {
