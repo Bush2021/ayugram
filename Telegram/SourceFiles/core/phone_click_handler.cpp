@@ -41,7 +41,7 @@ class ResolvePhoneAction final : public Ui::Menu::ItemBase {
 public:
 	ResolvePhoneAction(
 		not_null<Ui::RpWidget*> parent,
-		const style::Menu &st,
+		const style::PopupMenu &st,
 		const QString &phone,
 		not_null<Window::SessionController*> controller);
 
@@ -65,6 +65,7 @@ private:
 
 	const not_null<QAction*> _dummyAction;
 	const style::Menu &_st;
+	const int _shadowPadding;
 	rpl::variable<PeerData*> _peer;
 	rpl::variable<bool> _loaded;
 	Ui::PeerUserpicView _userpicView;
@@ -81,12 +82,13 @@ private:
 
 ResolvePhoneAction::ResolvePhoneAction(
 	not_null<Ui::RpWidget*> parent,
-	const style::Menu &st,
+	const style::PopupMenu &st,
 	const QString &phone,
 	not_null<Window::SessionController*> controller)
-: ItemBase(parent, st)
+: ItemBase(parent, st.menu)
 , _dummyAction(new QAction(parent))
-, _st(st)
+, _st(st.menu)
+, _shadowPadding(rect::m::sum::h(st.shadow.extend))
 , _api(&controller->session().mtp())
 , _height(rect::m::sum::v(st::groupCallJoinAsPadding)
 	+ st::groupCallJoinAsPhotoSize) {
@@ -215,10 +217,12 @@ void ResolvePhoneAction::paint(Painter &p) {
 			width());
 	} else {
 		p.setPen(selected ? _st.itemFgShortcutOver : _st.itemFgShortcut);
-		const auto w = width() - padding.left() - padding.right();
+		const auto w = width()
+			- rect::m::sum::h(padding)
+			- _shadowPadding;
 		_below.draw(p, Ui::Text::PaintContext{
 			.position = QPoint(
-				(width() - w) / 2,
+				(w - _below.countLineWidths(w).front()) / 4,
 				(height - _below.countHeight(w)) / 2),
 			.outerWidth = w,
 			.availableWidth = w,
@@ -364,7 +368,7 @@ void PhoneClickHandler::onClick(ClickContext context) const {
 
 	auto resolvePhoneAction = base::make_unique_q<ResolvePhoneAction>(
 		menu,
-		menu->st().menu,
+		menu->st(),
 		phone,
 		controller);
 

@@ -191,6 +191,7 @@ struct HistoryItem::CreateConfig {
 
 	PeerId savedFromSenderId = 0;
 	QString savedFromSenderName;
+	TimeId savedFromDate = 0;
 	bool savedFromOutgoing = false;
 
 	TimeId editDate = 0;
@@ -229,6 +230,7 @@ void HistoryItem::FillForwardedInfo(
 	config.savedFromSenderName = qs(
 		data.vsaved_from_name().value_or_empty());
 	config.savedFromOutgoing = data.is_saved_out();
+	config.savedFromDate = data.vsaved_date().value_or_empty();
 
 	config.imported = data.is_imported();
 }
@@ -4436,6 +4438,7 @@ void HistoryItem::setupForwardedComponent(const CreateConfig &config) {
 	forwarded->savedFromSender = _history->owner().peerLoaded(
 		config.savedFromSenderId);
 	forwarded->savedFromOutgoing = config.savedFromOutgoing;
+	forwarded->savedFromDate = config.savedFromDate;
 	if (!forwarded->savedFromSender
 		&& !config.savedFromSenderName.isEmpty()) {
 		forwarded->savedFromHiddenSenderInfo
