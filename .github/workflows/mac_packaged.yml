@@ -37,7 +37,7 @@ jobs:
           brew update
           brew upgrade || true
           brew install ada-url autoconf automake boost cmake ffmpeg@6 jpeg-xl libavif libheif libtool openal-soft openh264 openssl opus ninja pkg-config python qtbase qtimageformats qtsvg xz
-          sudo xcode-select -s /Applications/Xcode_26.1.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.2.0.app/Contents/Developer
 
           xcodebuild -version > CACHE_KEY.txt
           brew list --versions >> CACHE_KEY.txt

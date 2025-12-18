@@ -39,7 +39,7 @@ jobs:
           # Disable spotlight.
           sudo mdutil -a -i off
 
-          sudo xcode-select -s /Applications/Xcode_26.1.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.2.0.app/Contents/Developer
 
           sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
 
