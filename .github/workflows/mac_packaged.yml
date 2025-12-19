@@ -32,6 +32,12 @@ jobs:
           submodules: recursive
           path: ${{ env.REPO_NAME }}
 
+      - name: Xcode Cache
+        uses: irgaly/xcode-cache@v1
+        with:
+          key: xcode-cache-packaged-${{ github.workflow }}-${{ github.sha }}
+          restore-keys: xcode-cache-packaged-${{ github.workflow }}-
+
       - name: First set up.
         run: |
           brew update
