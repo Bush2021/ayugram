@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "chat_helpers/message_field.h"
 #include "boxes/sticker_set_box.h"
+#include "boxes/translate_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "base/platform/base_platform_info.h"
 #include "base/qt/qt_key_modifiers.h"
@@ -1394,6 +1395,17 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				tr::lng_context_copy_selected(tr::now),
 				[this] { copySelectedText(); },
 				&st::menuIconCopy);
+			if (item && !Ui::SkipTranslate(getSelectedText().rich)) {
+				const auto peer = item->history()->peer;
+				_menu->addAction(tr::lng_context_translate_selected({}), [=] {
+					_controller->show(Box(
+						Ui::TranslateBox,
+						peer,
+						MsgId(),
+						getSelectedText().rich,
+						false));
+				}, &st::menuIconTranslate);
+			}
 		} else {
 			if (item && !isUponSelected) {
 				const auto media = view->media();
@@ -1414,6 +1426,17 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					_menu->addAction(tr::lng_context_copy_text(tr::now), [=] {
 						copyContextText(itemId);
 					}, &st::menuIconCopy);
+				}
+				if (!item->isService() && !Ui::SkipTranslate(item->originalText())) {
+					const auto peer = item->history()->peer;
+					_menu->addAction(tr::lng_context_translate({}), [=] {
+						_controller->show(Box(
+							Ui::TranslateBox,
+							peer,
+							MsgId(),
+							item->originalText(),
+							false));
+					}, &st::menuIconTranslate);
 				}
 			}
 		}
