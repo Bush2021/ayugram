@@ -585,8 +585,9 @@ public:
 
 	[[nodiscard]] int peerGiftsCount() const;
 
+	[[nodiscard]] MTPInputPeer input() const;
+
 	const PeerId id;
-	MTPinputPeer input = MTP_inputPeerEmpty();
 
 protected:
 	void updateNameDelayed(

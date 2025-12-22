@@ -57,8 +57,8 @@ void ConnectStarRef(
 		Fn<void(ConnectedBot)> done,
 		Fn<void(const QString &)> fail) {
 	bot->session().api().request(MTPpayments_ConnectStarRefBot(
-		peer->input,
-		bot->inputUser
+		peer->input(),
+		bot->inputUser()
 	)).done([=](const MTPpayments_ConnectedStarRefBots &result) {
 		const auto parsed = Parse(&bot->session(), result);
 		if (parsed.empty()) {
@@ -973,7 +973,7 @@ void UpdateProgram(
 		MTP_flags((program.commission > 0 && program.durationMonths > 0)
 			? Flag::f_duration_months
 			: Flag()),
-		bot->inputUser,
+		bot->inputUser(),
 		MTP_int(program.commission),
 		MTP_int(program.durationMonths)
 	)).done([=](const MTPStarRefProgram &result) {

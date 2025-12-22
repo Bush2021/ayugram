@@ -352,7 +352,7 @@ void PlaceAuctionBid(
 			| (passDetails ? Flag::f_peer : Flag())
 			| (passDetails ? Flag::f_message : Flag())
 			| (hideName ? Flag::f_hide_name : Flag())),
-		passDetails ? to->input : MTP_inputPeerEmpty(),
+		passDetails ? to->input() : MTP_inputPeerEmpty(),
 		MTP_long(state.gift->id),
 		MTP_long(amount),
 		MTP_textWithEntities(

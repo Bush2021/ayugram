@@ -280,7 +280,7 @@ void TranslateTracker::requestSome() {
 	_requestId = Ayu::Translator::TranslateManager::currentInstance()->request(
 		&peer->session(),
 		MTP_flags(Flag::f_peer | Flag::f_id),
-		peer->input,
+		peer->input(),
 		MTP_vector<MTPint>(list),
 		MTPVector<MTPTextWithEntities>(),
 		MTP_string(to.twoLetterCode())

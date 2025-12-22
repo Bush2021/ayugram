@@ -50,7 +50,7 @@ MTPInputReplyTo ReplyToForMTP(
 	if (replyTo.storyId) {
 		if (const auto peer = owner->peerLoaded(replyTo.storyId.peer)) {
 			return MTP_inputReplyToStory(
-				peer->input,
+				peer->input(),
 				MTP_int(replyTo.storyId.story));
 		}
 	} else if (replyTo.messageId || replyTo.topicRootId) {
@@ -99,13 +99,13 @@ MTPInputReplyTo ReplyToForMTP(
 			MTP_int(replyTo.messageId ? replyTo.messageId.msg : 0),
 			MTP_int(replyTo.topicRootId),
 			(external
-				? owner->peer(replyTo.messageId.peer)->input
+				? owner->peer(replyTo.messageId.peer)->input()
 				: MTPInputPeer()),
 			MTP_string(replyTo.quote.text),
 			quoteEntities,
 			MTP_int(replyTo.quoteOffset),
 			(replyToMonoforumPeerId
-				? history->owner().peer(replyToMonoforumPeerId)->input
+				? history->owner().peer(replyToMonoforumPeerId)->input()
 				: MTPInputPeer()),
 			MTP_int(replyTo.todoItemId));
 	} else if (history->peer->amMonoforumAdmin()
@@ -113,7 +113,7 @@ MTPInputReplyTo ReplyToForMTP(
 		const auto replyToMonoforumPeer = replyTo.monoforumPeerId
 			? history->owner().peer(replyTo.monoforumPeerId)
 			: history->session().user();
-		return MTP_inputReplyToMonoForum(replyToMonoforumPeer->input);
+		return MTP_inputReplyToMonoForum(replyToMonoforumPeer->input());
 	}
 	return MTPInputReplyTo();
 }
@@ -425,7 +425,7 @@ void Histories::sendDialogRequests() {
 
 	auto peers = QVector<MTPInputDialogPeer>();
 	const auto dialogPeer = [](not_null<History*> history) {
-		return MTP_inputDialogPeer(history->peer->input);
+		return MTP_inputDialogPeer(history->peer->input());
 	};
 	ranges::transform(
 		histories,
@@ -505,7 +505,7 @@ void Histories::changeDialogUnreadMark(
 	session().api().request(MTPmessages_MarkDialogUnread(
 		MTP_flags(unread ? Flag::f_unread : Flag(0)),
 		MTPInputPeer(), // parent_peer
-		MTP_inputDialogPeer(history->peer->input)
+		MTP_inputDialogPeer(history->peer->input())
 	)).send();
 }
 
@@ -522,8 +522,8 @@ void Histories::changeSublistUnreadMark(
 	session().api().request(MTPmessages_MarkDialogUnread(
 		MTP_flags(Flag::f_parent_peer
 			| (unread ? Flag::f_unread : Flag(0))),
-		parent->input,
-		MTP_inputDialogPeer(sublist->sublistPeer()->input)
+		parent->input(),
+		MTP_inputDialogPeer(sublist->sublistPeer()->input())
 	)).send();
 }
 
@@ -536,7 +536,7 @@ void Histories::requestFakeChatListMessage(
 	_fakeChatListRequests.emplace(history);
 	sendRequest(history, RequestType::History, [=](Fn<void()> finish) {
 		return session().api().request(MTPmessages_GetHistory(
-			history->peer->input,
+			history->peer->input(),
 			MTP_int(0), // offset_id
 			MTP_int(0), // offset_date
 			MTP_int(0), // add_offset
@@ -577,7 +577,7 @@ void Histories::requestGroupAround(not_null<HistoryItem*> item) {
 	const auto requestId = sendRequest(history, RequestType::History, [=](
 			Fn<void()> finish) {
 		return session().api().request(MTPmessages_GetHistory(
-			history->peer->input,
+			history->peer->input(),
 			MTP_int(id),
 			MTP_int(0), // offset_date
 			MTP_int(-kMaxAlbumCount),
@@ -662,7 +662,7 @@ void Histories::reportPendingDeliveries() {
 		};
 		session().api().request(MTPmessages_ReportMessagesDelivery(
 			MTP_flags(0),
-			peer->input,
+			peer->input(),
 			MTP_vector(std::move(list))
 		)).done(finish).fail(finish).send();
 	}
@@ -738,12 +738,12 @@ void Histories::sendReadRequest(not_null<History*> history, State &state) {
 		};
 		if (const auto channel = history->peer->asChannel()) {
 			return session().api().request(MTPchannels_ReadHistory(
-				channel->inputChannel,
+				channel->inputChannel(),
 				MTP_int(tillId)
 			)).done(finished).fail(finished).send();
 		} else {
 			return session().api().request(MTPmessages_ReadHistory(
-				history->peer->input,
+				history->peer->input(),
 				MTP_int(tillId)
 			)).done([=](const MTPmessages_AffectedMessages &result) {
 				session().api().applyAffectedMessages(history->peer, result);
@@ -795,7 +795,7 @@ void Histories::deleteMessages(
 		};
 		if (const auto channel = history->peer->asChannel()) {
 			return session().api().request(MTPchannels_DeleteMessages(
-				channel->inputChannel,
+				channel->inputChannel(),
 				MTP_vector<MTPint>(ids)
 			)).done(done).fail(finish).send();
 		} else {
@@ -819,7 +819,7 @@ void Histories::deleteAllMessages(
 		const auto channel = peer->asChannel();
 		if (!justClear && revoke && channel && channel->canDelete()) {
 			return session().api().request(MTPchannels_DeleteChannel(
-				channel->inputChannel
+				channel->inputChannel()
 			)).done([=](const MTPUpdates &result) {
 				session().api().applyUpdates(result);
 			//}).fail([=](const MTP::Error &error) {
@@ -831,18 +831,18 @@ void Histories::deleteAllMessages(
 			using Flag = MTPchannels_DeleteHistory::Flag;
 			return session().api().request(MTPchannels_DeleteHistory(
 				MTP_flags(revoke ? Flag::f_for_everyone : Flag(0)),
-				channel->inputChannel,
+				channel->inputChannel(),
 				MTP_int(deleteTillId)
 			)).done(finish).fail(finish).send();
 		} else if (!justClear && revoke && chat && chat->amCreator()) {
 			return session().api().request(MTPmessages_DeleteChat(
-				chat->inputChat
+				chat->inputChat()
 			)).done(finish).fail([=](const MTP::Error &error) {
 				if (error.type() == "PEER_ID_INVALID") {
 					// Try to join and delete,
 					// while delete fails for non-joined.
 					session().api().request(MTPmessages_AddChatUser(
-						chat->inputChat,
+						chat->inputChat(),
 						MTP_inputUserSelf(),
 						MTP_int(0)
 					)).done([=](const MTPmessages_InvitedUsers &result) {
@@ -864,7 +864,7 @@ void Histories::deleteAllMessages(
 				| (revoke ? Flag::f_revoke : Flag(0));
 			return session().api().request(MTPmessages_DeleteHistory(
 				MTP_flags(flags),
-				peer->input,
+				peer->input(),
 				MTP_int(0),
 				MTPint(), // min_date
 				MTPint() // max_date
@@ -917,7 +917,7 @@ void Histories::deleteMessagesByDates(
 			| (revoke ? Flag::f_revoke : Flag(0));
 		return session().api().request(MTPmessages_DeleteHistory(
 			MTP_flags(flags),
-			peer->input,
+			peer->input(),
 			MTP_int(0),
 			MTP_int(minDate),
 			MTP_int(maxDate)
@@ -981,7 +981,7 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 	}
 	for (const auto &[peer, ids] : scheduledIdsByPeer) {
 		peer->session().api().request(MTPmessages_DeleteScheduledMessages(
-			peer->input,
+			peer->input(),
 			MTP_vector<MTPint>(ids)
 		)).done([peer = peer](const MTPUpdates &result) {
 			peer->session().api().applyUpdates(result);
@@ -1074,7 +1074,7 @@ void Histories::sendCreateTopicRequest(
 		MTP_flags(Flag::f_icon_color
 			| (topic->iconId() ? Flag::f_icon_emoji_id : Flag())
 			| (history->peer->isBot() ? Flag::f_title_missing : Flag())),
-		history->peer->input,
+		history->peer->input(),
 		MTP_string(topic->title()),
 		MTP_int(topic->colorId()),
 		MTP_long(topic->iconId()),

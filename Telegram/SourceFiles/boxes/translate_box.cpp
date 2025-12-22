@@ -233,7 +233,7 @@ void TranslateBox(
 		const auto reqId = Ayu::Translator::TranslateManager::currentInstance()->request(
 			&peer->session(),
 			MTP_flags(flags),
-			msgId ? peer->input : MTP_inputPeerEmpty(),
+			msgId ? peer->input() : MTP_inputPeerEmpty(),
 			(msgId
 				? MTP_vector<MTPint>(1, MTP_int(msgId))
 				: MTPVector<MTPint>()),

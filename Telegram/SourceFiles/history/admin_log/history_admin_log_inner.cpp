@@ -465,7 +465,7 @@ void InnerWidget::requestAdmins() {
 	const auto offset = 0;
 	const auto participantsHash = uint64(0);
 	_api.request(MTPchannels_GetParticipants(
-		_channel->inputChannel,
+		_channel->inputChannel(),
 		MTP_channelParticipantsAdmins(),
 		MTP_int(offset),
 		MTP_int(kMaxChannelAdmins),
@@ -859,7 +859,7 @@ void InnerWidget::preloadMore(Direction direction) {
 		if (!_filter.admins->empty()) {
 			admins.reserve(_filter.admins->size());
 			for (const auto &admin : (*_filter.admins)) {
-				admins.push_back(admin->inputUser);
+				admins.push_back(admin->inputUser());
 			}
 		}
 		flags |= MTPchannels_GetAdminLog::Flag::f_admins;
@@ -869,7 +869,7 @@ void InnerWidget::preloadMore(Direction direction) {
 	auto perPage = _items.empty() ? kEventsFirstPage : kEventsPerPage;
 	requestId = _api.request(MTPchannels_GetAdminLog(
 		MTP_flags(flags),
-		_channel->inputChannel,
+		_channel->inputChannel(),
 		MTP_string(_searchQuery),
 		MTP_channelAdminLogEventsFilter(MTP_flags(filter)),
 		MTP_vector<MTPInputUser>(admins),
@@ -1575,8 +1575,8 @@ void InnerWidget::suggestRestrictParticipant(
 			editRestrictions(true, {}, nullptr, 0);
 		} else {
 			_api.request(MTPchannels_GetParticipant(
-				_channel->inputChannel,
-				user->input
+				_channel->inputChannel(),
+				user->input()
 			)).done([=](const MTPchannels_ChannelParticipant &result) {
 				user->owner().processUsers(result.data().vusers());
 

@@ -73,7 +73,7 @@ jobs:
 
       - name: WebRTC cache.
         id: cache-webrtc
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.LibrariesPath }}/tg_owt
           key: ${{ runner.OS }}-webrtc-${{ env.WEBRTC }}-${{ env.CACHE_KEY }}
@@ -94,7 +94,7 @@ jobs:
 
       - name: TDE2E cache.
         id: cache-tde2e
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.LibrariesPath }}/tde2e
           key: ${{ runner.OS }}-tde2e-${{ env.CACHE_KEY }}
@@ -167,7 +167,7 @@ jobs:
           cd $REPO_NAME/build/Release
           mkdir -p artifact
           mv AyuGram.dmg artifact/
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:

@@ -152,11 +152,11 @@ void ShareBotGame(
 		randomId,
 		Data::Histories::PrepareMessage<MTPmessages_SendMedia>(
 			MTP_flags(flags),
-			history->peer->input,
+			history->peer->input(),
 			Data::Histories::ReplyToPlaceholder(),
 			MTP_inputMediaGame(
 				MTP_inputGameShortName(
-					bot->inputUser,
+					bot->inputUser(),
 					MTP_string(shortName))),
 			MTP_string(),
 			MTP_long(randomId),
@@ -412,7 +412,7 @@ void TogglePinnedThread(
 			: MTPmessages_ToggleDialogPin::Flag(0);
 		owner->session().api().request(MTPmessages_ToggleDialogPin(
 			MTP_flags(flags),
-			MTP_inputDialogPeer(history->peer->input)
+			MTP_inputDialogPeer(history->peer->input())
 		)).done([=] {
 			owner->notifyPinnedDialogsOrderUpdated();
 			if (onToggled) {
@@ -425,7 +425,7 @@ void TogglePinnedThread(
 	} else if (const auto topic = entry->asTopic()) {
 		const auto peer = topic->peer();
 		owner->session().api().request(MTPmessages_UpdatePinnedForumTopic(
-			peer->input,
+			peer->input(),
 			MTP_int(topic->rootId()),
 			MTP_bool(isPinned)
 		)).done([=](const MTPUpdates &result) {
@@ -440,7 +440,7 @@ void TogglePinnedThread(
 			: MTPmessages_ToggleSavedDialogPin::Flag(0);
 		owner->session().api().request(MTPmessages_ToggleSavedDialogPin(
 			MTP_flags(flags),
-			MTP_inputDialogPeer(sublist->sublistPeer()->input)
+			MTP_inputDialogPeer(sublist->sublistPeer()->input())
 		)).done([=] {
 			owner->notifyPinnedDialogsOrderUpdated();
 			if (onToggled) {
@@ -478,7 +478,7 @@ void Filler::addHidePromotion() {
 	_addAction(tr::lng_context_hide_psa(tr::now), [=] {
 		history->cacheTopPromotion(false, QString(), QString());
 		history->session().api().request(MTPhelp_HidePromoData(
-			history->peer->input
+			history->peer->input()
 		)).send();
 	}, &st::menuIconRemove);
 }
@@ -1810,7 +1810,7 @@ void PeerMenuDeleteContact(
 	const auto deleteSure = [=](Fn<void()> &&close) {
 		close();
 		user->session().api().request(MTPcontacts_DeleteContacts(
-			MTP_vector<MTPInputUser>(1, user->inputUser)
+			MTP_vector<MTPInputUser>(1, user->inputUser())
 		)).done([=](const MTPUpdates &result) {
 			user->session().api().applyUpdates(result);
 		}).send();
@@ -1878,7 +1878,7 @@ void PeerMenuDeleteTopic(
 		MsgId rootId) {
 	const auto api = &peer->session().api();
 	api->request(MTPmessages_DeleteTopicHistory(
-		peer->input,
+		peer->input(),
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result) {
 		const auto offset = api->applyAffectedHistory(peer, result);
@@ -2345,7 +2345,7 @@ void PeerMenuBlockUserBox(
 			peer->session().api().blockedPeers().block(peer);
 			if (reportChecked) {
 				peer->session().api().request(MTPmessages_ReportSpam(
-					peer->input
+					peer->input()
 				)).send();
 			}
 			if (clearChecked) {
@@ -3367,7 +3367,7 @@ base::weak_qptr<Ui::BoxContent> ShowSendNowMessagesBox(
 			}
 		}
 		session->api().request(MTPmessages_SendScheduledMessages(
-			history->peer->input,
+			history->peer->input(),
 			MTP_vector<MTPint>(ids)
 		)).done([=](const MTPUpdates &result) {
 			session->api().applyUpdates(result);
@@ -3436,7 +3436,7 @@ void ToggleMessagePinned(
 			close();
 			session->api().request(MTPmessages_UpdatePinnedMessage(
 				MTP_flags(MTPmessages_UpdatePinnedMessage::Flag::f_unpin),
-				peer->input,
+				peer->input(),
 				MTP_int(itemId.msg)
 			)).done([=](const MTPUpdates &result) {
 				session->api().applyUpdates(result);
@@ -3517,9 +3517,9 @@ void UnpinAllMessages(
 			api->request(MTPmessages_UnpinAllMessages(
 				MTP_flags((topicRootId ? Flag::f_top_msg_id : Flag())
 					| (sublist ? Flag::f_saved_peer_id : Flag())),
-				history->peer->input,
+				history->peer->input(),
 				MTP_int(topicRootId.bare),
-				sublist ? sublist->sublistPeer()->input : MTPInputPeer()
+				sublist ? sublist->sublistPeer()->input() : MTPInputPeer()
 			)).done([=](const MTPmessages_AffectedHistory &result) {
 				const auto peer = history->peer;
 				const auto offset = api->applyAffectedHistory(peer, result);
@@ -3893,8 +3893,8 @@ void PeerMenuConfirmToggleFee(
 			MTP_flags((refund ? Flag::f_refund_charged : Flag())
 				| (removeFee ? Flag() : Flag::f_require_payment)
 				| (parent ? Flag::f_parent_peer : Flag())),
-			(parent ? parent->input : MTPInputPeer()),
-			user->inputUser
+			(parent ? parent->input() : MTPInputPeer()),
+			user->inputUser()
 		)).done([=] {
 			if (!parent) {
 				user->clearPaysPerMessage();
@@ -3948,8 +3948,8 @@ void PeerMenuConfirmToggleFee(
 		using Flag = MTPaccount_GetPaidMessagesRevenue::Flag;
 		user->session().api().request(MTPaccount_GetPaidMessagesRevenue(
 			MTP_flags(parent ? Flag::f_parent_peer : Flag()),
-			parent ? parent->input : MTPInputPeer(),
-			user->inputUser
+			parent ? parent->input() : MTPInputPeer(),
+			user->inputUser()
 		)).done([=](const MTPaccount_PaidMessagesRevenue &result) {
 			*paidAmount = result.data().vstars_amount().v;
 		}).send();

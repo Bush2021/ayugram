@@ -433,7 +433,11 @@ MainWidget::MainWidget(
 	session().data().stickers().notifySavedGifsUpdated();
 }
 
-MainWidget::~MainWidget() = default;
+MainWidget::~MainWidget() {
+	if (_controller->activeChatCurrent()) {
+		session().api().saveCurrentDraftToCloud();
+	}
+}
 
 Main::Session &MainWidget::session() const {
 	return _controller->session();

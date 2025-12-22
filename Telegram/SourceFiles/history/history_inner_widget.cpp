@@ -2462,8 +2462,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		_widget->fillSenderUserpicMenu(
 			_menu.get(),
 			session->data().peer(PeerId(linkUserpicPeerId)));
-		_menu->popup(e->globalPos());
-		e->accept();
+		if (_menu->empty()) {
+			_menu = nullptr;
+		} else {
+			_menu->popup(e->globalPos());
+			e->accept();
+		}
 		return;
 	}
 	const auto controller = _controller;

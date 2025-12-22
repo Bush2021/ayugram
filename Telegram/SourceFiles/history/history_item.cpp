@@ -2651,6 +2651,7 @@ void HistoryItem::setRealId(MsgId newId) {
 	_history->owner().notifyItemDataChange(this);
 	_history->owner().groups().refreshMessage(this);
 	_history->owner().requestItemResize(this);
+	_history->owner().requestItemRepaint(this);
 
 	if (Has<HistoryMessageReply>()) {
 		incrementReplyToTopCounter();

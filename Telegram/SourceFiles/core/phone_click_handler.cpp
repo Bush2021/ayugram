@@ -222,7 +222,7 @@ void ResolvePhoneAction::paint(Painter &p) {
 			- _shadowPadding;
 		_below.draw(p, Ui::Text::PaintContext{
 			.position = QPoint(
-				(w - _below.countLineWidths(w).front()) / 4,
+				padding.left(),
 				(height - _below.countHeight(w)) / 2),
 			.outerWidth = w,
 			.availableWidth = w,
