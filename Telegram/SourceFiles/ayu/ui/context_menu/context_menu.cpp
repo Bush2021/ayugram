@@ -94,7 +94,7 @@ void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
 
 		if (const auto channel = peer->asChannel()) {
 			session->api()
-				.request(MTPchannels_DeleteMessages(channel->inputChannel, MTP_vector<MTPint>(ids)))
+				.request(MTPchannels_DeleteMessages(channel->inputChannel(), MTP_vector<MTPint>(ids)))
 				.done(done)
 				.fail(fail)
 				.handleFloodErrors()
@@ -115,7 +115,7 @@ void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
 		using Flag = MTPmessages_Search::Flag;
 		auto request = MTPmessages_Search(
 			MTP_flags(Flag::f_from_id),
-			peer->input,
+			peer->input(),
 			MTP_string(),
 			MTP_inputPeerSelf(),
 			MTPInputPeer(),
@@ -758,7 +758,7 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 				const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
 				if (const auto channel = item->history()->peer->asChannel()) {
 					item->history()->session().api().request(MTPchannels_ReadMessageContents(
-						channel->inputChannel,
+						channel->inputChannel(),
 						ids
 					)).send();
 				} else {
@@ -799,7 +799,7 @@ void AddBurnAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 
 			if (const auto channel = item->history()->peer->asChannel()) {
 				item->history()->session().api().request(MTPchannels_ReadMessageContents(
-					channel->inputChannel,
+					channel->inputChannel(),
 					ids
 				)).done([=]()
 				{

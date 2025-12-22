@@ -220,7 +220,7 @@ void readMentions(base::weak_ptr<Data::Thread> weakThread) {
 	using Flag = MTPmessages_ReadMentions::Flag;
 	peer->session().api().request(MTPmessages_ReadMentions(
 		MTP_flags(rootId ? Flag::f_top_msg_id : Flag()),
-		peer->input,
+		peer->input(),
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result)
 	{
@@ -247,9 +247,9 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 	using Flag = MTPmessages_ReadReactions::Flag;
 	peer->session().api().request(MTPmessages_ReadReactions(
 		MTP_flags(rootId ? Flag::f_top_msg_id : Flag(0)),
-		peer->input,
+		peer->input(),
 		MTP_int(rootId),
-		sublist ? sublist->sublistPeer()->input : MTPInputPeer()
+		sublist ? sublist->sublistPeer()->input() : MTPInputPeer()
 	)).done([=](const MTPmessages_AffectedHistory &result)
 	{
 		const auto offset = peer->session().api().applyAffectedHistory(
@@ -318,13 +318,13 @@ void readHistory(not_null<HistoryItem*> message) {
 					 {
 						 if (const auto channel = history->peer->asChannel()) {
 							 return history->session().api().request(MTPchannels_ReadHistory(
-								 channel->inputChannel,
+								 channel->inputChannel(),
 								 MTP_int(tillId)
 							 )).done([=] { AyuWorker::markAsOnline(&history->session()); }).send();
 						 }
 
 						 return history->session().api().request(MTPmessages_ReadHistory(
-							 history->peer->input,
+							 history->peer->input(),
 							 MTP_int(tillId)
 						 )).done([=](const MTPmessages_AffectedMessages &result)
 						 {
@@ -677,7 +677,7 @@ void searchPeerInner(const QString &peerId, Main::Session *session, const Userna
 
 	session->api().request(MTPmessages_GetInlineBotResults(
 		MTP_flags(0),
-		bot->inputUser,
+		bot->inputUser(),
 		MTP_inputPeerEmpty(),
 		MTPInputGeoPoint(),
 		MTP_string(peerId),
