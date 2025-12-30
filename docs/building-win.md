@@ -1,41 +1,57 @@
-# Build instructions for Windows 64-bit
+# Build instructions for Windows
 
 - [Prepare folder](#prepare-folder)
 - [Install third party software](#install-third-party-software)
+- [Choose architecture and initialize terminal](#choose-architecture-and-initialize-terminal)
 - [Clone source code and prepare libraries](#clone-source-code-and-prepare-libraries)
 - [Build the project](#build-the-project)
+- [Qt Visual Studio Tools](#qt-visual-studio-tools)
 
 ## Prepare folder
 
-The build is done in **Visual Studio 2022** with **10.0.26100.0** SDK version.
+The build is done in **Visual Studio 2026** with **10.0.26100.0** SDK version.
 
 Choose an empty folder for the future build, for example **D:\\TBuild**. It will be named ***BuildPath*** in the rest of this document. Create two folders there, ***BuildPath*\\ThirdParty** and ***BuildPath*\\Libraries**.
 
-All commands (if not stated otherwise) will be launched from **x64 Native Tools Command Prompt for VS 2022.bat** (should be in **Start Menu > Visual Studio 2022** menu folder). Pay attention not to use any other Command Prompt.
-
 ## Install third party software
 
-* Download **Python 3.10** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
+* Download **Python 3.14** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
 * Download **Git** installer from [https://git-scm.com/download/win](https://git-scm.com/download/win) and install it.
+
+## Choose architecture and initialize terminal
+
+For `win` (32-bit):
+
+    %comspec% /k "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
+
+For `win64` (64-bit):
+
+    %comspec% /k "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+
+Run both `Clone source code and prepare libraries` and `Build the project` sections in the terminal initialized with one of the commands above.
 
 ## Clone source code and prepare libraries
 
-Open **x64 Native Tools Command Prompt for VS 2022.bat**, go to ***BuildPath*** and run
+In the initialized terminal, go to ***BuildPath*** and run
 
-    git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
-    tdesktop\Telegram\build\prepare\win.bat
-
-You may encounter an error saying that your IP is not allowed - simply turn on VPN.
+    git clone --recursive https://github.com/Bush2021/ayugram.git
+    ayugram\Telegram\build\prepare\win.bat
 
 ## Build the project
 
-Go to ***BuildPath*\\tdesktop\\Telegram** and run
+Go to ***BuildPath*\\ayugram\\Telegram** and run:
 
-    configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+For `win` (32-bit):
 
-* Open ***BuildPath*\\tdesktop\\out\\Telegram.sln** in Visual Studio 2022
+    configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+
+For `win64` (64-bit):
+
+    configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+
+* Open ***BuildPath*\\ayugram\\out\\Telegram.slnx** in Visual Studio 2026
 * Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
-* The result AyuGram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
+* The result AyuGram.exe will be located in **D:\TBuild\ayugram\out\Debug** (and **Release**)
 
 If you encounter issue like `error C1090: PDB API call failed, error code '12'` on Release build, apply the following patch in `tdesktop/cmake` folder (via pwsh or manually):
 
@@ -81,3 +97,12 @@ option(DESKTOP_APP_TEST_APPS "Build test apps, development only." OFF)
 option(DESKTOP_APP_LOTTIE_DISABLE_RECOLORING "Disable recoloring of lottie animations." OFF)
 '@ | git -C cmake apply -
 ```
+
+### Qt Visual Studio Tools
+
+For better debugging you may want to install Qt Visual Studio Tools:
+
+* Open **Extensions** -> **Manage Extensions**
+* Go to **Online** tab
+* Search for **Qt**
+* Install **Qt Visual Studio Tools** extension
