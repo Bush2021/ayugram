@@ -22,17 +22,15 @@ All commands (if not stated otherwise) will be launched from **x64 Native Tools 
 
 Open **x64 Native Tools Command Prompt for VS 2022.bat**, go to ***BuildPath*** and run
 
-    git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
-    tdesktop\Telegram\build\prepare\win.bat
-
-You may encounter an error saying that your IP is not allowed - simply turn on VPN.
+    git clone --recursive https://github.com/Bush2021/ayugram.git ayugram
+    ayugram\Telegram\build\prepare\win.bat
 
 ## Build the project
 
-Go to ***BuildPath*\\tdesktop\\Telegram** and run
+Go to ***BuildPath*\\ayugram\\Telegram** and run
 
-    configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+    configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON -D DESKTOP_APP_NO_PDB=ON
 
-* Open ***BuildPath*\\tdesktop\\out\\Telegram.sln** in Visual Studio 2022
+* Open ***BuildPath*\\ayugram\\out\\Telegram.sln** in Visual Studio 2022
 * Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
 * The result AyuGram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
