@@ -489,26 +489,27 @@ void BottomInfo::layoutDateText() {
 			? (deleted + date)
 			: (deleted + name + afterAuthor);
 		auto helper = Ui::Text::CustomEmojiHelper(
-		Core::TextContext({ .session = &_reactionsOwner->session() }));
-	automarked = TextWithEntities();
+			Core::TextContext({ .session = &_reactionsOwner->session() }));
+		auto marked = TextWithEntities();
 		if (const auto count = _data.stars) {
 			marked.append(
 				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
 			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
 		}
 		if (const auto stake = _data.tonStake) {
-		marked.append(
-			QString::number(stake / 1e9)
-		).append(helper.image({
-			.image = Ui::Emoji::SinglePixmap(
-				Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
-				Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
-					st::stakeIconEmojiSize * style::DevicePixelRatio(),
-					Qt::SmoothTransformation),
-			.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
-			.textColor = false,
-		})).append("  ");
-	}marked.append(full);
+			marked.append(
+				QString::number(stake / 1e9)
+			).append(helper.image({
+				.image = Ui::Emoji::SinglePixmap(
+					Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
+					Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
+						st::stakeIconEmojiSize * style::DevicePixelRatio(),
+						Qt::SmoothTransformation),
+				.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
+				.textColor = false,
+			})).append("  ");
+		}
+		marked.append(full);
 		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
 			marked,

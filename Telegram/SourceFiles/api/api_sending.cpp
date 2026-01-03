@@ -366,7 +366,7 @@ bool SendDice(MessageToSend &message) {
 	};
 	const auto list = hardcoded/*config.get<std::vector<QString>>(
 		"emojies_send_dice",
-		hardcoded)*/; AssertIsDebug();
+		hardcoded)*/;
 	const auto emoji = full.toString();
 	if (!ranges::contains(list, emoji)) {
 		return false;
