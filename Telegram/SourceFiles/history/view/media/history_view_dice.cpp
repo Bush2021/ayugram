@@ -70,14 +70,14 @@ void Dice::updateOutcomeMessage() {
 		+ " "
 		+ QString::number(std::abs(won) / 1e9));
 	const auto text = out
-		? (won > 0
+		? (won >= 0
 			? tr::lng_action_stake_game_won_you
 			: tr::lng_action_stake_game_lost_you)(
 				tr::now,
 				lt_amount,
 				amount,
 				tr::marked)
-		: (won > 0
+		: (won >= 0
 			? tr::lng_action_stake_game_won
 			: tr::lng_action_stake_game_lost)(
 				tr::now,
@@ -117,7 +117,9 @@ bool Dice::updateItemData() {
 	_outcomeNanoTon = outcomeNanoTon;
 	_outcomeStakeNanoTon = outcomeStakeNanoTon;
 	_outcomeValue = outcomeValue;
-	updateOutcomeMessage();
+	if (_outcomeSet) {
+		updateOutcomeMessage();
+	}
 	return true;
 }
 

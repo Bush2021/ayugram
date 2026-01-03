@@ -355,7 +355,7 @@ bool SendDice(MessageToSend &message) {
 		|| !message.textWithTags.tags.isEmpty()) {
 		return false;
 	}
-	//auto &config = message.action.history->session().appConfig();
+	auto &config = message.action.history->session().appConfig();
 	static const auto hardcoded = std::vector<QString>{
 		Stickers::DicePacks::kDiceString,
 		Stickers::DicePacks::kDartString,
@@ -364,9 +364,9 @@ bool SendDice(MessageToSend &message) {
 		Stickers::DicePacks::kFballString + QChar(0xFE0F),
 		Stickers::DicePacks::kBballString,
 	};
-	const auto list = hardcoded/*config.get<std::vector<QString>>(
+	const auto list = config.get<std::vector<QString>>(
 		"emojies_send_dice",
-		hardcoded)*/;
+		hardcoded);
 	const auto emoji = full.toString();
 	if (!ranges::contains(list, emoji)) {
 		return false;

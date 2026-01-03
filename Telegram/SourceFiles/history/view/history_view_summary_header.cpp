@@ -42,7 +42,6 @@ SummaryHeader::~SummaryHeader() = default;
 
 void SummaryHeader::update(not_null<Element*> view) {
 	const auto item = view->data();
-	const auto repaint = [=] { item->customEmojiRepaint(); };
 
 	using namespace Ui;
 	_animation = std::make_unique<Animation>(Animation{
@@ -121,7 +120,6 @@ void SummaryHeader::paint(
 
 	y += st::historyReplyTop;
 	const auto rect = QRect(x, y, w, _height);
-	const auto selected = context.selected();
 	const auto colorPattern = 0;
 	const auto cache = !inBubble
 		? st->serviceReplyCache(colorPattern).get()
