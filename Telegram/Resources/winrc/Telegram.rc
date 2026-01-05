@@ -63,7 +63,7 @@ BEGIN
             VALUE "CompanyName", "Radolyn Labs"
             VALUE "FileDescription", "AyuGram Desktop"
             VALUE "FileVersion", "6.4.0.0"
-            VALUE "LegalCopyright", "Copyright (C) 2014-2025"
+            VALUE "LegalCopyright", "Copyright (C) 2014-2026"
             VALUE "ProductName", "AyuGram Desktop"
             VALUE "ProductVersion", "6.4.0.0"
         END
