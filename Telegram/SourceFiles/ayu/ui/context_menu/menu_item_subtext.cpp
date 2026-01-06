@@ -30,7 +30,7 @@ class ActionWithSubText : public Menu::ItemBase
 {
 public:
 	ActionWithSubText(
-		not_null<RpWidget*> parent,
+		not_null<Ui::Menu::Menu*> parent,
 		const style::Menu &st,
 		const style::icon &icon,
 		Fn<void()> callback,
@@ -81,14 +81,14 @@ TextParseOptions MenuTextOptions = {
 };
 
 ActionWithSubText::ActionWithSubText(
-	not_null<RpWidget*> parent,
+	not_null<Ui::Menu::Menu*> parent,
 	const style::Menu &st,
 	const style::icon &icon,
 	Fn<void()> callback,
 	const QString &title,
 	QString subtext)
 	: ItemBase(parent, st),
-	  _dummyAction(new QAction(parent)),
+	  _dummyAction(Ui::CreateChild<QAction>(parent)),
 	  _st(st),
 	  _icon(icon),
 	  _subText(std::move(subtext)),
@@ -97,7 +97,7 @@ ActionWithSubText::ActionWithSubText(
 		  + st::ttlItemTimerFont->height
 		  + st::ttlItemPadding.bottom()) {
 	setAcceptBoth(true);
-	initResizeHook(parent->sizeValue());
+	fitToMenuWidth();
 	setClickedCallback(std::move(callback));
 
 	paintRequest(
