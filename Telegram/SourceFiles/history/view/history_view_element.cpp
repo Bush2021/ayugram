@@ -621,7 +621,7 @@ QString DateTooltipText(not_null<Element*> view) {
 				const auto parsed = base::unixtime::parse(
 					forwarded->savedFromDate);
 				if (parsed != view->dateTime()) {
-					dateText += '\n' + tr::lng_forwarded_saved_date(
+					dateText += '\n' + tr::lng_forwarded_forwarded_date(
 						tr::now,
 						lt_date,
 						locale.toString(parsed, format));
@@ -1714,6 +1714,11 @@ void Element::validateText() {
 			return;
 		}
 	}
+
+	// Albums may show text of a different item than the parent one.
+	// Media::itemForText may initialize data within the object.
+	_textItem = _media ? _media->itemForText() : item.get();
+
 	const auto &summary = item->summaryEntry();
 	const auto summaryShownWas = (_flags & Flag::SummaryShown) != 0;
 	const auto summaryShownNow = !summary.result.empty() && summary.shown;
@@ -1721,7 +1726,6 @@ void Element::validateText() {
 	if (summaryShownNow) {
 		_flags |= Flag::SummaryShown;
 		if (summaryShownChanged) {
-			_textItem = item;
 			setTextWithLinks(summary.result);
 		}
 		return;
@@ -1729,8 +1733,6 @@ void Element::validateText() {
 		_flags &= ~Flag::SummaryShown;
 	}
 
-	// Albums may show text of a different item than the parent one.
-	_textItem = _media ? _media->itemForText() : item.get();
 	if (!_textItem) {
 		if (!_text.isEmpty()) {
 			setTextWithLinks({});

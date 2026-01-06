@@ -613,7 +613,7 @@ void ConfirmEmojiStatusBox(
 class BotAction final : public Ui::Menu::ItemBase {
 public:
 	BotAction(
-		not_null<Ui::RpWidget*> parent,
+		not_null<Ui::Menu::Menu*> parent,
 		std::shared_ptr<Ui::Show> show,
 		const style::Menu &st,
 		const AttachWebViewBot &bot,
@@ -654,14 +654,14 @@ private:
 };
 
 BotAction::BotAction(
-	not_null<Ui::RpWidget*> parent,
+	not_null<Ui::Menu::Menu*> parent,
 	std::shared_ptr<Ui::Show> show,
 	const style::Menu &st,
 	const AttachWebViewBot &bot,
 	Fn<void()> callback)
 : ItemBase(parent, st)
 , _show(std::move(show))
-, _dummyAction(new QAction(parent))
+, _dummyAction(Ui::CreateChild<QAction>(parent))
 , _st(st)
 , _bot(bot)
 , _icon(this, _bot.media)
@@ -669,7 +669,7 @@ BotAction::BotAction(
 		+ _st.itemStyle.font->height
 		+ _st.itemPadding.bottom()) {
 	setAcceptBoth(false);
-	initResizeHook(parent->sizeValue());
+	fitToMenuWidth();
 	setClickedCallback(std::move(callback));
 
 	_icon.move(_st.itemIconPosition);
@@ -2729,7 +2729,7 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 			});
 		};
 		auto action = base::make_unique_q<BotAction>(
-			raw,
+			raw->menu(),
 			controller->uiShow(),
 			raw->menu()->st(),
 			bot,
