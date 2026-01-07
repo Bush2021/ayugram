@@ -824,9 +824,11 @@ void Reply::paint(
 	}
 
 	if (_ripple.animation) {
+		_ripple.lastPaintedPoint = { x, y };
 		_ripple.animation->paint(p, x, y, w, &cache->bg2);
 		if (_ripple.animation->empty()) {
 			_ripple.animation.reset();
+			_ripple.lastPaintedPoint = {};
 		}
 	}
 
@@ -988,7 +990,7 @@ void Reply::createRippleAnimation(
 		Ui::RippleAnimation::RoundRectMask(
 			size,
 			st::messageQuoteStyle.radius),
-		[=] { view->repaint(); });
+		[=] { view->repaint(QRect(_ripple.lastPaintedPoint, size)); });
 }
 
 void Reply::saveRipplePoint(QPoint point) const {
