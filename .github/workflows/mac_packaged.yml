@@ -16,7 +16,7 @@ jobs:
 
     env:
       GIT: "https://github.com"
-      CMAKE_GENERATOR: "Xcode"
+      CMAKE_GENERATOR: "Ninja"
       CMAKE_BUILD_TYPE: "Release"
       CMAKE_BUILD_PARALLEL_LEVEL: ""
       CMAKE_PREFIX_PATH: "/opt/homebrew/opt/ffmpeg@6:/opt/homebrew/opt/openal-soft"
@@ -132,7 +132,7 @@ jobs:
             echo "ARTIFACT_NAME=AyuGram" >> $GITHUB_ENV
           fi
 
-          cmake -Bbuild . \
+          cmake -Bbuild -GXcode . \
           -DCMAKE_OSX_ARCHITECTURES=arm64 \
           -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -DTDESKTOP_API_ID=2040 \
