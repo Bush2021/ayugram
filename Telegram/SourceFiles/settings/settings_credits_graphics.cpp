@@ -139,8 +139,8 @@ const auto kTopUpPrefix = "cloud_lng_topup_purpose_";
 	const auto phrase = Lang::GetNonDefaultValue(
 		kTopUpPrefix + purpose.toUtf8());
 	return phrase.isEmpty()
-		? tr::lng_credits_small_balance_fallback(tr::rich)
-		: rpl::single(tr::rich(phrase));
+		? (tr::lng_credits_small_balance_fallback(tr::rich) | rpl::type_erased)
+		: (rpl::single(tr::rich(phrase)) | rpl::type_erased);
 }
 
 class Balance final

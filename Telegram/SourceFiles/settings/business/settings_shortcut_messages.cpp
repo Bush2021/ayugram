@@ -467,10 +467,10 @@ Type ShortcutMessages::Id(BusinessShortcutId shortcutId) {
 rpl::producer<QString> ShortcutMessages::title() {
 	return _shortcut.value() | rpl::map([=](const QString &shortcut) {
 		return IsAway(shortcut)
-			? tr::lng_away_title()
+			? (tr::lng_away_title() | rpl::type_erased)
 			: IsGreeting(shortcut)
-			? tr::lng_greeting_title()
-			: rpl::single('/' + shortcut);
+			? (tr::lng_greeting_title() | rpl::type_erased)
+			: (rpl::single('/' + shortcut) | rpl::type_erased);
 	}) | rpl::flatten_latest();
 }
 

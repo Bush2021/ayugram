@@ -364,6 +364,16 @@ void BuildSectionButtons(SectionBuilder &builder) {
 	const auto controller = builder.controller();
 	const auto showOther = builder.showOther();
 
+	// AyuGram settings entry
+	builder.addSectionButton({
+		.title = tr::ayu_AyuPreferences(),
+		.targetSection = AyuMain::Id(),
+		.icon = { &st::menuIconPremium },
+	});
+
+	builder.addDivider();
+	builder.addSkip();
+
 	if (!session->supportMode()) {
 		builder.addSectionButton({
 			.title = tr::lng_settings_my_account(),
@@ -402,7 +412,7 @@ void BuildSectionButtons(SectionBuilder &builder) {
 			|| session->settings().dialogsFiltersEnabled();
 
 		auto shownProducer = hasFilters
-			? rpl::single(true)
+			? (rpl::single(true) | rpl::type_erased)
 			: (rpl::single(rpl::empty) | rpl::then(
 				session->appConfig().refreshed()
 			) | rpl::map([=] {
@@ -413,7 +423,7 @@ void BuildSectionButtons(SectionBuilder &builder) {
 				preload();
 			}
 			return enabled;
-		}));
+		}) | rpl::type_erased);
 
 		if (hasFilters) {
 			preload();
@@ -1009,223 +1019,6 @@ void SetupValidatePasswordSuggestion(
 	Ui::AddSkip(content);
 	Ui::AddDivider(content);
 	Ui::AddSkip(content);
-}
-
-void SetupSections(
-		not_null<Window::SessionController*> controller,
-		not_null<Ui::VerticalLayout*> container,
-		Fn<void(Type)> showOther) {
-	Ui::AddDivider(container);
-
-	SetupValidatePhoneNumberSuggestion(
-		controller,
-		container,
-		showOther);
-	SetupValidatePasswordSuggestion(
-		controller,
-		container,
-		showOther);
-
-	const auto addSection = [&](
-			rpl::producer<QString> label,
-			Type type,
-			IconDescriptor &&descriptor) {
-		AddButtonWithIcon(
-			container,
-			std::move(label),
-			st::settingsButton,
-			std::move(descriptor)
-		)->addClickHandler([=] {
-			showOther(type);
-		});
-	};
-
-	Ui::AddSkip(container);
-	addSection(
-		tr::ayu_AyuPreferences(),
-		AyuMain::Id(),
-        { .icon = &st::menuIconPremium });
-	Ui::AddSkip(container);
-	Ui::AddDivider(container);
-    Ui::AddSkip(container);
-
-	if (controller->session().supportMode()) {
-		SetupSupport(controller, container);
-
-		Ui::AddDivider(container);
-		Ui::AddSkip(container);
-	} else {
-		addSection(
-			tr::lng_settings_my_account(),
-			Information::Id(),
-			{ &st::menuIconProfile });
-	}
-
-	addSection(
-		tr::lng_settings_section_notify(),
-		Notifications::Id(),
-		{ &st::menuIconNotifications });
-	addSection(
-		tr::lng_settings_section_privacy(),
-		PrivacySecurity::Id(),
-		{ &st::menuIconLock });
-	addSection(
-		tr::lng_settings_section_chat_settings(),
-		Chat::Id(),
-		{ &st::menuIconChatBubble });
-
-	const auto preload = [=] {
-		controller->session().data().chatsFilters().requestSuggested();
-	};
-	const auto account = &controller->session().account();
-	const auto slided = container->add(
-		object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
-			container,
-			CreateButtonWithIcon(
-				container,
-				tr::lng_settings_section_filters(),
-				st::settingsButton,
-				{ &st::menuIconShowInFolder }))
-	)->setDuration(0);
-	if (controller->session().data().chatsFilters().has()
-		|| controller->session().settings().dialogsFiltersEnabled()) {
-		slided->show(anim::type::instant);
-		preload();
-	} else {
-		const auto enabled = [=] {
-			const auto result = account->appConfig().get<bool>(
-				u"dialog_filters_enabled"_q,
-				false);
-			if (result) {
-				preload();
-			}
-			return result;
-		};
-		const auto preloadIfEnabled = [=](bool enabled) {
-			if (enabled) {
-				preload();
-			}
-		};
-		slided->toggleOn(
-			rpl::single(rpl::empty) | rpl::then(
-				account->appConfig().refreshed()
-			) | rpl::map(
-				enabled
-			) | rpl::before_next(preloadIfEnabled));
-	}
-	slided->entity()->setClickedCallback([=] {
-		showOther(Folders::Id());
-	});
-
-	addSection(
-		tr::lng_settings_advanced(),
-		Advanced::Id(),
-		{ &st::menuIconManage });
-	addSection(
-		tr::lng_settings_section_devices(),
-		Calls::Id(),
-		{ &st::menuIconUnmute });
-
-	SetupPowerSavingButton(&controller->window(), container);
-	SetupLanguageButton(&controller->window(), container);
-
-	Ui::AddSkip(container);
-}
-
-void SetupPremium(
-		not_null<Window::SessionController*> controller,
-		not_null<Ui::VerticalLayout*> container,
-		Fn<void(Type)> showOther) {
-	if (!controller->session().premiumPossible()) {
-		return;
-	}
-	Ui::AddDivider(container);
-	Ui::AddSkip(container);
-
-	const auto isPaused = Window::PausedIn(
-		controller,
-		Window::GifPauseReason::Any);
-
-	AddPremiumStar(
-		AddButtonWithIcon(
-			container,
-			tr::lng_premium_summary_title(),
-			st::settingsButton),
-		false,
-		isPaused
-	)->addClickHandler([=] {
-		controller->setPremiumRef("settings");
-		showOther(PremiumId());
-	});
-	{
-		controller->session().credits().load();
-		AddPremiumStar(
-			AddButtonWithLabel(
-				container,
-				tr::lng_settings_credits(),
-				controller->session().credits().balanceValue(
-				) | rpl::map([=](CreditsAmount c) {
-					return c
-						? Lang::FormatCreditsAmountToShort(c).string
-						: QString();
-				}),
-				st::settingsButton),
-			true,
-			isPaused
-		)->addClickHandler([=] {
-			controller->setPremiumRef("settings");
-			showOther(CreditsId());
-		});
-	}
-	{
-		const auto wrap = container->add(
-			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-				container,
-				object_ptr<Ui::VerticalLayout>(container)));
-		wrap->toggleOn(
-			controller->session().credits().tonBalanceValue(
-			) | rpl::map([](CreditsAmount c) -> bool { return !c.empty(); }));
-		wrap->finishAnimating();
-		controller->session().credits().tonLoad();
-		const auto button = AddButtonWithLabel(
-			wrap->entity(),
-			tr::lng_settings_currency(),
-			controller->session().credits().tonBalanceValue(
-			) | rpl::map([=](CreditsAmount c) {
-				return c
-					? Lang::FormatCreditsAmountToShort(c).string
-					: QString();
-			}),
-			st::settingsButton,
-			{ &st::menuIconTon });
-		button->addClickHandler([=] {
-			controller->setPremiumRef("settings");
-			showOther(CurrencyId());
-		});
-	}
-	const auto button = AddButtonWithIcon(
-		container,
-		tr::lng_business_title(),
-		st::settingsButton,
-		{ .icon = &st::menuIconShop });
-	button->addClickHandler([=] {
-		showOther(BusinessId());
-	});
-
-	if (controller->session().premiumCanBuy()) {
-		const auto button = AddButtonWithIcon(
-			container,
-			tr::lng_settings_gift_premium(),
-			st::settingsButton,
-			{ .icon = &st::menuIconGiftPremium }
-		);
-		Ui::NewBadge::AddToRight(button);
-
-		button->addClickHandler([=] {
-			Ui::ChooseStarGiftRecipient(controller);
-		});
-	}
-	Ui::AddSkip(container);
 }
 
 bool HasInterfaceScale() {

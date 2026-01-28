@@ -729,14 +729,14 @@ TopBarWithSticker::TopBarWithSticker(
 
 	rpl::combine(
 		(args.stickerValue
-			? std::move(args.stickerValue)
-			: rpl::single((DocumentData*)nullptr)),
+			? (std::move(args.stickerValue) | rpl::type_erased)
+			: (rpl::single((DocumentData*)nullptr) | rpl::type_erased)),
 		(args.nameValue
-			? std::move(args.nameValue)
-			: rpl::single(QString())),
+			? (std::move(args.nameValue) | rpl::type_erased)
+			: (rpl::single(QString()) | rpl::type_erased)),
 		(args.aboutValue
-			? std::move(args.aboutValue)
-			: rpl::single(TextWithEntities()))
+			? (std::move(args.aboutValue) | rpl::type_erased)
+			: (rpl::single(TextWithEntities()) | rpl::type_erased))
 	) | rpl::on_next([=](
 			DocumentData *document,
 			const QString &name,
@@ -1597,8 +1597,8 @@ base::weak_qptr<Ui::RpWidget> Premium::createPinnedToTop(
 			st::infoTopBarScale);
 		_back->setDuration(0);
 		_back->toggleOn(isLayer
-			? _backToggles.value() | rpl::type_erased
-			: rpl::single(true));
+			? (_backToggles.value() | rpl::type_erased)
+			: (rpl::single(true) | rpl::type_erased));
 		_back->entity()->addClickHandler([=] {
 			_showBack.fire({});
 		});

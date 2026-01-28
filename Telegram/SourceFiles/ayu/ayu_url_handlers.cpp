@@ -21,7 +21,7 @@
 
 #include "main/main_session.h"
 #include "ui/boxes/donate_info_box.h"
-#include "ui/settings/settings_main.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "window/window_controller.h"
 
 namespace AyuUrlHandlers {

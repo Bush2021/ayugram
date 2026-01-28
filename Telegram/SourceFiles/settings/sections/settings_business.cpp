@@ -841,8 +841,8 @@ base::weak_qptr<Ui::RpWidget> Business::createPinnedToTop(
 			st::infoTopBarScale);
 		_back->setDuration(0);
 		_back->toggleOn(isLayer
-			? _backToggles.value() | rpl::type_erased
-			: rpl::single(true));
+			? (_backToggles.value() | rpl::type_erased)
+			: (rpl::single(true) | rpl::type_erased));
 		_back->entity()->addClickHandler([=] {
 			_showBack.fire({});
 		});

@@ -72,59 +72,6 @@ int CurrentNotificationsCount() {
 
 using ChangeType = Window::Notifications::ChangeType;
 
-class NotificationsCount : public Ui::RpWidget {
-public:
-	NotificationsCount(
-		QWidget *parent,
-		not_null<Window::SessionController*> controller);
-
-	void setCount(int count);
-
-	~NotificationsCount();
-
-protected:
-	void paintEvent(QPaintEvent *e) override;
-	void mousePressEvent(QMouseEvent *e) override;
-	void mouseMoveEvent(QMouseEvent *e) override;
-	void leaveEventHook(QEvent *e) override;
-	void mouseReleaseEvent(QMouseEvent *e) override;
-
-	int resizeGetHeight(int newWidth) override;
-
-private:
-	using ScreenCorner = Core::Settings::ScreenCorner;
-	void setOverCorner(ScreenCorner corner);
-	void clearOverCorner();
-
-	class SampleWidget;
-	void removeSample(SampleWidget *widget);
-
-	QRect getScreenRect() const;
-	QRect getScreenRect(int width) const;
-	int getContentLeft() const;
-	void prepareNotificationSampleSmall();
-	void prepareNotificationSampleLarge();
-	void prepareNotificationSampleUserpic();
-
-	const not_null<Window::SessionController*> _controller;
-
-	QPixmap _notificationSampleUserpic;
-	QPixmap _notificationSampleSmall;
-	QPixmap _notificationSampleLarge;
-	ScreenCorner _chosenCorner;
-	std::vector<Ui::Animations::Simple> _sampleOpacities;
-
-	bool _isOverCorner = false;
-	ScreenCorner _overCorner = ScreenCorner::TopLeft;
-	bool _isDownCorner = false;
-	ScreenCorner _downCorner = ScreenCorner::TopLeft;
-
-	int _oldCount;
-
-	std::vector<SampleWidget*> _cornerSamples[5];
-
-};
-
 class NotificationsCount::SampleWidget : public QWidget {
 public:
 	SampleWidget(NotificationsCount *owner, const QPixmap &cache);
@@ -966,8 +913,8 @@ void BuildGlobalNotificationsSection(SectionBuilder &builder) {
 		.title = tr::lng_settings_desktop_notify(),
 		.icon = { &st::menuIconNotifications },
 		.toggled = desktopToggles
-			? desktopToggles->events_starting_with(settings.desktopNotify())
-			: rpl::single(settings.desktopNotify()),
+			? (desktopToggles->events_starting_with(settings.desktopNotify()) | rpl::type_erased)
+			: (rpl::single(settings.desktopNotify()) | rpl::type_erased),
 		.keywords = { u"desktop"_q, u"popup"_q, u"show"_q },
 	});
 
@@ -983,8 +930,8 @@ void BuildGlobalNotificationsSection(SectionBuilder &builder) {
 			: tr::lng_settings_alert_linux)(),
 		.icon = { &st::menuIconDockBounce },
 		.toggled = flashbounceToggles
-			? flashbounceToggles->events_starting_with(settings.flashBounceNotify())
-			: rpl::single(settings.flashBounceNotify()),
+			? (flashbounceToggles->events_starting_with(settings.flashBounceNotify()) | rpl::type_erased)
+			: (rpl::single(settings.flashBounceNotify()) | rpl::type_erased),
 		.keywords = { u"flash"_q, u"bounce"_q, u"taskbar"_q },
 	});
 
@@ -999,8 +946,8 @@ void BuildGlobalNotificationsSection(SectionBuilder &builder) {
 		.title = tr::lng_settings_sound_allowed(),
 		.icon = { &st::menuIconUnmute },
 		.toggled = soundAllowed
-			? soundAllowed->events_starting_with(allowed())
-			: rpl::single(allowed()),
+			? (soundAllowed->events_starting_with(allowed()) | rpl::type_erased)
+			: (rpl::single(allowed()) | rpl::type_erased),
 		.keywords = { u"sound"_q, u"audio"_q, u"mute"_q },
 	});
 

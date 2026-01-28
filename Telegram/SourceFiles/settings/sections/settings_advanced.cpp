@@ -156,8 +156,8 @@ void BuildDataStorageSection(SectionBuilder &builder) {
 		},
 		.keywords = { u"download"_q, u"path"_q, u"folder"_q },
 		.shown = showDownloadPath
-			? showDownloadPath->value()
-			: rpl::single(true),
+			? (showDownloadPath->value() | rpl::type_erased)
+			: (rpl::single(true) | rpl::type_erased),
 	});
 
 	builder.addButton({
@@ -396,8 +396,8 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 				.checked = settings->trayIconMonochrome(),
 				.keywords = { u"monochrome"_q, u"icon"_q, u"tray"_q },
 				.shown = tray
-					? tray->checkedValue()
-					: rpl::single(trayEnabled()),
+					? (tray->checkedValue() | rpl::type_erased)
+					: (rpl::single(trayEnabled()) | rpl::type_erased),
 			})
 			: nullptr;
 
@@ -522,8 +522,8 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 		.checked = settings->closeBehavior() == Behavior::CloseToTaskbar,
 		.keywords = { u"close"_q, u"taskbar"_q, u"minimize"_q },
 		.shown = closeToTaskbarShown
-			? closeToTaskbarShown->value()
-			: rpl::single(false),
+			? (closeToTaskbarShown->value() | rpl::type_erased)
+			: (rpl::single(false) | rpl::type_erased),
 	});
 	if (closeToTaskbar) {
 		closeToTaskbar->checkedChanges(
@@ -558,8 +558,8 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 			.checked = minimizedToggled(),
 			.keywords = { u"minimized"_q, u"startup"_q, u"hidden"_q },
 			.shown = autostart
-				? autostart->checkedValue()
-				: rpl::single(cAutoStart()),
+				? (autostart->checkedValue() | rpl::type_erased)
+				: (rpl::single(cAutoStart()) | rpl::type_erased),
 		});
 
 		if (autostart) {
