@@ -159,6 +159,8 @@ QByteArray Settings::serialize() const {
 	LogPosition(_mediaViewPosition, u"Viewer"_q);
 	const auto ivPosition = Serialize(_ivPosition);
 	LogPosition(_ivPosition, u"IV"_q);
+	const auto callPanelPosition = Serialize(_callPanelPosition);
+	LogPosition(_callPanelPosition, u"CallPanel"_q);
 	const auto proxy = _proxy.serialize();
 	const auto skipLanguages = _skipTranslationLanguages.current();
 
@@ -246,7 +248,8 @@ QByteArray Settings::serialize() const {
 		+ Serialize::bytearraySize(_tonsiteStorageToken)
 		+ sizeof(qint32) * 8
 		+ sizeof(ushort)
-		+ sizeof(qint32); // _notificationsDisplayChecksum
+		+ sizeof(qint32) // _notificationsDisplayChecksum
+		+ Serialize::bytearraySize(callPanelPosition);
 
 	auto result = QByteArray();
 	result.reserve(size);
@@ -410,7 +413,8 @@ QByteArray Settings::serialize() const {
 			<< qint32(_systemDarkModeEnabled.current() ? 1 : 0)
 			<< qint32(_quickDialogAction)
 			<< _notificationsVolume
-			<< _notificationsDisplayChecksum;
+			<< _notificationsDisplayChecksum
+			<< callPanelPosition;
 	}
 
 	Ensures(result.size() == size);
@@ -533,6 +537,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	qint32 trayIconMonochrome = (_trayIconMonochrome.current() ? 1 : 0);
 	qint32 ttlVoiceClickTooltipHidden = _ttlVoiceClickTooltipHidden.current() ? 1 : 0;
 	QByteArray ivPosition;
+	QByteArray callPanelPosition;
 	QString customFontFamily = _customFontFamily;
 	qint32 systemUnlockEnabled = _systemUnlockEnabled ? 1 : 0;
 	qint32 weatherInCelsius = !_weatherInCelsius ? 0 : *_weatherInCelsius ? 1 : 2;
@@ -881,6 +886,9 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	if (!stream.atEnd()) {
 		stream >> notificationsDisplayChecksum;
 	}
+	if (!stream.atEnd()) {
+		stream >> callPanelPosition;
+	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
 			"Bad data for Core::Settings::constructFromSerialized()"));
@@ -1092,6 +1100,9 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_ttlVoiceClickTooltipHidden = (ttlVoiceClickTooltipHidden == 1);
 	if (!ivPosition.isEmpty()) {
 		_ivPosition = Deserialize(ivPosition);
+	}
+	if (!callPanelPosition.isEmpty()) {
+		_callPanelPosition = Deserialize(callPanelPosition);
 	}
 	_customFontFamily = customFontFamily;
 	_systemUnlockEnabled = (systemUnlockEnabled == 1);
