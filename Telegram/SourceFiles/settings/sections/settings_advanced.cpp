@@ -156,8 +156,8 @@ void BuildDataStorageSection(SectionBuilder &builder) {
 		},
 		.keywords = { u"download"_q, u"path"_q, u"folder"_q },
 		.shown = showDownloadPath
-			? (showDownloadPath->value() | rpl::type_erased)
-			: (rpl::single(true) | rpl::type_erased),
+			? showDownloadPath->value()
+			: rpl::single(true) | rpl::type_erased,
 	});
 
 	builder.addButton({
@@ -349,7 +349,6 @@ void BuildWindowTitleSection(SectionBuilder &builder) {
 
 void BuildSystemIntegrationSection(SectionBuilder &builder) {
 	const auto controller = builder.controller();
-	const auto container = builder.container();
 	const auto settings = &Core::App().settings();
 
 	builder.addDivider();
@@ -504,6 +503,7 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 #elif defined Q_OS_WIN // Q_OS_MAC
 	using Behavior = Core::Settings::CloseBehavior;
 
+	const auto container = builder.container();
 	const auto closeToTaskbarShown = container
 		? container->lifetime().make_state<rpl::variable<bool>>(
 			!Core::App().tray().has())

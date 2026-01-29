@@ -1,3 +1,7 @@
+6.4.3 beta (28.01.25)
+
+- Search in Settings.
+
 6.4.2 (08.01.25)
 
 - Fix non-closing popup menu items.

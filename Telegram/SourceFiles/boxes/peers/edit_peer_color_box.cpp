@@ -2241,7 +2241,9 @@ void EditPeerProfileColorSection(
 			? std::nullopt
 			: std::make_optional(state->patternEmojiId.current()));
 	};
-	setIndex(peer->colorProfileIndex().value_or(kUnsetColorIndex));
+	setIndex(peer->emojiStatusId().collectible
+		? kUnsetColorIndex
+		: peer->colorProfileIndex().value_or(kUnsetColorIndex));
 
 	const auto margin = st::settingsColorRadioMargin;
 	const auto skip = st::settingsColorRadioSkip;

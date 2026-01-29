@@ -1270,7 +1270,6 @@ void BuildPremiumSectionContent(
 		SectionBuilder &builder,
 		std::shared_ptr<PremiumState> state) {
 	const auto controller = builder.controller();
-	const auto session = builder.session();
 
 	if (controller && state) {
 		builder.add([controller, state](const WidgetContext &ctx) {

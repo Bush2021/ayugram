@@ -412,7 +412,7 @@ void BuildSectionButtons(SectionBuilder &builder) {
 			|| session->settings().dialogsFiltersEnabled();
 
 		auto shownProducer = hasFilters
-			? (rpl::single(true) | rpl::type_erased)
+			? rpl::single(true) | rpl::type_erased
 			: (rpl::single(rpl::empty) | rpl::then(
 				session->appConfig().refreshed()
 			) | rpl::map([=] {
@@ -423,7 +423,7 @@ void BuildSectionButtons(SectionBuilder &builder) {
 				preload();
 			}
 			return enabled;
-		}) | rpl::type_erased);
+		}));
 
 		if (hasFilters) {
 			preload();

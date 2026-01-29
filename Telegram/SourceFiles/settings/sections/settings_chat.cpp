@@ -1387,15 +1387,6 @@ void SetupStickersEmoji(
 			checked,
 			st::settingsCheckbox);
 	};
-	const auto add = [&](const QString &label, bool checked, auto &&handle) {
-		return inner->add(
-			checkbox(label, checked),
-			st::settingsCheckboxPadding
-		)->checkedChanges(
-		) | rpl::on_next(
-			std::move(handle),
-			inner->lifetime());
-	};
 	const auto addWithReturn = [&](
 			const QString &label,
 			bool checked,

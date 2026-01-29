@@ -913,8 +913,8 @@ void BuildGlobalNotificationsSection(SectionBuilder &builder) {
 		.title = tr::lng_settings_desktop_notify(),
 		.icon = { &st::menuIconNotifications },
 		.toggled = desktopToggles
-			? (desktopToggles->events_starting_with(settings.desktopNotify()) | rpl::type_erased)
-			: (rpl::single(settings.desktopNotify()) | rpl::type_erased),
+			? desktopToggles->events_starting_with(settings.desktopNotify())
+			: rpl::single(settings.desktopNotify()) | rpl::type_erased,
 		.keywords = { u"desktop"_q, u"popup"_q, u"show"_q },
 	});
 
@@ -930,8 +930,8 @@ void BuildGlobalNotificationsSection(SectionBuilder &builder) {
 			: tr::lng_settings_alert_linux)(),
 		.icon = { &st::menuIconDockBounce },
 		.toggled = flashbounceToggles
-			? (flashbounceToggles->events_starting_with(settings.flashBounceNotify()) | rpl::type_erased)
-			: (rpl::single(settings.flashBounceNotify()) | rpl::type_erased),
+			? flashbounceToggles->events_starting_with(settings.flashBounceNotify())
+			: rpl::single(settings.flashBounceNotify()) | rpl::type_erased,
 		.keywords = { u"flash"_q, u"bounce"_q, u"taskbar"_q },
 	});
 
@@ -946,8 +946,8 @@ void BuildGlobalNotificationsSection(SectionBuilder &builder) {
 		.title = tr::lng_settings_sound_allowed(),
 		.icon = { &st::menuIconUnmute },
 		.toggled = soundAllowed
-			? (soundAllowed->events_starting_with(allowed()) | rpl::type_erased)
-			: (rpl::single(allowed()) | rpl::type_erased),
+			? soundAllowed->events_starting_with(allowed())
+			: rpl::single(allowed()) | rpl::type_erased,
 		.keywords = { u"sound"_q, u"audio"_q, u"mute"_q },
 	});
 

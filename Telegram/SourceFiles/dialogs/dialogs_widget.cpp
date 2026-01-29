@@ -3832,7 +3832,8 @@ void Widget::updateLockUnlockVisibility(anim::type animated) {
 		|| (widthAnimation && !suggestionsAnimation)
 		|| _childList
 		|| !session().domain().local().hasLocalPasscode()
-		|| (!_stories->empty()
+		|| (_stories
+			&& !_stories->empty()
 			&& _scroll->position().overscroll < -st::dialogsFilterSkip);
 	const auto hiddenAnimated = _searchHasFocus
 		|| _searchSuggestionsLocked
