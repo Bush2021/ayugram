@@ -11,6 +11,7 @@
 #include "ayu/data/ayu_database.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/ui/boxes/import_filters_box.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "boxes/abstract_box.h"
 #include "boxes/peer_list_box.h"
@@ -18,6 +19,7 @@
 #include "filters/per_dialog_filter.h"
 #include "filters/settings_filters_list.h"
 #include "inline_bots/bot_attach_web_view.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_boxes.h"
 #include "styles/style_menu_icons.h"
@@ -32,6 +34,8 @@
 #include "window/window_session_controller.h"
 
 namespace Settings {
+
+using namespace Builder;
 
 rpl::producer<QString> AyuFilters::title() {
 	return tr::ayu_CategoryFilters();
@@ -293,5 +297,48 @@ void AyuFilters::setupContent(not_null<Window::SessionController*> controller) {
 
 	ResizeFitChild(this, content);
 }
+
+const auto kMeta = BuildHelper({
+	.id = AyuFilters::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_CategoryFilters,
+	.icon = &st::menuIconDelete,
+}, [](SectionBuilder &builder) {
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/regex-filters"_q,
+			.title = tr::ayu_RegexFilters(tr::now),
+			.keywords = { u"regex"_q, u"filter"_q, u"block"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/filters-enable"_q,
+			.title = tr::ayu_RegexFiltersEnable(tr::now),
+			.keywords = { u"filter"_q, u"enable"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/shared-filters"_q,
+			.title = tr::ayu_RegexFiltersShared(tr::now),
+			.keywords = { u"shared"_q, u"filter"_q, u"common"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/shadowban"_q,
+			.title = tr::ayu_FiltersShadowBan(tr::now),
+			.keywords = { u"shadowban"_q, u"shadow"_q, u"ban"_q, u"hide"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/hide-from-blocked"_q,
+			.title = tr::ayu_FiltersHideFromBlocked(tr::now),
+			.keywords = { u"blocked"_q, u"hide"_q, u"filter"_q },
+		};
+	});
+});
 
 } // namespace Settings

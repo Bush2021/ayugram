@@ -22,6 +22,8 @@
 #include "ayu/ui/ayu_logo.h"
 #include "core/version.h"
 #include "settings/settings_common.h"
+#include "settings/settings_builder.h"
+#include "settings/sections/settings_main.h"
 #include "styles/style_ayu_settings.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -219,5 +221,52 @@ void AyuMain::setupContent(not_null<Window::SessionController*> controller) {
 
 	ResizeFitChild(this, content);
 }
+
+using namespace Builder;
+
+const auto kMeta = BuildHelper({
+	.id = AyuMain::Id(),
+	.parentId = MainId(),
+	.title = &tr::ayu_AyuPreferences,
+	.icon = &st::menuIconPremium,
+}, [](SectionBuilder &builder) {
+	// AyuGram categories
+	builder.addSectionButton({
+		.title = rpl::single(QString("AyuGram")),
+		.targetSection = AyuGhost::Id(),
+		.icon = { &st::menuIconGroupReactions },
+		.keywords = { u"ghost"_q, u"privacy"_q, u"stealth"_q },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryFilters(),
+		.targetSection = AyuFilters::Id(),
+		.icon = { &st::menuIconTagFilter },
+		.keywords = { u"filters"_q, u"shadowban"_q },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryGeneral(),
+		.targetSection = AyuGeneral::Id(),
+		.icon = { &st::menuIconShowAll },
+		.keywords = { u"general"_q, u"common"_q },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryAppearance(),
+		.targetSection = AyuAppearance::Id(),
+		.icon = { &st::menuIconPalette },
+		.keywords = { u"appearance"_q, u"theme"_q, u"style"_q },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryChats(),
+		.targetSection = AyuChats::Id(),
+		.icon = { &st::menuIconChatBubble },
+		.keywords = { u"chats"_q, u"messages"_q },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryOther(),
+		.targetSection = AyuOther::Id(),
+		.icon = { &st::menuIconFave },
+		.keywords = { u"other"_q, u"misc"_q },
+	});
+});
 
 } // namespace Settings

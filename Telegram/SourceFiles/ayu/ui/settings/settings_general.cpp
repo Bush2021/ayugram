@@ -9,7 +9,9 @@
 #include "lang_auto.h"
 #include "settings_ayu_utils.h"
 #include "ayu/ayu_settings.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/vertical_list.h"
 #include "ui/boxes/single_choice_box.h"
@@ -17,7 +19,11 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include "ayu/ui/settings/settings_main.h"
+
 namespace Settings {
+
+using namespace Builder;
 
 rpl::producer<QString> AyuGeneral::title() {
 	return tr::ayu_CategoryGeneral();
@@ -343,5 +349,90 @@ void AyuGeneral::setupContent(not_null<Window::SessionController*> controller) {
 
 	ResizeFitChild(this, content);
 }
+
+const auto kMeta = BuildHelper({
+	.id = AyuGeneral::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_CategoryGeneral,
+	.icon = &st::menuIconShowAll,
+}, [](SectionBuilder &builder) {
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/translation-provider"_q,
+			.title = tr::ayu_TranslationProvider(tr::now),
+			.keywords = { u"translate"_q, u"google"_q, u"yandex"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/disable-stories"_q,
+			.title = tr::ayu_DisableStories(tr::now),
+			.keywords = { u"stories"_q, u"hide"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/similar-channels"_q,
+			.title = tr::ayu_DisableSimilarChannels(tr::now),
+			.keywords = { u"similar"_q, u"channels"_q, u"collapse"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/disable-notifications-delay"_q,
+			.title = tr::ayu_DisableNotificationsDelay(tr::now),
+			.keywords = { u"notifications"_q, u"delay"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/show-message-seconds"_q,
+			.title = tr::ayu_SettingsShowMessageSeconds(tr::now),
+			.keywords = { u"time"_q, u"seconds"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/show-peer-id"_q,
+			.title = tr::ayu_SettingsShowID(tr::now),
+			.keywords = { u"id"_q, u"peer"_q, u"api"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/spoof-webview"_q,
+			.title = tr::ayu_SettingsSpoofWebviewAsAndroid(tr::now),
+			.keywords = { u"webview"_q, u"android"_q, u"spoof"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/bigger-webview"_q,
+			.title = tr::ayu_SettingsBiggerWindow(tr::now),
+			.keywords = { u"webview"_q, u"size"_q, u"window"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/sticker-confirmation"_q,
+			.title = tr::ayu_StickerConfirmation(tr::now),
+			.keywords = { u"sticker"_q, u"confirm"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/gif-confirmation"_q,
+			.title = tr::ayu_GIFConfirmation(tr::now),
+			.keywords = { u"gif"_q, u"confirm"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/voice-confirmation"_q,
+			.title = tr::ayu_VoiceConfirmation(tr::now),
+			.keywords = { u"voice"_q, u"confirm"_q },
+		};
+	});
+});
 
 } // namespace Settings

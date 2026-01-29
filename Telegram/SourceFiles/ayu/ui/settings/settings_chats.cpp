@@ -12,7 +12,9 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/edit_mark_box.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "core/application.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_boxes.h"
@@ -27,6 +29,8 @@
 #include "window/window_session_controller.h"
 
 namespace Settings {
+
+using namespace Builder;
 
 rpl::producer<QString> AyuChats::title() {
 	return tr::ayu_CategoryChats();
@@ -679,5 +683,97 @@ void AyuChats::setupContent(not_null<Window::SessionController*> controller) {
 
 	ResizeFitChild(this, content);
 }
+
+const auto kMeta = BuildHelper({
+	.id = AyuChats::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_CategoryChats,
+	.icon = &st::menuIconChatBubble,
+}, [](SectionBuilder &builder) {
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/stickers-emoji"_q,
+			.title = tr::lng_settings_stickers_emoji(tr::now),
+			.keywords = { u"stickers"_q, u"emoji"_q, u"added"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/hide-reactions"_q,
+			.title = tr::ayu_HideReactions(tr::now),
+			.keywords = { u"reactions"_q, u"hide"_q, u"channel"_q, u"group"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/recent-stickers-count"_q,
+			.title = tr::ayu_SettingsRecentStickersCount(tr::now),
+			.keywords = { u"stickers"_q, u"recent"_q, u"limit"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/channel-bottom-button"_q,
+			.title = tr::ayu_ChannelBottomButton(tr::now),
+			.keywords = { u"channel"_q, u"button"_q, u"mute"_q, u"discuss"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/quick-admin-shortcuts"_q,
+			.title = tr::ayu_QuickAdminShortcuts(tr::now),
+			.keywords = { u"admin"_q, u"shortcuts"_q, u"quick"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/message-shot"_q,
+			.title = tr::ayu_SettingsShowMessageShot(tr::now),
+			.keywords = { u"message"_q, u"shot"_q, u"screenshot"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/deleted-mark"_q,
+			.title = tr::ayu_DeletedMarkText(tr::now),
+			.keywords = { u"deleted"_q, u"mark"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/edited-mark"_q,
+			.title = tr::ayu_EditedMarkText(tr::now),
+			.keywords = { u"edited"_q, u"mark"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/wide-messages"_q,
+			.title = tr::ayu_SettingsWideMultiplier(tr::now),
+			.keywords = { u"wide"_q, u"messages"_q, u"width"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/context-menu"_q,
+			.title = tr::ayu_ContextMenuElementsHeader(tr::now),
+			.keywords = { u"context"_q, u"menu"_q, u"right click"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/message-field"_q,
+			.title = tr::ayu_MessageFieldElementsHeader(tr::now),
+			.keywords = { u"message"_q, u"field"_q, u"input"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/message-field-popups"_q,
+			.title = tr::ayu_MessageFieldPopupsHeader(tr::now),
+			.keywords = { u"popup"_q, u"mentions"_q, u"commands"_q },
+		};
+	});
+});
 
 } // namespace Settings

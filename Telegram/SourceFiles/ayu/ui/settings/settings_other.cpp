@@ -13,10 +13,12 @@
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/donate_qr_box.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "boxes/abstract_box.h"
 #include "core/application.h"
 #include "lang/lang_text_entity.h"
 #include "main/main_session.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
@@ -32,6 +34,8 @@
 #include "window/themes/window_theme.h"
 
 namespace Settings {
+
+using namespace Builder;
 namespace {
 
 struct Asset
@@ -247,5 +251,43 @@ void AyuOther::setupContent(not_null<Window::SessionController*> controller) {
 
 	ResizeFitChild(this, content);
 }
+
+const auto kMeta = BuildHelper({
+	.id = AyuOther::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_CategoryOther,
+	.icon = &st::menuIconFave,
+}, [](SectionBuilder &builder) {
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/donations"_q,
+			.title = tr::ayu_SupportHeader(tr::now),
+			.keywords = { u"donate"_q, u"support"_q, u"crypto"_q },
+		};
+	});
+#ifndef TDESKTOP_DISABLE_AUTOUPDATE
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/crash-reporting"_q,
+			.title = tr::ayu_CrashReporting(tr::now),
+			.keywords = { u"crash"_q, u"report"_q, u"debug"_q },
+		};
+	});
+#endif
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/url-scheme"_q,
+			.title = tr::ayu_RegisterURLScheme(tr::now),
+			.keywords = { u"url"_q, u"scheme"_q, u"protocol"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/reset-settings"_q,
+			.title = tr::ayu_ResetSettings(tr::now),
+			.keywords = { u"reset"_q, u"restore"_q, u"default"_q },
+		};
+	});
+});
 
 } // namespace Settings

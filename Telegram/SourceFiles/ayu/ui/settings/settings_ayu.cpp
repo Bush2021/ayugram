@@ -8,11 +8,14 @@
 
 #include "lang_auto.h"
 #include "settings_ayu_utils.h"
+#include "settings_main.h"
 #include "ayu/ayu_settings.h"
 #include "boxes/peer_list_box.h"
 #include "filters/settings_filters_list.h"
 #include "settings/settings_common.h"
+#include "settings/settings_builder.h"
 #include "styles/style_settings.h"
+#include "styles/style_menu_icons.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
@@ -20,6 +23,8 @@
 #include "window/window_session_controller.h"
 
 namespace Settings {
+
+using namespace Builder;
 
 rpl::producer<QString> AyuGhost::title() {
 	return rpl::single(QString("AyuGram"));
@@ -310,5 +315,100 @@ void AyuGhost::setupContent(not_null<Window::SessionController*> controller) {
 
 	ResizeFitChild(this, content);
 }
+
+const auto kMeta = BuildHelper({
+	.id = AyuGhost::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_AyuPreferences,
+	.icon = &st::menuIconGroupReactions,
+}, [](SectionBuilder &builder) {
+	// Ghost Mode settings
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/ghost-mode"_q,
+			.title = tr::ayu_GhostModeToggle(tr::now),
+			.keywords = { u"ghost"_q, u"invisible"_q, u"stealth"_q, u"privacy"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/dont-read-messages"_q,
+			.title = tr::ayu_DontReadMessages(tr::now),
+			.keywords = { u"read"_q, u"messages"_q, u"ghost"_q, u"privacy"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/dont-read-stories"_q,
+			.title = tr::ayu_DontReadStories(tr::now),
+			.keywords = { u"read"_q, u"stories"_q, u"ghost"_q, u"privacy"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/dont-send-online"_q,
+			.title = tr::ayu_DontSendOnlinePackets(tr::now),
+			.keywords = { u"online"_q, u"status"_q, u"ghost"_q, u"privacy"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/dont-send-upload"_q,
+			.title = tr::ayu_DontSendUploadProgress(tr::now),
+			.keywords = { u"upload"_q, u"typing"_q, u"progress"_q, u"ghost"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/mark-read-after-action"_q,
+			.title = tr::ayu_MarkReadAfterAction(tr::now),
+			.keywords = { u"read"_q, u"action"_q, u"mark"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/scheduled-messages"_q,
+			.title = tr::ayu_UseScheduledMessages(tr::now),
+			.keywords = { u"scheduled"_q, u"messages"_q, u"send"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/send-without-sound"_q,
+			.title = tr::ayu_SendWithoutSoundByDefault(tr::now),
+			.keywords = { u"sound"_q, u"silent"_q, u"mute"_q, u"notification"_q },
+		};
+	});
+
+	// Spy Essentials
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/save-deleted"_q,
+			.title = tr::ayu_SaveDeletedMessages(tr::now),
+			.keywords = { u"deleted"_q, u"save"_q, u"messages"_q, u"spy"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/save-history"_q,
+			.title = tr::ayu_SaveMessagesHistory(tr::now),
+			.keywords = { u"history"_q, u"save"_q, u"messages"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/local-premium"_q,
+			.title = tr::ayu_LocalPremium(tr::now),
+			.keywords = { u"premium"_q, u"local"_q, u"fake"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/disable-ads"_q,
+			.title = tr::ayu_DisableAds(tr::now),
+			.keywords = { u"ads"_q, u"disable"_q, u"block"_q, u"advertising"_q },
+		};
+	});
+});
 
 } // namespace Settings

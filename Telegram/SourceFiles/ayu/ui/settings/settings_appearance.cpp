@@ -10,8 +10,10 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/font_selector.h"
 #include "ayu/ui/components/icon_picker.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "main/main_session.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_icons.h"
 #include "styles/style_menu_icons.h"
@@ -22,6 +24,8 @@
 #include "window/window_session_controller.h"
 
 namespace Settings {
+
+using namespace Builder;
 
 namespace {
 
@@ -539,5 +543,85 @@ void AyuAppearance::setupContent(not_null<Window::SessionController*> controller
 
 	ResizeFitChild(this, content);
 }
+
+const auto kMeta = BuildHelper({
+	.id = AyuAppearance::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_CategoryAppearance,
+	.icon = &st::menuIconPalette,
+}, [](SectionBuilder &builder) {
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/app-icon"_q,
+			.title = tr::ayu_AppIconHeader(tr::now),
+			.keywords = { u"icon"_q, u"logo"_q, u"app"_q },
+		};
+	});
+#ifdef Q_OS_WIN
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/hide-notification-badge"_q,
+			.title = tr::ayu_HideNotificationBadge(tr::now),
+			.keywords = { u"badge"_q, u"notification"_q, u"taskbar"_q },
+		};
+	});
+#endif
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/material-switches"_q,
+			.title = tr::ayu_MaterialSwitches(tr::now),
+			.keywords = { u"material"_q, u"switch"_q, u"toggle"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/remove-message-tail"_q,
+			.title = tr::ayu_RemoveMessageTail(tr::now),
+			.keywords = { u"tail"_q, u"bubble"_q, u"message"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/disable-custom-backgrounds"_q,
+			.title = tr::ayu_DisableCustomBackgrounds(tr::now),
+			.keywords = { u"background"_q, u"wallpaper"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/monospace-font"_q,
+			.title = tr::ayu_MonospaceFont(tr::now),
+			.keywords = { u"font"_q, u"monospace"_q, u"code"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/hide-notification-counters"_q,
+			.title = tr::ayu_HideNotificationCounters(tr::now),
+			.keywords = { u"notification"_q, u"counter"_q, u"badge"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/hide-all-chats"_q,
+			.title = tr::ayu_HideAllChats(tr::now),
+			.keywords = { u"all chats"_q, u"folder"_q, u"hide"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/drawer-elements"_q,
+			.title = tr::ayu_DrawerElementsHeader(tr::now),
+			.keywords = { u"drawer"_q, u"menu"_q, u"sidebar"_q },
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
+			.id = u"ayu/tray-elements"_q,
+			.title = tr::ayu_TrayElementsHeader(tr::now),
+			.keywords = { u"tray"_q, u"icon"_q, u"system"_q },
+		};
+	});
+});
 
 } // namespace Settings
