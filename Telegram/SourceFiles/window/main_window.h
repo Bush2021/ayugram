@@ -140,11 +140,6 @@ public:
 		updateGlobalMenuHook();
 	}
 
-	[[nodiscard]] QRect countInitialGeometry(
-		Core::WindowPosition position,
-		Core::WindowPosition initial,
-		QSize minSize) const;
-
 	[[nodiscard]] virtual rpl::producer<QPoint> globalForceClicks() {
 		return rpl::never<QPoint>();
 	}
@@ -238,10 +233,19 @@ private:
 [[nodiscard]] Core::WindowPosition PositionWithScreen(
 	Core::WindowPosition position,
 	const QScreen *chosen,
-	QSize minimal);
+	QSize minimal,
+	const QString &name);
 [[nodiscard]] Core::WindowPosition PositionWithScreen(
 	Core::WindowPosition position,
 	not_null<const QWidget*> widget,
-	QSize minimal);
+	QSize minimal,
+	const QString &name);
+
+[[nodiscard]] QRect CountInitialGeometry(
+	not_null<const Ui::RpWindow*> widget,
+	Core::WindowPosition position,
+	Core::WindowPosition initial,
+	QSize minSize,
+	const QString &name);
 
 } // namespace Window
