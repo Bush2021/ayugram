@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/sticker_set_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/language_box.h"
+#include "boxes/url_auth_box.h"
 #include "passport/passport_form_controller.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -615,6 +616,17 @@ bool ResolveUsernameOrPhone(
 			: selfId;
 		ResolveGiftCode(controller, appnameParam, fromId, toId);
 		return true;
+	}
+	if (domainParam == u"oauth"_q) {
+		const auto token = params.value(u"startapp"_q);
+		if (!token.isEmpty()) {
+			UrlAuthBox::ActivateUrl(
+				controller->uiShow(),
+				&controller->session(),
+				u"tg://resolve?domain=oauth&startapp="_q + token,
+				context);
+			return true;
+		}
 	}
 
 	// Fix t.me/s/username links.
@@ -1715,6 +1727,28 @@ bool ResolveTonSettings(
 	return true;
 }
 
+bool ResolveOAuth(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto token = params.value(u"token"_q);
+	if (token.isEmpty()) {
+		return false;
+	}
+	UrlAuthBox::ActivateUrl(
+		controller->uiShow(),
+		&controller->session(),
+		u"tg://oauth?token="_q + token,
+		context);
+	return true;
+}
+
 } // namespace
 
 bool TryRouterForLocalUrl(
@@ -1832,6 +1866,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^ton/?(^\\?.*)?(#|$)"_q,
 			ResolveTonSettings
+		},
+		{
+			u"^oauth/?\\?(.+)(#|$)"_q,
+			ResolveOAuth
 		},
 		{
 			u"^user\\?(.+)(#|$)"_q,

@@ -2450,6 +2450,8 @@ void Controller::saveTitle() {
 		_controls.title->showError();
 		if (type == u"NO_CHAT_TITLE"_q) {
 			_box->scrollToWidget(_controls.title);
+		} else {
+			_navigation->showToast(type);
 		}
 		cancelSave();
 	};
@@ -2528,8 +2530,9 @@ void Controller::saveDescription() {
 				MTPstring() // Description.
 			)).done([=] {
 				successCallback();
-			}).fail([=] {
+			}).fail([=](const MTP::Error &error) {
 				_controls.description->showError();
+				_navigation->showToast(error.type());
 				cancelSave();
 			}).send();
 		}).fail([=] {
@@ -2549,6 +2552,7 @@ void Controller::saveDescription() {
 			return;
 		}
 		_controls.description->showError();
+		_navigation->showToast(type);
 		cancelSave();
 	}).send();
 }
@@ -2620,9 +2624,11 @@ void Controller::togglePreHistoryHidden(
 		channel->session().api().applyUpdates(result);
 		apply();
 	}).fail([=](const MTP::Error &error) {
-		if (error.type() == u"CHAT_NOT_MODIFIED"_q) {
+		const auto type = error.type();
+		if (type == u"CHAT_NOT_MODIFIED"_q) {
 			apply();
 		} else {
+			_navigation->showToast(type);
 			fail();
 		}
 	}).send();

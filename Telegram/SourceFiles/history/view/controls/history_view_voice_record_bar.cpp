@@ -504,6 +504,9 @@ TTLButton::TTLButton(
 		}
 
 	}, lifetime());
+	setAccessibleName((recordingVideo
+		? tr::lng_in_dlg_video_message_ttl
+		: tr::lng_in_dlg_voice_message_ttl)(tr::now));
 }
 
 void TTLButton::clearState() {
@@ -612,6 +615,7 @@ ListenWrap::ListenWrap(
 , _inactiveWaveformBar(
 	anim::with_alpha(_activeWaveformBar, kInactiveWaveformBarAlpha))
 , _playPause(_playPauseSt, [=] { _playPauseButton->update(); }) {
+	_delete->setAccessibleName(tr::lng_record_lock_delete(tr::now));
 	init();
 }
 
@@ -760,6 +764,7 @@ void ListenWrap::initPlayButton() {
 	const auto &width = _waveformBgFinalCenterRect.height();
 	_playPauseButton->resize(width, width);
 	_playPauseButton->show();
+	_playPauseButton->setAccessibleName(tr::lng_record_lock_play(tr::now));
 
 	_playPauseButton->paintRequest(
 	) | rpl::on_next([=](const QRect &clip) {
@@ -781,6 +786,9 @@ void ListenWrap::initPlayButton() {
 	const auto showPause = _lifetime.make_state<rpl::variable<bool>>(false);
 	showPause->changes(
 	) | rpl::on_next([=](bool pause) {
+		_playPauseButton->setAccessibleName(pause
+			? tr::lng_record_lock_pause(tr::now)
+			: tr::lng_record_lock_play(tr::now));
 		_playPause.setState(pause
 			? PlayButtonLayout::State::Pause
 			: PlayButtonLayout::State::Play);
@@ -1062,6 +1070,7 @@ void RecordLock::init() {
 		}
 		drawProgress(p);
 	}, lifetime());
+	setAccessibleName(tr::lng_record_lock(tr::now));
 }
 
 void RecordLock::drawProgress(QPainter &p) {
@@ -1308,6 +1317,7 @@ CancelButton::CancelButton(
 , _width(st::historyRecordCancelButtonWidth)
 , _rippleRect(QRect(0, (height - _width) / 2, _width, _width))
 , _text(st::semiboldTextStyle, tr::lng_selected_clear(tr::now)) {
+	setAccessibleName(tr::lng_record_cancel_recording(tr::now));
 	resize(_width, height);
 	init();
 }
@@ -1625,6 +1635,9 @@ void VoiceRecordBar::init() {
 
 	_paused.value() | rpl::distinct_until_changed(
 	) | rpl::on_next([=](bool paused) {
+		_lock->setAccessibleName(paused
+			? tr::lng_record_lock_resume(tr::now)
+			: tr::lng_record_lock(tr::now));
 		if (!paused) {
 			return;
 		}

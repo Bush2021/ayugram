@@ -69,4 +69,4 @@ settings.local.json
 Telegram/SourceFiles/_other/packer_private.h
 
 # AI work folder (session-specific, not for version control)
-docs/ai/work/
+.ai

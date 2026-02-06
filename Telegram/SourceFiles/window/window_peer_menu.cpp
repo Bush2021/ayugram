@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 #include "boxes/max_invite_box.h"
 #include "boxes/moderate_messages_box.h"
+#include "boxes/select_future_owner_box.h"
 #include "boxes/choose_filter_box.h"
 #include "boxes/create_poll_box.h"
 #include "boxes/edit_todo_list_box.h"
@@ -3682,6 +3683,26 @@ Fn<void()> ClearHistoryHandler(
 Fn<void()> DeleteAndLeaveHandler(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
+	if (const auto channel = peer->asChannel();
+			channel && channel->amCreator()) {
+		const auto requestId = std::make_shared<mtpRequestId>(0);
+		return [=] {
+			if (controller->showFrozenError() || (*requestId > 0)) {
+				return;
+			}
+			*requestId = peer->session().api().request(
+				MTPchannels_GetFutureCreatorAfterLeave(
+					channel->inputChannel()
+			)).done([=](const MTPUser &result) {
+				*requestId = 0;
+				const auto user = peer->owner().processUser(result);
+				controller->show(Box(SelectFutureOwnerbox, channel, user));
+			}).fail([=](const MTP::Error &error) {
+				*requestId = 0;
+				controller->show(Box(DeleteChatBox, peer));
+			}).send();
+		};
+	}
 	return [=] {
 		if (!controller->showFrozenError()) {
 			controller->show(Box(DeleteChatBox, peer));
