@@ -136,9 +136,7 @@ TopBarWidget::TopBarWidget(
 , _groupCall(this, st::topBarGroupCall)
 , _search(this, st::topBarSearch)
 , _infoToggle(this, st::topBarInfo)
-, _menuToggle(
-	object_ptr<Ui::IconButton>::fromRaw(
-		Ui::CreateChild<MenuToggleButton>(this, st::topBarMenuToggle)))
+, _menuToggle(this, st::topBarMenuToggle)
 , _recentActions(this, st::topBarRecentActions)
 , _admins(this, st::topBarAdmins)
 , _titlePeerText(st::windowMinWidth / 3)
