@@ -385,9 +385,11 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 			rect,
 			true);
 
+		context.translate(0, -y);
 		p.translate(0, y);
 		view->draw(p, context);
 		p.translate(0, -y);
+		context.translate(0, y);
 
 		if (displayUserpic) {
 			const auto picX = st::msgMargin.left();
