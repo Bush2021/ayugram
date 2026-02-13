@@ -3834,6 +3834,8 @@ void ApiWrap::editMedia(
 		to.replyTo.monoforumPeerId = existing->sublistPeerId();
 		to.replaceMediaOf = MsgId();
 	}
+	const auto forceFile = (type == SendMediaType::File)
+		&& (file.type == Ui::PreparedFile::Type::Video);
 	_fileLoader->addTask(std::make_unique<FileLoadTask>(
 		&session(),
 		file.path,
@@ -3854,7 +3856,9 @@ void ApiWrap::editMedia(
 		type,
 		to,
 		caption,
-		file.spoiler));
+		file.spoiler,
+		nullptr,
+		forceFile));
 }
 
 void ApiWrap::sendFiles(
@@ -3887,6 +3891,8 @@ void ApiWrap::sendFiles(
 				&& type != SendMediaType::File)
 			? SendMediaType::Photo
 			: SendMediaType::File;
+		const auto forceFile = (type == SendMediaType::File)
+			&& (file.type == Ui::PreparedFile::Type::Video);
 		tasks.push_back(std::make_unique<FileLoadTask>(
 			&session(),
 			file.path,
@@ -3909,7 +3915,8 @@ void ApiWrap::sendFiles(
 			to,
 			caption,
 			file.spoiler,
-			album));
+			album,
+			forceFile));
 		caption = TextWithTags();
 	}
 	if (album) {
