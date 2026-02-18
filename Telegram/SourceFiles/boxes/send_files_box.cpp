@@ -774,7 +774,10 @@ void SendFilesBox::refreshButtons() {
 			&_st.tabbed.menu,
 			&_st.tabbed.icons);
 	}
-	addButton(tr::lng_cancel(), [=] { closeBox(); });
+	addButton(tr::lng_cancel(), [=] {
+		requestToTakeTextWithTags();
+		closeBox();
+	});
 	_addFile = addLeftButton(
 		tr::lng_stickers_featured_add(),
 		base::fn_delayed(st::historyAttach.ripple.hideDuration, this, [=] {
@@ -1150,6 +1153,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 			}
 			// Just close the box if it is the only one.
 			if (_list.files.size() == 1) {
+				requestToTakeTextWithTags();
 				closeBox();
 				return;
 			}
@@ -1509,6 +1513,7 @@ void SendFilesBox::setupCaption() {
 	}, _caption->lifetime());
 	_caption->cancelled(
 	) | rpl::on_next([=] {
+		requestToTakeTextWithTags();
 		closeBox();
 	}, _caption->lifetime());
 	_caption->setMimeDataHook([=](
@@ -1906,6 +1911,16 @@ void SendFilesBox::showFinished() {
 		InvokeQueued(raw, [=] {
 			raw->raise();
 		});
+	}
+}
+
+rpl::producer<TextWithTags> SendFilesBox::takeTextWithTagsRequests() const {
+	return _textWithTagsRequests.events();
+}
+
+void SendFilesBox::requestToTakeTextWithTags() const {
+	if (_caption && !_caption->isHidden()) {
+		_textWithTagsRequests.fire_copy(_caption->getTextWithTags());
 	}
 }
 

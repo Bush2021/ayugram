@@ -188,9 +188,11 @@ void Badge::setContent(Content content) {
 				p,
 				badge->rect().marginsRemoved({ skip, skip, skip, skip }),
 				badge->width(),
-				(type == Ui::TextBadgeType::Direct
-					? st::windowSubTextFg
-					: st::attentionButtonFg));
+				_overrideSt
+					? _overrideSt->premiumFg
+					: (type == Ui::TextBadgeType::Direct
+						? st::windowSubTextFg
+						: st::attentionButtonFg));
 			}, _view->lifetime());
 	} break;
 	case BadgeType::Extera:
@@ -284,7 +286,7 @@ rpl::producer<Badge::Content> BadgeContentForPeer(not_null<PeerData*> peer) {
 		BadgeValue(peer),
 		EmojiStatusIdValue(peer)
 	) | rpl::map([=](BadgeType badge, EmojiStatusId emojiStatusId) {
-		if (emojiStatusId.collectible) {
+		if (emojiStatusId.collectible && (badge == BadgeType::Verified)) {
 			return Badge::Content{ BadgeType::Premium, emojiStatusId };
 		}
 		if (badge == BadgeType::Verified) {
