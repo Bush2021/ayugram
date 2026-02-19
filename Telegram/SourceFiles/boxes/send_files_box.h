@@ -179,6 +179,8 @@ private:
 		void applyChanges();
 
 		[[nodiscard]] QImage generatePriceTagBackground() const;
+		[[nodiscard]] bool setSingleFileDisplayName(
+			const QString &displayName);
 
 	private:
 		base::unique_qptr<Ui::RpWidget> _preview;
@@ -245,6 +247,9 @@ private:
 
 	void openDialogToAddFileToAlbum();
 	void refreshAllAfterChanges(int fromItem, Fn<void()> perform = nullptr);
+	[[nodiscard]] bool setDisplayNameInSingleFilePreview(
+		int fileIndex,
+		const QString &displayName);
 
 	void enqueueNextPrepare();
 	void addPreparedAsyncFile(Ui::PreparedFile &&file);
