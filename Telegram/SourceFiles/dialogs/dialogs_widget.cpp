@@ -614,6 +614,7 @@ Widget::Widget(
 		setupStories();
 	}
 
+	_searchForNarrowLayout->setAccessibleName(tr::lng_dlg_filter(tr::now));
 	_searchForNarrowLayout->setClickedCallback([=] {
 		_search->setFocusFast();
 		if (_childList) {
