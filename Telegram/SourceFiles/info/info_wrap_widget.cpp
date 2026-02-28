@@ -388,6 +388,7 @@ void WrapWidget::createTopBar() {
 			base::make_unique_q<Ui::IconButton>(
 				_topBar,
 				st::infoTopBarClose));
+		close->setAccessibleName(tr::lng_sr_close_panel(tr::now));
 		close->addClickHandler([this] {
 			_controller->parentController()->closeThirdSection();
 		});
@@ -402,6 +403,7 @@ void WrapWidget::createTopBar() {
 			base::make_unique_q<Ui::IconButton>(
 				_topBar,
 				st::infoLayerTopBarClose));
+		close->setAccessibleName(tr::lng_sr_close_panel(tr::now));
 		close->addClickHandler([this] {
 			checkBeforeClose([=] {
 				_controller->parentController()->hideSpecialLayer();
@@ -442,6 +444,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 				: st::infoTopBarSearch;
 			const auto button = _topBar->addButton(
 				base::make_unique_q<Ui::IconButton>(_topBar, st));
+			button->setAccessibleName(tr::lng_dlg_filter(tr::now));
 			button->addClickHandler([=] {
 				_controller->showSettings(::Settings::Search::Id());
 			});
@@ -455,6 +458,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 					: st::infoTopBarQr;
 				const auto button = _topBar->addButton(
 					base::make_unique_q<Ui::IconButton>(_topBar, st));
+				button->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
 				button->addClickHandler([show, self] {
 					Ui::DefaultShowFillPeerQrBoxCallback(show, self);
 				});
@@ -588,6 +592,7 @@ void WrapWidget::addTopBarMenuButton() {
 			(wrap() == Wrap::Layer
 				? st::infoLayerTopBarMenu
 				: st::infoTopBarMenu))));
+	_topBarMenuToggle->setAccessibleName(tr::lng_sr_profile_menu(tr::now));
 	_topBarMenuToggle->addClickHandler([this] {
 		showTopBarMenu(false);
 	});
