@@ -1469,3 +1469,5 @@ infoMusicButtonTitle: FlatLabel(defaultFlatLabel) {
 }
 infoMusicButtonBottom: 8px;
 infoMusicButtonLine: 2px;
+
+memberTagPillPadding: margins(5px, -1px, 5px, 0px);

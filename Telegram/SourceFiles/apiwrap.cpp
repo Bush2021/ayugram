@@ -542,6 +542,8 @@ void ApiWrap::sendMessageFail(
 	} else if (show && error == u"CHAT_FORWARDS_RESTRICTED"_q) {
 		show->showToast(peer->isBroadcast()
 			? tr::lng_error_noforwards_channel(tr::now)
+			: peer->isUser()
+			? tr::lng_error_noforwards_user(tr::now)
 			: tr::lng_error_noforwards_group(tr::now), kJoinErrorDuration);
 	} else if (error == u"PREMIUM_ACCOUNT_REQUIRED"_q) {
 		Settings::ShowPremium(&session(), "premium_stickers");
@@ -3582,7 +3584,6 @@ void ApiWrap::forwardMessages(
 		if (shared) {
 			++shared->requestsLeft;
 		}
-		const auto requestType = Data::Histories::RequestType::Send;
 		const auto idsCopy = localIds;
 		const auto scheduled = action.options.scheduled;
 		const auto starsPaid = std::min(
@@ -3593,64 +3594,86 @@ void ApiWrap::forwardMessages(
 			action.options.starsApproved -= starsPaid;
 			oneFlags |= SendFlag::f_allow_paid_stars;
 		}
-		histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
-			history->sendRequestId = request(MTPmessages_ForwardMessages(
-				MTP_flags(oneFlags),
+		auto buildMessage = [=](
+				not_null<History*> history,
+				FullReplyTo replyTo)
+			-> Data::Histories::PreparedMessage {
+			const auto kGeneralId = Data::ForumTopic::kGeneralId;
+			const auto realTopMsgId = (replyTo.topicRootId == kGeneralId)
+				? MsgId(0)
+				: replyTo.topicRootId;
+			auto flags = oneFlags;
+			if (realTopMsgId) {
+				flags |= SendFlag::f_top_msg_id;
+			} else {
+				flags &= ~SendFlag::f_top_msg_id;
+			}
+			return MTPmessages_ForwardMessages(
+				MTP_flags(flags),
 				forwardFrom->input(),
 				MTP_vector<MTPint>(ids),
 				MTP_vector<MTPlong>(randomIds),
-				peer->input(),
-				MTP_int(topMsgId),
+				history->peer->input(),
+				MTP_int(realTopMsgId),
 				(action.options.suggest
-					? ReplyToForMTP(history, action.replyTo)
+					? ReplyToForMTP(history, replyTo)
 					: monoforumPeer
-					? MTP_inputReplyToMonoForum(monoforumPeer->input())
+					? MTP_inputReplyToMonoForum(
+						monoforumPeer->input())
 					: MTPInputReplyTo()),
 				MTP_int(action.options.scheduled),
 				MTP_int(action.options.scheduleRepeatPeriod),
-				(sendAs ? sendAs->input() : MTP_inputPeerEmpty()),
-				Data::ShortcutIdToMTP(_session, action.options.shortcutId),
+				(sendAs
+					? sendAs->input()
+					: MTP_inputPeerEmpty()),
+				Data::ShortcutIdToMTP(
+					&history->session(),
+					action.options.shortcutId),
 				MTP_long(action.options.effectId),
-				MTPint(), // video_timestamp
+				MTPint(),
 				MTP_long(starsPaid),
-				Api::SuggestToMTP(action.options.suggest)
-			)).done([=](const MTPUpdates &result) {
+				Api::SuggestToMTP(action.options.suggest));
+		};
+		histories.sendPreparedMessage(
+			history,
+			FullReplyTo{ .topicRootId = topicRootId },
+			uint64(0),
+			std::move(buildMessage),
+			[=](const MTPUpdates &result, const MTP::Response &) {
 				if (!scheduled) {
-					this->updates().checkForSentToScheduled(result);
+					_session->api().updates().checkForSentToScheduled(
+						result);
 				}
-				applyUpdates(result);
 				if (shared && !--shared->requestsLeft) {
 					shared->callback();
 				}
-
 				const auto &settings = AyuSettings::getInstance();
 				if (!settings.sendReadMessages && settings.markReadAfterAction && history->lastMessage())
 				{
 					readHistory(history->lastMessage());
 				}
 
-				finish();
-				if (peer->isSelf() && session().premium()) {
+				if (peer->isSelf() && _session->premium()) {
 					ProcessRecentSelfForwards(
 						_session,
 						result,
 						peer->id,
 						forwardFrom->id);
 				}
-			}).fail([=](const MTP::Error &error) {
+			},
+			[=](const MTP::Error &error, const MTP::Response &) {
 				if (idsCopy) {
 					for (const auto &[randomId, itemId] : *idsCopy) {
-						sendMessageFail(error, peer, randomId, itemId);
+						_session->api().sendMessageFail(
+							error,
+							peer,
+							randomId,
+							itemId);
 					}
 				} else {
-					sendMessageFail(error, peer);
+					_session->api().sendMessageFail(error, peer);
 				}
-				finish();
-			}).afterRequest(
-				history->sendRequestId
-			).send();
-			return history->sendRequestId;
-		});
+			});
 
 		ids.resize(0);
 		randomIds.resize(0);
@@ -3877,10 +3900,22 @@ void ApiWrap::sendFiles(
 		std::shared_ptr<SendingAlbum> album,
 		const SendAction &action) {
 	const auto haveCaption = !caption.text.isEmpty();
-	if (haveCaption
-		&& !list.canAddCaption(
+	const auto captionAttached = !haveCaption
+		? false
+		: (list.files.size() == 1)
+		? list.canAddCaption(
 			album != nullptr,
-			type == SendMediaType::Photo)) {
+			type == SendMediaType::Photo)
+		: Ui::CaptionWillBeAttached(
+			list,
+			[&] {
+				auto way = Ui::SendFilesWay();
+				way.setGroupFiles(album != nullptr);
+				way.setSendImagesAsPhotos(type == SendMediaType::Photo);
+				return way;
+			}(),
+			false);
+	if (haveCaption && !captionAttached) {
 		auto message = MessageToSend(action);
 		message.textWithTags = base::take(caption);
 		message.action.clearDraft = false;

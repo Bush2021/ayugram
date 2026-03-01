@@ -899,8 +899,9 @@ bool AddDeleteMessageAction(
 			}
 			const auto list = HistoryItemsList{ item };
 			if (CanCreateModerateMessagesBox(list)) {
+				const auto opt = DefaultModerateMessagesBoxOptions();
 				controller->show(
-					Box(CreateModerateMessagesBox, list, nullptr));
+					Box(CreateModerateMessagesBox, list, nullptr, opt));
 			} else {
 				const auto suggestModerateActions = false;
 				controller->show(
@@ -2071,17 +2072,18 @@ void AddSelectRestrictionAction(
 	if (addIcon && !menu->empty()) {
 		menu->addSeparator();
 	}
+	const auto user = peer->asUser();
 	auto button = base::make_unique_q<Ui::Menu::MultilineAction>(
 		menu->menu(),
 		menu->st().menu,
 		st::historyHasCustomEmoji,
-		addIcon
+		((addIcon && !user)
 			? st::historySponsoredAboutMenuLabelPosition
-			: st::historyHasCustomEmojiPosition,
+			: st::historyHasCustomEmojiPosition),
 		tr::ayu_UnforwardableContextMenuText(
 			tr::now,
 			tr::rich),
-		addIcon ? &st::menuIconCopyright : nullptr);
+		(addIcon && !user) ? &st::menuIconCopyright : nullptr);
 	button->setAttribute(Qt::WA_TransparentForMouseEvents);
 	menu->addAction(std::move(button));
 }
