@@ -41,7 +41,7 @@ jobs:
           brew update
           brew upgrade || true
           brew install ada-url autoconf automake boost cmake ffmpeg@6 jpeg-xl libavif libheif libtool openal-soft openh264 openssl opus ninja pkg-config python qtbase qtimageformats qtsvg xz
-          sudo xcode-select -s /Applications/Xcode_26.2.0.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.3.0.app/Contents/Developer
           sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
 
           xcodebuild -version > CACHE_KEY.txt
@@ -155,7 +155,7 @@ jobs:
           cd $REPO_NAME/build/Release
           mkdir -p artifact
           mv AyuGram.app artifact/
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
