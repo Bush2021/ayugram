@@ -97,6 +97,9 @@ void GenerateItems(
 		if (!message.postAuthor.empty()) {
 			flags |= MessageFlag::HasPostAuthor;
 		}
+		if (from && from->isSelf()) {
+			flags |= MessageFlag::Outgoing;
+		}
 
 		return history->makeMessage({
 										.id = history->nextNonHistoryEntryId(),

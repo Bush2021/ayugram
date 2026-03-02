@@ -2403,7 +2403,7 @@ bool Message::hasFromPhoto() const {
 	}
 	switch (context()) {
 	case Context::AdminLog:
-		return true;
+		return !hasOutLayout();
 	case Context::Monoforum:
 		return (delegate()->elementChatMode() == ElementChatMode::Wide);
 	case Context::History:
@@ -3740,7 +3740,7 @@ bool Message::allowTextSelectionByHandler(
 bool Message::hasFromName() const {
 	switch (context()) {
 	case Context::AdminLog:
-		return true;
+		return !hasOutLayout();
 	case Context::Monoforum:
 		return data()->out() || data()->from()->isChannel();
 	case Context::History:
@@ -3815,6 +3815,9 @@ bool Message::displayForwardedFrom() const {
 bool Message::hasOutLayout() const {
 	const auto item = data();
 	if (item->history()->peer->isSelf()) {
+		if (item->isAdminLogEntry()) {
+			return item->out();
+		}
 		if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
 			if (context() == Context::ShortcutMessages) {
 				return true;
