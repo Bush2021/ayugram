@@ -76,7 +76,7 @@ void BackButton::updateCache() {
 	_cachedWidth = width();
 	const auto widgetWidth = _widget
 		? _widget->width() + st::historyAdminLogTopBarUserpicSkip
-		: 0;
+		: st::topBarBack.width();
 	const auto availableWidth = width()
 		- st::historyAdminLogTopBarLeft
 		- widgetWidth;
@@ -104,7 +104,7 @@ void BackButton::paintEvent(QPaintEvent *e) {
 	const auto startY = (height() - totalHeight) / 2 - st::lineWidth;
 	const auto widgetWidth = _widget
 		? _widget->width() + st::historyAdminLogTopBarUserpicSkip
-		: 0;
+		: st::topBarBack.width();
 	const auto textX = st::historyAdminLogTopBarLeft + widgetWidth;
 
 	const auto context = Ui::Text::PaintContext{

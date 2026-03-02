@@ -92,20 +92,13 @@ void FixedBar::goBack() {
 }
 
 int FixedBar::resizeGetHeight(int newWidth) {
-	auto filterLeft = newWidth;
-
-	auto cancelLeft = filterLeft - _cancel->width();
+	auto cancelLeft = newWidth - _cancel->width();
 	_cancel->moveToLeft(cancelLeft, 0);
 
-	auto searchShownLeft = st::topBarArrowPadding.left();
-	auto searchHiddenLeft = filterLeft - 0;
-	auto searchCurrentLeft = anim::interpolate(searchHiddenLeft, searchShownLeft, 0.0);
-	_backButton->resizeToWidth(searchCurrentLeft);
+	_backButton->resizeToWidth(newWidth);
 	_backButton->moveToLeft(0, 0);
 
-	auto newHeight = _backButton->height();
-
-	return newHeight;
+	return _backButton->height();
 }
 
 void FixedBar::setAnimatingMode(bool enabled) {
