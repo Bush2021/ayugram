@@ -954,6 +954,7 @@ void TopBarWidget::setActiveChat(
 	updateUnreadBadge();
 	refreshInfoButton();
 	if (_menu) {
+		_menuToggle->setForceRippled(false);
 		_menu = nullptr;
 	}
 	updateOnlineDisplay();
