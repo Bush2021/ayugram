@@ -2403,7 +2403,7 @@ bool Message::hasFromPhoto() const {
 	}
 	switch (context()) {
 	case Context::AdminLog:
-		return !hasOutLayout();
+		return !hasOutLayout(); // https://github.com/Bush2021/ayugram/commit/24bf31c
 	case Context::Monoforum:
 		return (delegate()->elementChatMode() == ElementChatMode::Wide);
 	case Context::History:
@@ -3740,7 +3740,7 @@ bool Message::allowTextSelectionByHandler(
 bool Message::hasFromName() const {
 	switch (context()) {
 	case Context::AdminLog:
-		return !hasOutLayout();
+		return !hasOutLayout(); // https://github.com/Bush2021/ayugram/commit/24bf31c
 	case Context::Monoforum:
 		return data()->out() || data()->from()->isChannel();
 	case Context::History:
@@ -3817,7 +3817,7 @@ bool Message::hasOutLayout() const {
 	if (item->history()->peer->isSelf()) {
 		if (item->isAdminLogEntry()) {
 			return item->out();
-		}
+		} // https://github.com/Bush2021/ayugram/commit/24bf31c
 		if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
 			if (context() == Context::ShortcutMessages) {
 				return true;

@@ -954,7 +954,7 @@ void TopBarWidget::setActiveChat(
 	updateUnreadBadge();
 	refreshInfoButton();
 	if (_menu) {
-		_menuToggle->setForceRippled(false);
+		_menuToggle->setForceRippled(false); // https://github.com/Bush2021/ayugram/commit/0cb1e90
 		_menu = nullptr;
 	}
 	updateOnlineDisplay();

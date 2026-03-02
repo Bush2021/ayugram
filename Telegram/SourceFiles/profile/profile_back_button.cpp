@@ -76,7 +76,7 @@ void BackButton::updateCache() {
 	_cachedWidth = width();
 	const auto widgetWidth = _widget
 		? _widget->width() + st::historyAdminLogTopBarUserpicSkip
-		: st::topBarBack.width();
+		: st::topBarBack.width(); // https://github.com/Bush2021/ayugram/commit/5b2b676
 	const auto availableWidth = width()
 		- st::historyAdminLogTopBarLeft
 		- widgetWidth;
@@ -104,7 +104,7 @@ void BackButton::paintEvent(QPaintEvent *e) {
 	const auto startY = (height() - totalHeight) / 2 - st::lineWidth;
 	const auto widgetWidth = _widget
 		? _widget->width() + st::historyAdminLogTopBarUserpicSkip
-		: st::topBarBack.width();
+		: st::topBarBack.width(); // https://github.com/Bush2021/ayugram/commit/5b2b676
 	const auto textX = st::historyAdminLogTopBarLeft + widgetWidth;
 
 	const auto context = Ui::Text::PaintContext{
