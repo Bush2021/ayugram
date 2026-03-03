@@ -378,7 +378,7 @@ public:
 
 	template <typename PeerDataRange>
 	void peerListAddSelectedPeers(PeerDataRange &&range) {
-		for (const auto peer : range) {
+		for (const auto &peer : range) {
 			peerListAddSelectedPeerInBunch(peer);
 		}
 		peerListFinishSelectedRowsBunch();

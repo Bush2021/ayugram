@@ -1784,7 +1784,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			return;
 		}
 
-		for (const auto thread : result) {
+		for (const auto &thread : result) {
 			const auto peer = thread->peer();
 			const auto threadHistory = thread->owningHistory();
 			const auto forum = threadHistory->asForum();
@@ -2157,7 +2157,7 @@ void FastShareLink(
 			comment.text = url;
 		}
 		auto &api = show->session().api();
-		for (const auto thread : result) {
+		for (const auto &thread : result) {
 			auto message = Api::MessageToSend(
 				Api::SendAction(thread, options));
 			message.textWithTags = comment;
