@@ -56,7 +56,7 @@ For `win64` (64-bit):
 
     configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
 
-* Open ***BuildPath*\\ayugram\\out\\Telegram.sln** in Visual Studio 2026
+* Open ***BuildPath*\\ayugram\\out\\Telegram.slnx** in Visual Studio 2026
 * Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
 * The result AyuGram.exe will be located in **D:\TBuild\ayugram\out\Debug** (and **Release**)
 
