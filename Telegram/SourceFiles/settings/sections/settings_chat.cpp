@@ -289,18 +289,20 @@ void ColorsPalette::show(Type type) {
 		return;
 	}
 	list.insert(list.begin(), scheme->accentColor);
-	const auto &settings = AyuFeatures::MessageShot::isChoosingTheme() ? AyuFeatures::MessageShot::getSelectedColorFromDefault() : Core::App().settings();
-	const auto color = settings.themesAccentColors().get(type);
+	const auto &settings = Core::App().settings();
+	const auto color = AyuFeatures::MessageShot::isChoosingTheme()
+		? AyuFeatures::MessageShot::getSelectedColorFromDefault()
+		: settings.themesAccentColors().get(type);
 	const auto current = (settings.systemAccentColorEnabled()
 		? Window::Theme::SystemAccentColor()
 		: std::optional<QColor>()).value_or(
 			color.value_or(scheme->accentColor));
 	const auto i = ranges::find(list, current);
-	if (i == end(list)) {
+	if (i == list.end()) {
 		list.back() = current;
 	}
 	const auto selected = std::clamp(
-		int(i - begin(list)),
+		int(i - list.begin()),
 		0,
 		int(list.size()) - 1);
 
