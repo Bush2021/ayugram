@@ -4013,9 +4013,11 @@ void History::clear(ClearType type, bool markEmpty) {
 				_lastMessage = std::nullopt;
 			}
 		}
-		const auto tillId = (_lastMessage && *_lastMessage)
+		const auto tillId = (_lastMessage
+			&& (*_lastMessage)
+			&& (*_lastMessage)->isRegular())
 			? (*_lastMessage)->id
-			: std::numeric_limits<MsgId>::max();
+			: MsgId(std::numeric_limits<int64>::max());
 		clearUpTill(tillId);
 		if (blocks.empty() && _lastMessage && *_lastMessage) {
 			addItemToBlock(*_lastMessage);
@@ -4033,11 +4035,6 @@ void History::clear(ClearType type, bool markEmpty) {
 		chat->markupSenders.clear();
 	} else if (const auto channel = peer->asMegagroup()) {
 		channel->mgInfo->markupSenders.clear();
-	}
-	if (const auto forum = peer->forum()) {
-		forum->enumerateTopics([&](not_null<Data::ForumTopic*> topic) {
-			destroyMessagesByTopic(topic->rootId());
-		});
 	}
 
 	owner().notifyHistoryChangeDelayed(this);
