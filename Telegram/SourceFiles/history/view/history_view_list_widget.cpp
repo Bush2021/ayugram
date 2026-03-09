@@ -3881,7 +3881,7 @@ void ListWidget::mouseActionUpdate() {
 		lnkhost = reactionView;
 	} else if (overReplyBtn) {
 		dragState = replyBtnState;
-		lnkhost = replyBtnView;
+		lnkhost = _replyButtonManager.get();
 	} else if (view) {
 		auto cursorDeltaLength = [&] {
 			auto cursorDelta = (_overState.point - _pressState.point);
