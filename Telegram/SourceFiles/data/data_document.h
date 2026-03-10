@@ -291,13 +291,12 @@ public:
 	[[nodiscard]] Storage::Cache::Key cacheKey() const;
 	[[nodiscard]] uint8 cacheTag() const;
 
-	[[nodiscard]] bool canBeStreamed(HistoryItem *item) const;
+	[[nodiscard]] bool canBeStreamed() const;
 	[[nodiscard]] auto createStreamingLoader(
 		Data::FileOrigin origin,
-		bool forceRemoteLoader,
-		HistoryItem *item) const
+		bool forceRemoteLoader) const
 	-> std::unique_ptr<Media::Streaming::Loader>;
-	[[nodiscard]] bool useStreamingLoader(HistoryItem *item) const;
+	[[nodiscard]] bool useStreamingLoader() const;
 
 	void setInappPlaybackFailed();
 	[[nodiscard]] bool inappPlaybackFailed() const;
@@ -363,7 +362,6 @@ private:
 	friend class Serialize::Document;
 
 	[[nodiscard]] LocationType locationType() const;
-	[[nodiscard]] bool canVideoBeStreamed(HistoryItem *item) const;
 	void validateLottieSticker();
 	void setMaybeSupportsStreaming(bool supports);
 	void setLoadedInMediaCacheLocation();

@@ -2430,7 +2430,9 @@ bool PeerMenuShowAddTodoListTasks(not_null<HistoryItem*> item) {
 		&& !item->Has<HistoryMessageForwarded>()
 		&& todolist
 		&& (todolist->items.size() < appConfig->todoListItemsLimit())
-		&& (item->out() || todolist->othersCanAppend());
+		&& (item->out()
+			|| item->history()->peer->isSelf()
+			|| todolist->othersCanAppend());
 }
 
 void PeerMenuAddTodoListTasks(
