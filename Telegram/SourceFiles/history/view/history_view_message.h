@@ -78,6 +78,8 @@ struct RightBadge : RuntimeComponent<RightBadge, Element> {
 	BadgeRole role = BadgeRole::User;
 	bool overridden = false;
 	bool special = false;
+	mutable std::unique_ptr<Ui::RippleAnimation> ripple;
+	mutable QPoint lastPoint;
 };
 
 struct BottomRippleMask {
@@ -191,6 +193,7 @@ public:
 
 private:
 	struct CommentsButton;
+	struct LinkRipple;
 	struct FromNameStatus;
 	struct RightAction;
 
@@ -219,7 +222,29 @@ private:
 	void toggleTopicButtonRipple(bool pressed);
 	void createTopicButtonRipple();
 
+	void toggleLinkRipple(bool pressed);
+	void recordLinkRipplePoint(
+		QPoint point,
+		QPoint textOrigin) const;
+	void paintLinkRipple(
+		Painter &p,
+		const ClickHandlerPtr &handler,
+		QRect linkRect,
+		QPoint textPosition) const;
+	void createLinkRippleMask(
+		const QPainterPath &path,
+		QPoint textPosition,
+		int useWidth,
+		style::margins padding,
+		int radius) const;
+	void createLinkRippleMask(
+		QRect linkRect,
+		QPoint textPosition,
+		style::margins padding,
+		int radius) const;
+
 	void toggleRightActionRipple(bool pressed);
+	void toggleBadgeRipple(bool pressed);
 
 	void toggleReplyRipple(bool pressed);
 	void toggleSummaryHeaderRipple(bool pressed);
@@ -353,6 +378,8 @@ private:
 	mutable ClickHandlerPtr _fastReplyLink;
 	mutable std::unique_ptr<ViewButton> _viewButton;
 	std::unique_ptr<TopicButton> _topicButton;
+	mutable std::unique_ptr<LinkRipple> _linkRipple;
+	mutable QPoint _linkRippleLastPoint;
 	mutable std::unique_ptr<CommentsButton> _comments;
 	mutable std::unique_ptr<TranscribeButton> _summarize;
 
