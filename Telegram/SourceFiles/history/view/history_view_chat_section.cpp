@@ -2154,6 +2154,9 @@ void ChatWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
 	auto button = object_ptr<Ui::IconButton>(
 		this,
 		close ? st::historyReplyCancel : st::historyPinnedShowAll);
+	button->setAccessibleName(close
+		? tr::lng_cancel(tr::now)
+		: tr::lng_settings_events_pinned(tr::now));
 	button->clicks(
 	) | rpl::on_next([=] {
 		if (close) {
@@ -3204,19 +3207,25 @@ void ChatWidget::listShowPremiumToast(not_null<DocumentData*> document) {
 void ChatWidget::listOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) {
+	const auto showDrawButton = _topic
+		? Data::CanSendAnyOf(_topic, Data::FilesSendRestrictions())
+		: Data::CanSendAnyOf(_peer, Data::FilesSendRestrictions());
 	controller()->openPhoto(
 		photo,
-		{ context, _repliesRootId, _monoforumPeerId });
+		{ context, _repliesRootId, _monoforumPeerId, showDrawButton });
 }
 
 void ChatWidget::listOpenDocument(
 		not_null<DocumentData*> document,
 		FullMsgId context,
 		bool showInMediaView) {
+	const auto showDrawButton = _topic
+		? Data::CanSendAnyOf(_topic, Data::FilesSendRestrictions())
+		: Data::CanSendAnyOf(_peer, Data::FilesSendRestrictions());
 	controller()->openDocument(
 		document,
 		showInMediaView,
-		{ context, _repliesRootId, _monoforumPeerId });
+		{ context, _repliesRootId, _monoforumPeerId, showDrawButton });
 }
 
 void ChatWidget::listPaintEmpty(

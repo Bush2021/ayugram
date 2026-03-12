@@ -1238,14 +1238,15 @@ void TopBarWidget::updateControlsVisibility() {
 		hideChildren();
 		return;
 	}
-
 	const auto &settings = AyuSettings::getInstance();
 
-	_clear->show();
-	_delete->setVisible(_canDelete);
-	_messageShot->setVisible(settings.showMessageShot);
-	_forward->setVisible(_canForward);
-	_sendNow->setVisible(_canSendNow);
+	const auto visible = showSelectedState() || _selectedShown.animating();
+	_clear->setVisible(visible);
+	_delete->setVisible(_canDelete && visible);
+	_messageShot->setVisible(settings.showMessageShot && visible);
+	_forward->setVisible(_canForward && visible);
+	_sendNow->setVisible(_canSendNow && visible);
+
 
 	const auto isOneColumn = _controller->adaptive().isOneColumn();
 	const auto backVisible = !rootChatsListBar()
@@ -1699,6 +1700,9 @@ bool TopBarWidget::showSelectedActions() const {
 }
 
 void TopBarWidget::slideAnimationCallback() {
+	if (!_selectedShown.animating() && !_searchShown.animating()) {
+		updateControlsVisibility();
+	}
 	updateControlsGeometry();
 	update();
 }
