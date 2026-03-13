@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "lang/translate_mtproto_provider.h"
 #include "lang/translate_url_provider.h"
+#include "main/main_session.h"
 #include "platform/platform_translate_provider.h"
 
 namespace {
@@ -59,17 +60,8 @@ public:
 			: !request.text.text.isEmpty()
 			? Flag::f_text
 			: Flag(0);
-		const auto peerData = request.msgId
-			? _session->data().peer(PeerId(request.peerId))
-			: nullptr;
-		if (request.msgId && !peerData) {
-			done(Ui::TranslateProviderResult{
-				.error = Ui::TranslateProviderError::Unknown,
-			});
-			return;
-		}
 		const auto peer = request.msgId
-			? peerData->input()
+			? _session->data().peer(PeerId(request.peerId))->input()
 			: MTP_inputPeerEmpty();
 		const auto idList = request.msgId
 			? MTP_vector<MTPint>(1, MTP_int(request.msgId))
