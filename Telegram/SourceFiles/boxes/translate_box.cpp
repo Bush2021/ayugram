@@ -23,16 +23,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/text/text_utilities.h"
-#include "api/api_text_entities.h"
-
-// AyuGram includes
-#include "ayu/features/translator/ayu_translator.h"
 
 
 namespace Ui {
 namespace {
 
 constexpr auto kSkipAtLeastOneDuration = 3 * crl::time(1000);
+
+[[nodiscard]] TranslateBoxContentError ToContentError(
+		TranslateProviderError error) {
+	switch (error) {
+	case TranslateProviderError::LocalLanguagePackMissing:
+		return TranslateBoxContentError::LocalLanguagePackMissing;
+	case TranslateProviderError::None:
+	case TranslateProviderError::Unknown:
+		return TranslateBoxContentError::Unknown;
+	}
+	return TranslateBoxContentError::Unknown;
+}
 
 } // namespace
 
@@ -59,13 +67,6 @@ void TranslateBox(
 			msgId,
 			std::move(text)));
 
-	const auto ayuReqId = std::make_shared<mtpRequestId>(0);
-	box->boxClosing() | rpl::on_next([=] {
-		if (*ayuReqId) {
-			Ayu::Translator::TranslateManager::currentInstance()->cancel(*ayuReqId);
-		}
-	}, box->lifetime());
-
 	TranslateBoxContent(box, {
 		.text = request->text,
 		.hasCopyRestriction = hasCopyRestriction,
@@ -79,50 +80,17 @@ void TranslateBox(
 		.request = [=](
 				LanguageId to,
 				Fn<void(TranslateBoxContentResult)> done) {
-			if (*ayuReqId) {
-				Ayu::Translator::TranslateManager::currentInstance()->cancel(*ayuReqId);
-			}
-			using Flag = MTPmessages_TranslateText::Flag;
-			const auto flags = request->msgId
-				? (Flag::f_peer | Flag::f_id)
-				: !request->text.text.isEmpty()
-				? Flag::f_text
-				: Flag(0);
-			*ayuReqId = Ayu::Translator::TranslateManager::currentInstance()->request(
-				&peer->session(),
-				MTP_flags(flags),
-				request->msgId ? peer->input() : MTP_inputPeerEmpty(),
-				(request->msgId
-					? MTP_vector<MTPint>(1, MTP_int(request->msgId))
-					: MTPVector<MTPint>()),
-				(request->msgId
-					? MTPVector<MTPTextWithEntities>()
-					: MTP_vector<MTPTextWithEntities>(1, MTP_textWithEntities(
-						MTP_string(request->text.text),
-						Api::EntitiesToMTP(
-							&peer->session(),
-							request->text.entities,
-							Api::ConvertOption::SkipLocal)))),
-				MTP_string(to.twoLetterCode())
-			).done([=](const MTPmessages_TranslatedText &result) {
-				const auto &data = result.data();
-				const auto &list = data.vresult().v;
-				if (list.isEmpty()) {
+			state->provider->request(*request, to, [=](TranslateProviderResult result) {
+				if (result.text.has_value()) {
 					done(TranslateBoxContentResult{
-						.error = TranslateBoxContentError::Unknown,
+						.text = std::move(result.text),
 					});
-				} else {
-					done(TranslateBoxContentResult{
-						.text = Api::ParseTextWithEntities(
-							&peer->session(),
-							list.front()),
-					});
+					return;
 				}
-			}).fail([done](const MTP::Error &) {
 				done(TranslateBoxContentResult{
-					.error = TranslateBoxContentError::Unknown,
+					.error = ToContentError(result.error),
 				});
-			}).send();
+			});
 		},
 	});
 }
