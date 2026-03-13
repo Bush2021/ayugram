@@ -44,14 +44,32 @@ public:
 			Ui::TranslateProviderRequest request,
 			LanguageId to,
 			Fn<void(Ui::TranslateProviderResult)> done) override {
+		// AyuGram marker: custom provider bridge for google/yandex.
+		const auto manager = Ayu::Translator::TranslateManager::currentInstance();
+		if (!manager) {
+			done(Ui::TranslateProviderResult{
+				.error = Ui::TranslateProviderError::Unknown,
+			});
+			return;
+		}
+
 		using Flag = MTPmessages_TranslateText::Flag;
 		const auto flags = request.msgId
 			? (Flag::f_peer | Flag::f_id)
 			: !request.text.text.isEmpty()
 			? Flag::f_text
 			: Flag(0);
+		const auto peerData = request.msgId
+			? _session->data().peer(PeerId(request.peerId))
+			: nullptr;
+		if (request.msgId && !peerData) {
+			done(Ui::TranslateProviderResult{
+				.error = Ui::TranslateProviderError::Unknown,
+			});
+			return;
+		}
 		const auto peer = request.msgId
-			? _session->data().peer(PeerId(request.peerId))->input()
+			? peerData->input()
 			: MTP_inputPeerEmpty();
 		const auto idList = request.msgId
 			? MTP_vector<MTPint>(1, MTP_int(request.msgId))
@@ -65,7 +83,7 @@ public:
 					request.text.entities,
 					Api::ConvertOption::SkipLocal)));
 
-		Ayu::Translator::TranslateManager::currentInstance()->request(
+		manager->request(
 			_session,
 			MTP_flags(flags),
 			peer,
@@ -102,6 +120,7 @@ namespace Ui {
 std::unique_ptr<TranslateProvider> CreateTranslateProvider(
 		not_null<Main::Session*> session) {
 	const auto ayuProvider = AyuSettings::getInstance().translationProvider;
+	// AyuGram marker: non-telegram providers are routed through Ayu manager.
 	if (ayuProvider == u"google"_q || ayuProvider == u"yandex"_q) {
 		return std::make_unique<AyuTranslateProvider>(session);
 	}

@@ -42,8 +42,9 @@ void SetupTranslator(not_null<Ui::VerticalLayout*> container,
 
 	AddSubsectionTitle(container, tr::lng_translate_settings_subtitle()/*rpl::single(QString("Translate Messages"))*/);
 
+	// AyuGram marker: "Telegram" option maps to upstream provider path.
 	const auto options = std::vector{
-		QString("Telegram"),
+		QString("Telegram (Upstream)"),
 		QString("Google"),
 		QString("Yandex")
 	};
