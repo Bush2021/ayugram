@@ -4195,6 +4195,10 @@ bool Message::displayForwardedFrom() const {
 }
 
 bool Message::hasOutLayout() const {
+	if (AyuFeatures::MessageShot::isTakingShot()) {
+		return false;
+	}
+
 	const auto item = data();
 	if (item->history()->peer->isSelf()) {
 		if (item->isAdminLogEntry()) {

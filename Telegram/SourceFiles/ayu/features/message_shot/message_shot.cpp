@@ -12,6 +12,7 @@
 #include "qguiapplication.h"
 #include "ayu/ui/boxes/message_shot_box.h"
 #include "boxes/abstract_box.h"
+#include "data/data_file_origin.h"
 #include "data/data_cloud_themes.h"
 #include "data/data_forum.h"
 #include "data/data_peer.h"
@@ -353,15 +354,17 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		height += view->resizeGetHeight(width);
 	}
 
-	width *= style::DevicePixelRatio();
-	height *= style::DevicePixelRatio();
+	const auto logicalWidth = width;
+	const auto logicalHeight = height;
+	const auto imageWidth = width * style::DevicePixelRatio();
+	const auto imageHeight = height * style::DevicePixelRatio();
 
 	// create the image
-	QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
+	QImage image(imageWidth, imageHeight, QImage::Format_ARGB32_Premultiplied);
 	image.setDevicePixelRatio(style::DevicePixelRatio());
 	image.fill(Qt::transparent);
 
-	const auto viewport = QRect(0, 0, width, height);
+	const auto viewport = QRect(0, 0, logicalWidth, logicalHeight);
 
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> userpics;
 	base::flat_map<MsgId, Ui::PeerUserpicView> hiddenSenderUserpics;
@@ -374,9 +377,11 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		const auto &message = messages[i];
 		const auto view = getView(message);
 
-		const auto displayUserpic = view->displayFromPhoto() || message->isPost();
+		const auto displayUserpic = view->displayFromPhoto()
+			|| (view->hasOutLayout() && !view->isAttachedToNext())
+			|| message->isPost();
 
-		const auto rect = QRect(0, y, width, view->height());
+		const auto rect = QRect(0, y, logicalWidth, view->height());
 
 		auto context = controller->defaultChatTheme()->preparePaintContext(
 			st.get(),
@@ -392,7 +397,9 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		context.translate(0, y);
 
 		if (displayUserpic) {
-			const auto picX = st::msgMargin.left();
+			const auto picX = view->hasOutLayout()
+				? (logicalWidth - st::msgMargin.right() - st::msgPhotoSize)
+				: st::msgMargin.left();
 			const auto picY = y + view->height() - st::msgPhotoSize;
 
 			if (const auto from = message->displayFrom()) {
@@ -403,7 +410,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 					userpics[from],
 					picX,
 					picY,
-					width,
+					logicalWidth,
 					st::msgPhotoSize,
 					context.paused);
 			} else if (const auto info = message->displayHiddenSenderInfo()) {
@@ -412,8 +419,20 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 						p,
 						picX,
 						picY,
-						width,
+						logicalWidth,
 						st::msgPhotoSize);
+				} else {
+					auto &userpic = hiddenSenderUserpics[message->id];
+					const auto valid = info->paintCustomUserpic(
+						p,
+						userpic,
+						picX,
+						picY,
+						logicalWidth,
+						st::msgPhotoSize);
+					if (!valid) {
+						info->customUserpic.load(&controller->session(), message->fullId());
+					}
 				}
 			}
 		}
