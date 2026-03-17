@@ -29,6 +29,19 @@ namespace {
 
 constexpr auto kInitialVideoQuality = 480; // Start with SD.
 
+[[nodiscard]] int DefaultIvZoom() {
+	const auto exact = cScale() * 100 / cScreenScale();
+	const auto snap10 = ((exact + 5) / 10) * 10;
+	const auto snap25 = ((exact + 12) / 25) * 25;
+	return (std::abs(exact - snap25) <= std::abs(exact - snap10))
+		? snap25
+		: snap10;
+}
+
+[[nodiscard]] int ResolveIvZoom(int value) {
+	return (value > 0) ? value : DefaultIvZoom();
+}
+
 [[nodiscard]] WindowPosition Deserialize(const QByteArray &data) {
 	QDataStream stream(data);
 	stream.setVersion(QDataStream::Qt_5_1);
@@ -250,7 +263,7 @@ QByteArray Settings::serialize() const {
 		+ sizeof(ushort)
 		+ sizeof(qint32) // _notificationsDisplayChecksum
 		+ Serialize::bytearraySize(callPanelPosition)
-		+ sizeof(qint32) * 3; // _cornerReply + _systemAccentColorEnabled + _usePlatformTranslation
+		+ sizeof(qint32) * 4;
 
 	auto result = QByteArray();
 	result.reserve(size);
@@ -418,7 +431,8 @@ QByteArray Settings::serialize() const {
 			<< callPanelPosition
 			<< qint32(_cornerReply.current() ? 1 : 0)
 			<< qint32(_systemAccentColorEnabled ? 1 : 0)
-			<< qint32(_usePlatformTranslation ? 1 : 0);
+			<< qint32(_usePlatformTranslation ? 1 : 0)
+			<< qint32(_systemTextReplace.current() ? 1 : 0);
 	}
 
 	Ensures(result.size() == size);
@@ -558,6 +572,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		? 1
 		: 0;
 	qint32 usePlatformTranslation = _usePlatformTranslation ? 1 : 0;
+	qint32 systemTextReplace = _systemTextReplace.current() ? 1 : 0;
 
 	stream >> themesAccentColors;
 	if (!stream.atEnd()) {
@@ -907,6 +922,9 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	if (!stream.atEnd()) {
 		stream >> usePlatformTranslation;
 	}
+	if (!stream.atEnd()) {
+		stream >> systemTextReplace;
+	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
 			"Bad data for Core::Settings::constructFromSerialized()"));
@@ -983,6 +1001,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_loopAnimatedStickers = (loopAnimatedStickers == 1);
 	_largeEmoji = (largeEmoji == 1);
 	_replaceEmoji = (replaceEmoji == 1);
+	_systemTextReplace = (systemTextReplace == 1);
 	_suggestEmoji = (suggestEmoji == 1);
 	_suggestStickersByEmoji = (suggestStickersByEmoji == 1);
 	_spellcheckerEnabled = (spellcheckerEnabled == 1);
@@ -1502,6 +1521,7 @@ void Settings::resetOnLastLogout() {
 	_loopAnimatedStickers = true;
 	_largeEmoji = true;
 	_replaceEmoji = true;
+	_systemTextReplace = true;
 	_suggestEmoji = true;
 	_suggestStickersByEmoji = true;
 	_suggestAnimatedEmoji = true;
@@ -1525,7 +1545,7 @@ void Settings::resetOnLastLogout() {
 	_hiddenGroupCallTooltips = 0;
 	_storiesClickTooltipHidden = false;
 	_ttlVoiceClickTooltipHidden = false;
-	_ivZoom = 100;
+	_ivZoom = 0;
 	_recordVideoMessages = false;
 	_videoQuality = {};
 	_chatFiltersHorizontal = false;
@@ -1688,14 +1708,18 @@ bool Settings::rememberedDeleteMessageOnlyForYou() const {
 }
 
 int Settings::ivZoom() const {
-	return _ivZoom.current();
+	return ResolveIvZoom(_ivZoom.current());
 }
 
 rpl::producer<int> Settings::ivZoomValue() const {
-	return _ivZoom.value();
+	return _ivZoom.value() | rpl::map(ResolveIvZoom);
 }
 
 void Settings::setIvZoom(int value) {
+	if (!value || value == DefaultIvZoom()) {
+		_ivZoom = 0;
+		return;
+	}
 #ifdef Q_OS_WIN
 	constexpr auto kMin = 25;
 	constexpr auto kMax = 500;
@@ -1704,6 +1728,15 @@ void Settings::setIvZoom(int value) {
 	constexpr auto kMax = 200;
 #endif
 	_ivZoom = std::clamp(value, kMin, kMax);
+}
+
+bool Settings::normalizeIvZoom() {
+	const auto value = _ivZoom.current();
+	if (value && value == DefaultIvZoom()) {
+		_ivZoom = 0;
+		return true;
+	}
+	return false;
 }
 
 Media::VideoQuality Settings::videoQuality() const {
