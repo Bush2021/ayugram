@@ -70,7 +70,7 @@ void MessageShotBox::setupContent() {
 
 	AyuFeatures::MessageShot::setShotConfig(_config);
 
-	setTitle(rpl::single(QString("Message Shot")));
+	setTitle(rpl::single(tr::ayu_MessageShotTopBarText(tr::now)));
 
 	auto wrap = object_ptr<Ui::VerticalLayout>(this);
 	const auto content = wrap.data();
