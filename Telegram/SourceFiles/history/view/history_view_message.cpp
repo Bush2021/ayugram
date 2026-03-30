@@ -62,6 +62,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "styles/style_ayu_icons.h"
 
@@ -1640,7 +1641,28 @@ void Message::paintCommentsButton(
 	} else {
 		auto &list = _comments->userpics;
 		const auto limit = HistoryMessageViews::kMaxRecentRepliers;
-		const auto count = std::min(int(views->recentRepliers.size()), limit);
+		auto filteredRepliers = std::vector<PeerId>();
+		filteredRepliers.reserve(std::min(int(views->recentRepliers.size()), limit));
+		for (const auto peerId : views->recentRepliers) {
+			const auto peer = history()->owner().peer(peerId);
+			if (!peer || FiltersController::isBlocked(peer)) {
+				continue;
+			}
+			filteredRepliers.push_back(peerId);
+			if (filteredRepliers.size() == limit) {
+				break;
+			}
+		}
+		const auto count = int(filteredRepliers.size());
+		if (!count) {
+			const auto &icon = stm->historyComments;
+			icon.paint(
+				p,
+				left,
+				top + (st::historyCommentsButtonHeight - icon.height()) / 2,
+				width);
+			left += icon.width();
+		} else {
 		const auto single = st::historyCommentsUserpics.size;
 		const auto shift = st::historyCommentsUserpics.shift;
 		const auto regenerate = [&] {
@@ -1652,7 +1674,7 @@ void Message::paintCommentsButton(
 				const auto peer = entry.peer;
 				auto &view = entry.view;
 				const auto wasView = view.cloud.get();
-				if (views->recentRepliers[i] != peer->id
+				if (filteredRepliers[i] != peer->id
 					|| peer->userpicUniqueKey(view) != entry.uniqueKey
 					|| view.cloud.get() != wasView) {
 					return true;
@@ -1662,7 +1684,7 @@ void Message::paintCommentsButton(
 		}();
 		if (regenerate) {
 			for (auto i = 0; i != count; ++i) {
-				const auto peerId = views->recentRepliers[i];
+				const auto peerId = filteredRepliers[i];
 				if (i == list.size()) {
 					list.push_back(UserpicInRow{
 						history()->owner().peer(peerId)
@@ -1685,6 +1707,7 @@ void Message::paintCommentsButton(
 			top + (st::historyCommentsButtonHeight - single) / 2,
 			_comments->cachedUserpics);
 		left += single + (count - 1) * (single - shift);
+		}
 	}
 
 	left += st::historyCommentsSkipText;
