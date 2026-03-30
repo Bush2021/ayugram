@@ -1015,6 +1015,22 @@ InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 				return FiltersController::isBlocked(peer);
 			}), end(peers));
 		}
+		for (auto i = result.reactions.begin(); i != result.reactions.end();) {
+			const auto j = result.recent.find(i->id);
+			if (j == end(result.recent)) {
+				++i;
+				continue;
+			}
+			if (const auto hidden = i->count - int(j->second.size()); hidden > 0) {
+				i->count -= hidden;
+			}
+			if (i->count > 0) {
+				++i;
+			} else {
+				result.recent.erase(j);
+				i = result.reactions.erase(i);
+			}
+		}
 	}
 	result.flags = (view->hasOutLayout() ? Flag::OutLayout : Flag())
 		| (view->embedReactionsInBubble() ? Flag::InBubble : Flag())
