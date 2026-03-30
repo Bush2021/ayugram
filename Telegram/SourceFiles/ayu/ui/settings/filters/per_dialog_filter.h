@@ -23,11 +23,13 @@ namespace Settings {
 class PerDialogFiltersListRow final : public PeerListRow
 {
 public:
-	explicit PerDialogFiltersListRow(PeerId peer);
+	explicit PerDialogFiltersListRow(ID dialogId);
+	[[nodiscard]] ID dialogId() const;
 	QString generateName() override;
 	PaintRoundImageCallback generatePaintUserpicCallback(bool forceRound) override;
 
 private:
+	ID _dialogId = 0;
 	PeerId peerId;
 };
 

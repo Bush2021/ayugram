@@ -22,9 +22,14 @@
 
 namespace Settings {
 
-PerDialogFiltersListRow::PerDialogFiltersListRow(PeerId peer)
-	: PeerListRow(peer.value)
-	  , peerId(peer) {
+PerDialogFiltersListRow::PerDialogFiltersListRow(ID dialogId)
+	: PeerListRow(PeerListRowId(dialogId))
+	  , _dialogId(dialogId)
+	  , peerId(PeerId(PeerIdHelper(abs(dialogId)))) {
+}
+
+ID PerDialogFiltersListRow::dialogId() const {
+	return _dialogId;
 }
 
 QString PerDialogFiltersListRow::generateName() {
@@ -69,9 +74,7 @@ void PerDialogFiltersListController::prepareShadowBan() {
 	const auto &shadowBanned = settings.shadowBanIds();
 
 	for (const auto id : shadowBanned) {
-		auto peerId = PeerId(PeerIdHelper(abs(id)));
-
-		auto row = std::make_unique<PerDialogFiltersListRow>(peerId);
+		auto row = std::make_unique<PerDialogFiltersListRow>(id);
 
 		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow>&&>(row));
 	}
@@ -101,9 +104,7 @@ void PerDialogFiltersListController::prepare() {
 	}
 
 	for (const auto &[id, count] : countsByDialogIds) {
-		PeerId peerId = PeerId(PeerIdHelper(abs(id)));
-
-		auto row = std::make_unique<PerDialogFiltersListRow>(peerId);
+		auto row = std::make_unique<PerDialogFiltersListRow>(id);
 		auto status = QString();
 		if (count.filters > 0) {
 			status += tr::ayu_RegexFiltersAmount(tr::now, lt_count, count.filters);
@@ -127,13 +128,11 @@ void PerDialogFiltersListController::prepare() {
 
 void PerDialogFiltersListController::rowClicked(not_null<PeerListRow*> peer) {
 	ID did;
-	if (peer->special()) {
-		const ID pred = peer->id() & PeerId::kChatTypeMask;
-		if (countsByDialogIds.contains(pred)) {
-			did = pred;
-		} else {
-			did = -pred;
-		}
+	if (const auto row = dynamic_cast<PerDialogFiltersListRow*>(peer.get())) {
+		did = row->dialogId();
+	} else if (peer->special()) {
+		const auto pred = static_cast<long long>(peer->id() & PeerId::kChatTypeMask);
+		did = countsByDialogIds.contains(pred) ? pred : -pred;
 	} else {
 		did = getDialogIdFromPeer(peer->peer());
 	}
