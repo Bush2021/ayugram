@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/send_files_box.h"
 
 #include "lang/lang_keys.h"
+#include "storage/localimageloader.h"
 #include "storage/localstorage.h"
 #include "storage/storage_media_prepare.h"
 #include "iv/iv_instance.h"
@@ -17,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "mtproto/mtproto_config.h"
 #include "chat_helpers/message_field.h"
+#include "menu/menu_checked_action.h"
 #include "menu/menu_send.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "chat_helpers/field_autocomplete.h"
@@ -25,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor_layer_widget.h"
 #include "history/history_drag_area.h"
 #include "history/view/controls/history_view_characters_limit.h"
+#include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/history_view_schedule_box.h"
 #include "core/mime_type.h"
 #include "core/ui_integration.h"
@@ -45,6 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/grouped_layout.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
+#include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
@@ -192,16 +196,44 @@ void EditFileCaptionBox(
 	Ui::ResizeFitChild(wrap, field);
 	if (const auto window = Core::App().findWindow(box)) {
 		const auto controller = window->sessionController();
+		const auto allow = [=](not_null<DocumentData*> emoji) {
+			return captionToPeer
+				&& Data::AllowEmojiWithoutPremium(captionToPeer, emoji);
+		};
 		Ui::SetupCaptionFieldInBox(
 			box,
 			controller,
 			field,
 			captionToPeer,
-			[=](not_null<DocumentData*> emoji) {
-				return captionToPeer
-					&& Data::AllowEmojiWithoutPremium(captionToPeer, emoji);
-			},
+			allow,
 			PremiumFeature::EmojiStatus);
+		if (controller) {
+			const auto chatStyle = InitMessageFieldHandlers({
+				.session = &controller->session(),
+				.show = controller->uiShow(),
+				.field = field,
+				.customEmojiPaused = [=] {
+					return controller->isGifPausedAtLeastFor(
+						Window::GifPauseReason::Layer);
+				},
+				.allowPremiumEmoji = allow,
+				.fieldStyle = &st.files.caption,
+			});
+			const auto aiButton = Ui::SetupCaptionAiButton({
+				.parent = field->parentWidget(),
+				.field = field,
+				.session = &controller->session(),
+				.show = controller->uiShow(),
+				.chatStyle = chatStyle,
+			});
+			rpl::combine(
+				box->sizeValue(),
+				field->geometryValue()
+			) | rpl::on_next([=](QSize, QRect) {
+				Ui::UpdateCaptionAiButtonGeometry(aiButton, field);
+				aiButton->raise();
+			}, aiButton->lifetime());
+		}
 	}
 	field->setTextWithTags(std::move(currentCaption));
 
@@ -398,6 +430,8 @@ SendFilesBox::Block::Block(
 			: nullptr;
 		if (media) {
 			_isSingleMedia = true;
+			media->setSendWay(way);
+			media->setCanShowHighQualityBadge(first.canUseHighQualityPhoto());
 			_preview.reset(media);
 		} else {
 			_preview.reset(Ui::CreateChild<Ui::SingleFilePreview>(
@@ -689,6 +723,11 @@ Fn<SendMenu::Details()> SendFilesBox::prepareSendMenuDetails(
 			: _invertCaption
 			? SendMenu::CaptionState::Above
 			: SendMenu::CaptionState::Below;
+		result.photoQuality = !hasSendLargePhotosOption()
+			? SendMenu::PhotoQualityState::None
+			: way.sendLargePhotos()
+			? SendMenu::PhotoQualityState::High
+			: SendMenu::PhotoQualityState::Standard;
 		result.price = canChangePrice()
 			? _price.current()
 			: std::optional<uint64>();
@@ -703,6 +742,8 @@ auto SendFilesBox::prepareSendMenuCallback()
 		switch (action.type) {
 		case Type::CaptionDown: _invertCaption = false; break;
 		case Type::CaptionUp: _invertCaption = true; break;
+		case Type::PhotoQualityOn: setSendLargePhotos(true); break;
+		case Type::PhotoQualityOff: setSendLargePhotos(false); break;
 		case Type::SpoilerOn: toggleSpoilers(true); break;
 		case Type::SpoilerOff: toggleSpoilers(false); break;
 		case Type::ChangePrice: changePrice(); break;
@@ -757,7 +798,7 @@ void SendFilesBox::enqueueNextPrepare() {
 	_list.filesToProcess.pop_front();
 	const auto weak = base::make_weak(this);
 	_preparing = true;
-	const auto sideLimit = PhotoSideLimit(); // Get on main thread.
+	const auto sideLimit = PhotoSideLimit(_sendWay.current().sendLargePhotos());
 	crl::async([weak, sideLimit, file = std::move(file)]() mutable {
 		Storage::PrepareDetails(file, st::sendMediaPreviewSize, sideLimit);
 		crl::on_main([weak, file = std::move(file)]() mutable {
@@ -945,12 +986,19 @@ void SendFilesBox::refreshButtons() {
 bool SendFilesBox::hasSendMenu(const MenuDetails &details) const {
 	return (details.type != SendMenu::Type::Disabled)
 		|| (details.spoiler != SendMenu::SpoilerState::None)
-		|| (details.caption != SendMenu::CaptionState::None);
+		|| (details.caption != SendMenu::CaptionState::None)
+		|| (details.photoQuality != SendMenu::PhotoQualityState::None)
+		|| details.price.has_value();
 }
 
 bool SendFilesBox::hasSpoilerMenu() const {
 	return !hasPrice()
 		&& _list.hasSpoilerMenu(_sendWay.current().sendImagesAsPhotos());
+}
+
+bool SendFilesBox::hasSendLargePhotosOption() const {
+	return _list.hasSendLargePhotosOption(
+		_sendWay.current().sendImagesAsPhotos());
 }
 
 bool SendFilesBox::canChangePrice() const {
@@ -981,6 +1029,15 @@ void SendFilesBox::toggleSpoilers(bool enabled) {
 	for (auto &block : _blocks) {
 		block.toggleSpoilers(enabled);
 	}
+}
+
+void SendFilesBox::setSendLargePhotos(bool enabled) {
+	auto way = _sendWay.current();
+	if (way.sendLargePhotos() == enabled) {
+		return;
+	}
+	way.setSendLargePhotos(enabled);
+	_sendWay = way;
 }
 
 void SendFilesBox::changePrice() {
@@ -1203,6 +1260,10 @@ void SendFilesBox::updateCaptionVisibility() {
 	if (_emojiToggle) {
 		_emojiToggle->setVisible(can);
 	}
+	if (_aiButton) {
+		_aiButton->setVisible(can
+			&& Ui::HasEnoughLinesForAi(&_show->session(), _caption.data()));
+	}
 }
 
 void SendFilesBox::preparePreview() {
@@ -1302,7 +1363,8 @@ void SendFilesBox::pushBlock(int from, int till) {
 				if (ok) {
 					refreshAllAfterChanges(from);
 				}
-			});
+			},
+			PhotoSideLimit(true));
 	};
 	const auto replaceAttachment = [=, show = _show](int index) {
 		applyBlockChanges();
@@ -1411,6 +1473,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 					}
 					refreshAllAfterChanges(from);
 				}),
+				PhotoSideLimit(true),
 				video->thumbnail.size());
 		};
 		const auto checkResult = [=](const Ui::PreparedList &list) {
@@ -1521,15 +1584,18 @@ void SendFilesBox::pushBlock(int from, int till) {
 		if (canToggleSpoiler) {
 			const auto spoilered = file.spoiler;
 			const auto &icons = _st.tabbed.icons;
-			state->menu->addAction(spoilered
-				? tr::lng_context_disable_spoiler(tr::now)
-				: tr::lng_context_spoiler_effect(tr::now), [=] {
-				applyBlockChanges();
-				refreshAllAfterChanges(from, [&] {
-					auto &entry = _list.files[fileIndex];
-					entry.spoiler = !spoilered;
-				});
-			}, spoilered ? &icons.menuSpoilerOff : &icons.menuSpoiler);
+			Menu::AddCheckedAction(
+				state->menu.get(),
+				tr::lng_context_spoiler_effect(tr::now),
+				[=] {
+					applyBlockChanges();
+					refreshAllAfterChanges(from, [&] {
+						auto &entry = _list.files[fileIndex];
+						entry.spoiler = !spoilered;
+					});
+				},
+				&icons.menuSpoiler,
+				spoilered);
 		}
 		const auto canEditCover = file.isVideoFile()
 			&& (_toPeer->isBroadcast() || _toPeer->isSelf());
@@ -1763,7 +1829,7 @@ void SendFilesBox::setupCaption() {
 		return Data::AllowEmojiWithoutPremium(_toPeer, emoji);
 	};
 	const auto show = _show;
-	InitMessageFieldHandlers({
+	const auto chatStyle = InitMessageFieldHandlers({
 		.session = &show->session(),
 		.show = show,
 		.field = _caption.data(),
@@ -1833,6 +1899,14 @@ void SendFilesBox::setupCaption() {
 		checkCharsLimitation();
 		refreshMessagesCount();
 	}, _caption->lifetime());
+
+	_aiButton = Ui::SetupCaptionAiButton({
+		.parent = this,
+		.field = _caption.data(),
+		.session = &_show->session(),
+		.show = _show,
+		.chatStyle = chatStyle,
+	});
 }
 
 void SendFilesBox::setupCaptionAutocomplete() {
@@ -2178,6 +2252,10 @@ void SendFilesBox::updateControlsGeometry() {
 				_caption->y() + st::boxAttachEmojiTop);
 			_emojiToggle->update();
 		}
+		if (_aiButton) {
+			Ui::UpdateCaptionAiButtonGeometry(_aiButton, _caption.data());
+			_aiButton->raise();
+		}
 	}
 	const auto pairs = std::array<std::pair<RpWidget*, int>, 4>{ {
 		{ _hintLabel.data(), st::editMediaLabelMargins.top() },
@@ -2224,14 +2302,18 @@ void SendFilesBox::setInnerFocus() {
 	}
 }
 
-void SendFilesBox::saveSendWaySettings() {
+void SendFilesBox::saveSendWaySettings(bool rememberAll) {
 	auto way = _sendWay.current();
 	auto oldWay = Core::App().settings().sendFilesWay();
-	if (_groupFiles->isHidden()) {
+	if (!rememberAll) {
+		way.setGroupFiles(oldWay.groupFiles());
+		way.setSendImagesAsPhotos(oldWay.sendImagesAsPhotos());
+	} else if (_groupFiles->isHidden()) {
 		way.setGroupFiles(oldWay.groupFiles());
 	}
-	if (_list.overrideSendImagesAsPhotos == way.sendImagesAsPhotos()
-		|| _sendImagesAsPhotos->isHidden()) {
+	if (rememberAll
+		&& (_list.overrideSendImagesAsPhotos == way.sendImagesAsPhotos()
+			|| _sendImagesAsPhotos->isHidden())) {
 		way.setSendImagesAsPhotos(oldWay.sendImagesAsPhotos());
 	}
 	if (way != oldWay) {
@@ -2266,6 +2348,7 @@ void SendFilesBox::send(
 		auto child = _sendMenuDetails();
 		child.spoiler = SendMenu::SpoilerState::None;
 		child.caption = SendMenu::CaptionState::None;
+		child.photoQuality = SendMenu::PhotoQualityState::None;
 		child.price = std::nullopt;
 		return SendMenu::DefaultCallback(_show, sendCallback())(
 			{ .type = SendMenu::ActionType::Schedule },
@@ -2278,20 +2361,20 @@ void SendFilesBox::send(
 		return;
 	}
 
-	if (_wayRemember && _wayRemember->checked()) {
-		saveSendWaySettings();
-	}
+	const auto way = _sendWay.current();
 
 	for (auto &item : _list.files) {
 		item.spoiler = false;
 	}
 	applyBlockChanges();
+	for (auto &item : _list.files) {
+		item.sendLargePhotos = way.sendLargePhotos();
+	}
 
 	Storage::ApplyModifications(_list);
 
 	_confirmed = true;
 	if (_confirmedCallback) {
-		const auto way = _sendWay.current();
 		auto caption = fieldText();
 		if (!validateLength(caption.text)) {
 			return;
@@ -2302,6 +2385,7 @@ void SendFilesBox::send(
 				return;
 			}
 		}
+		saveSendWaySettings(_wayRemember && _wayRemember->checked());
 		options.invertCaption = _invertCaption;
 		options.price = hasPrice() ? _price.current() : 0;
 		if (options.price > 0) {

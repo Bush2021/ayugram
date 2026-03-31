@@ -304,6 +304,14 @@ void UiIntegration::activationFromTopPanel() {
 	Platform::IgnoreApplicationActivationRightNow();
 }
 
+void UiIntegration::touchCounterIncrement() {
+	++_touchCounter;
+}
+
+int UiIntegration::touchCounterNow() {
+	return _touchCounter;
+}
+
 bool UiIntegration::screenIsLocked() {
 	return Core::App().screenIsLocked();
 }

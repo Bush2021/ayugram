@@ -600,6 +600,7 @@ void SessionNavigation::showMessageByLinkResolved(
 	params.origin = SectionShow::OriginMessage{
 		info.clickFromMessageId
 	};
+	params.highlight.pollOption = info.pollOption;
 	const auto peer = item->history()->peer;
 	const auto topicId = peer->isForum() ? item->topicRootId() : 0;
 	if (topicId) {
@@ -619,6 +620,7 @@ void SessionNavigation::showPeerByLinkResolved(
 	params.origin = SectionShow::OriginMessage{
 		info.clickFromMessageId
 	};
+	params.highlight.pollOption = info.pollOption;
 	if (info.voicechatHash && peer->isChannel()) {
 		// First show the channel itself.
 		crl::on_main(this, [=] {

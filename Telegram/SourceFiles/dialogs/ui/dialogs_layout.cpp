@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/ui/dialogs_layout.h"
 
+#include "base/options.h"
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
 #include "data/data_channel.h"
@@ -55,7 +56,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 
 namespace Dialogs::Ui {
+
+const char kOptionDialogsMuteIcon[] = "dialogs-mute-icon";
+
 namespace {
+
+base::options::toggle DialogsMuteIcon({
+	.id = kOptionDialogsMuteIcon,
+	.name = "Mute icon in dialogs",
+	.description = "Show a small mute icon next to the chat name "
+		"for muted chats.",
+});
 
 const auto kPsaBadgePrefix = "cloud_lng_badge_psa_";
 
@@ -188,7 +199,7 @@ int PaintBadges(
 		st.muted = badgesState.unreadMuted;
 		const auto counter = FormatUnreadCounter(
 			badgesState.unreadCounter,
-			badgesState.mention || badgesState.reaction,
+			badgesState.mention || badgesState.reaction || badgesState.poll,
 			narrow);
 		const auto badge = PaintUnreadBadge(p, counter, right, top, st);
 		right -= badge.width() + st.padding;
@@ -203,26 +214,31 @@ int PaintBadges(
 		right -= icon.width() + st::dialogsUnreadPadding;
 	}
 	if (badgesState.mention || badgesState.reaction) {
-		UnreadBadgeStyle st;
-		st.sizeId = badgesState.mention
-			? UnreadBadgeSize::Dialogs
-			: UnreadBadgeSize::ReactionInDialogs;
-		st.active = context.active;
-		st.selected = context.selected;
-		st.muted = badgesState.mention
+		const auto muted = badgesState.mention
 			? badgesState.mentionMuted
 			: badgesState.reactionMuted;
-		st.padding = 0;
-		st.textTop = 0;
-		const auto counter = QString();
-		const auto badge = PaintUnreadBadge(p, counter, right, top, st);
-		ThreeStateIcon(
+		const auto &icon = ThreeStateIcon(
 			badgesState.mention
-				? st::dialogsUnreadMention
-				: st::dialogsUnreadReaction,
-			st.active,
-			st.selected).paintInCenter(p, badge);
-		right -= badge.width() + st.padding + st::dialogsUnreadPadding;
+				? (muted
+					? st::dialogsUnreadMentionMuted
+					: st::dialogsUnreadMention)
+				: (muted
+					? st::dialogsUnreadReactionMuted
+					: st::dialogsUnreadReaction),
+			context.active,
+			context.selected);
+		icon.paint(p, right - icon.width(), top, context.width);
+		right -= icon.width() + st::dialogsUnreadPadding;
+	}
+	if (badgesState.poll) {
+		const auto &icon = ThreeStateIcon(
+			badgesState.pollMuted
+				? st::dialogsUnreadPollMuted
+				: st::dialogsUnreadPoll,
+			context.active,
+			context.selected);
+		icon.paint(p, right - icon.width(), top, context.width);
+		right -= icon.width() + st::dialogsUnreadPadding;
 	}
 	return (initial - right);
 }
@@ -803,8 +819,24 @@ void PaintRow(
 			context.width,
 			text);
 	} else if (from) {
+		auto badgeWidth = 0;
 		if ((history || sublist) && !context.search) {
+			const auto widthBefore = rectForName.width();
 			paintPeerBadge(rowName.maxWidth());
+			badgeWidth = widthBefore - rectForName.width();
+		}
+		const auto drawMuteIcon = DialogsMuteIcon.value()
+			&& thread
+			&& thread->muted();
+		if (drawMuteIcon) {
+			const auto &muteIcon = ThreeStateIcon(
+				st::dialogsMuteIcon,
+				context.active,
+				context.selected);
+			rectForName.setWidth(
+				rectForName.width()
+					- muteIcon.width()
+					- st::dialogsMuteIconSkip);
 		}
 		p.setPen(context.active
 			? st::dialogsNameFgActive
@@ -816,6 +848,22 @@ void PaintRow(
 			.availableWidth = rectForName.width(),
 			.elisionLines = 1,
 		});
+		if (drawMuteIcon) {
+			const auto &muteIcon = ThreeStateIcon(
+				st::dialogsMuteIcon,
+				context.active,
+				context.selected);
+			const auto nameW = std::min(
+				rowName.maxWidth(),
+				rectForName.width());
+			const auto muteLeft = rectForName.left()
+				+ nameW
+				+ badgeWidth
+				+ st::dialogsMuteIconSkip;
+			const auto muteTop = rectForName.top()
+				+ (st::semiboldFont->height - muteIcon.height()) / 2;
+			muteIcon.paint(p, muteLeft, muteTop, context.width);
+		}
 	} else if (hiddenSenderInfo) {
 		p.setPen(context.active
 			? st::dialogsNameFgActive

@@ -59,6 +59,7 @@ struct Action;
 
 namespace HistoryView::Controls {
 class CharactersLimitLabel;
+class ComposeAiButton;
 } // namespace HistoryView::Controls
 
 enum class SendFilesAllow {
@@ -213,10 +214,12 @@ private:
 	void addMenuButton();
 	void applyBlockChanges();
 	void toggleSpoilers(bool enabled);
+	void setSendLargePhotos(bool enabled);
 	void changePrice();
 
 	[[nodiscard]] bool canChangePrice() const;
 	[[nodiscard]] bool hasPrice() const;
+	[[nodiscard]] bool hasSendLargePhotosOption() const;
 	void refreshPriceTag();
 	[[nodiscard]] QImage preparePriceTagBg(QSize size) const;
 
@@ -237,7 +240,7 @@ private:
 	void send(Api::SendOptions options, bool ctrlShiftEnter = false);
 	[[nodiscard]] Fn<void(Api::SendOptions)> sendCallback();
 	void captionResized();
-	void saveSendWaySettings();
+	void saveSendWaySettings(bool rememberAll);
 
 	void setupDragArea();
 	void refreshTitleText();
@@ -305,6 +308,7 @@ private:
 	std::unique_ptr<ChatHelpers::FieldAutocomplete> _autocomplete;
 	TextWithTags _prefilledCaptionText;
 	object_ptr<Ui::EmojiButton> _emojiToggle = { nullptr };
+	HistoryView::Controls::ComposeAiButton *_aiButton = nullptr;
 	base::unique_qptr<ChatHelpers::TabbedPanel> _emojiPanel;
 	base::unique_qptr<QObject> _emojiFilter;
 	using CharactersLimitLabel = HistoryView::Controls::CharactersLimitLabel;

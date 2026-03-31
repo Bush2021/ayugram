@@ -58,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
+#include "styles/style_polls.h"
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -1246,6 +1247,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			const auto maybeMediaHighlight = context.highlightPathCache
 				&& context.highlightPathCache->isEmpty();
 			auto mediaPosition = QPoint(inner.left(), top);
+			_lastMediaPosition = mediaPosition;
 			p.translate(mediaPosition);
 			media->draw(p, context.translated(
 				-mediaPosition
@@ -2391,7 +2393,9 @@ void Message::clickHandlerPressedChanged(
 		; badge && badge->tagLink && handler == badge->tagLink) {
 		toggleBadgeRipple(pressed);
 	} else if (displayFromName() && handler == fromLink()) {
-		startLinkRipple();
+		if (_fromLinkRipplePointSet || !pressed) {
+			startLinkRipple();
+		}
 	} else if (const auto via = data()->Get<HistoryMessageVia>()
 		; via
 		&& (handler == via->link)
@@ -2815,6 +2819,8 @@ bool Message::hasFromPhoto() const {
 TextState Message::textState(
 		QPoint point,
 		StateRequest request) const {
+	_fromLinkRipplePointSet = 0;
+
 	const auto item = data();
 	const auto media = this->media();
 
@@ -3177,6 +3183,7 @@ bool Message::getStateFromName(
 			&& point.x() < availableLeft + nameText->maxWidth()) {
 			outResult->link = fromLink();
 			recordLinkRipplePoint(point, trect.topLeft());
+			_fromLinkRipplePointSet = 1;
 			return true;
 		}
 		auto via = item->Get<HistoryMessageVia>();
@@ -4844,6 +4851,10 @@ QRect Message::innerGeometry() const {
 		}
 	}
 	return result;
+}
+
+QPoint Message::mediaTopLeft() const {
+	return _lastMediaPosition;
 }
 
 bool Message::isCommentsRootView() const {
