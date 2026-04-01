@@ -2330,6 +2330,9 @@ void Message::clickHandlerPressedChanged(
 		bool pressed) {
 	const auto startLinkRipple = [&] {
 		if (!_linkRipple) {
+			if (!pressed) {
+				return;
+			}
 			_linkRipple = std::make_unique<LinkRipple>();
 		}
 		_linkRipple->link = handler;

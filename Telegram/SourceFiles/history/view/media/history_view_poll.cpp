@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_reaction_preview.h"
@@ -1887,6 +1888,7 @@ bool Poll::inlineFooter() const {
 bool Poll::canAddOption() const {
 	return (_flags & PollData::Flag::OpenAnswers)
 		&& !(_flags & PollData::Flag::Closed)
+		&& !_parent->data()->Has<HistoryMessageForwarded>()
 		&& (int(_poll->answers.size())
 			< _poll->session().appConfig().pollOptionsLimit());
 }
@@ -2497,7 +2499,8 @@ void Poll::Options::updateAnswers() {
 	auto options = ranges::views::all(
 		_owner->_poll->answers
 	) | ranges::views::transform(&PollAnswer::option) | ranges::to_vector;
-	if (_owner->_flags & PollData::Flag::ShuffleAnswers) {
+	if ((_owner->_flags & PollData::Flag::ShuffleAnswers)
+		&& !(_owner->_flags & PollData::Flag::Creator)) {
 		const auto userId = _owner->_poll->session().userId();
 		const auto pollId = _owner->_poll->id;
 		ranges::sort(options, [&](const QByteArray &a, const QByteArray &b) {
@@ -2541,7 +2544,8 @@ void Poll::Options::updateAnswers() {
 		return result;
 	}) | ranges::to_vector;
 
-	if (_owner->_flags & PollData::Flag::ShuffleAnswers) {
+	if ((_owner->_flags & PollData::Flag::ShuffleAnswers)
+		&& !(_owner->_flags & PollData::Flag::Creator)) {
 		const auto visitorId = _owner->_poll->session().userId();
 		const auto pollId = _owner->_poll->id;
 		ranges::sort(_answers, [&](const Answer &a, const Answer &b) {
