@@ -18,6 +18,8 @@ ayuSReadMenuIcon: icon {{ "ayu/sread", menuIconColor }};
 ayuStreamerModeMenuIcon: icon {{ "ayu/streamer", menuIconColor }};
 ayuToBeginningMenuIcon: icon {{ "ayu/to_beginning", menuIconColor }};
 ayuRepeatMenuIcon: icon {{ "ayu/repeat", menuIconColor }};
+ayuContactsMutualIcon: icon {{ "ayu/contacts_mutual", contactsStatusFg }};
+ayuContactsMutualIconOver: icon {{ "ayu/contacts_mutual", contactsStatusFgOver }};
 
 messageFieldAttachIcon: icon {{ "ayu/message_field/attach", menuIconColor }};
 messageFieldCommandsIcon: icon {{ "ayu/message_field/commands", menuIconColor }};
