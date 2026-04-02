@@ -11,6 +11,7 @@ namespace Ui {
 namespace {
 
 constexpr auto kSerializedSendLargePhotos = int32(4);
+constexpr auto kSerializedPhotoQualitySet = int32(8);
 
 } // namespace
 
@@ -69,15 +70,19 @@ int32 SendFilesWay::serialize() const {
 	if (sendLargePhotos()) {
 		result |= kSerializedSendLargePhotos;
 	}
+	result |= kSerializedPhotoQualitySet;
 	return result;
 }
 
 std::optional<SendFilesWay> SendFilesWay::FromSerialized(int32 value) {
-	if (value < 0 || value > 7) {
+	if (value < 0 || value > 15) {
 		return std::nullopt;
 	}
-	const auto sendLargePhotos = (value & kSerializedSendLargePhotos) != 0;
-	value &= ~kSerializedSendLargePhotos;
+	const auto photoQualitySet = (value & kSerializedPhotoQualitySet) != 0;
+	const auto sendLargePhotos = photoQualitySet
+		? ((value & kSerializedSendLargePhotos) != 0)
+		: true;
+	value &= ~(kSerializedSendLargePhotos | kSerializedPhotoQualitySet);
 	auto result = SendFilesWay();
 	result.setGroupFiles((value == 0) || (value == 3));
 	result.setSendImagesAsPhotos((value == 0) || (value == 1));
