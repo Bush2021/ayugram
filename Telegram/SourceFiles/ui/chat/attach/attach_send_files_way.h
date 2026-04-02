@@ -74,7 +74,7 @@ private:
 		HasCompressedStickers = (1 << 2),
 		SendLargePhotos = (1 << 3),
 
-		Default = GroupFiles | SendImagesAsPhotos,
+		Default = GroupFiles | SendImagesAsPhotos | SendLargePhotos,
 	};
 	friend inline constexpr bool is_flag_type(Flag) { return true; };
 
