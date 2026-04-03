@@ -326,6 +326,7 @@ void SetupPhoto(
 		auto &image = chosen.image;
 		UpdatePhotoLocally(self, image);
 		photo->showCustom(base::duplicate(image));
+		const auto isMarkup = (chosen.markup.documentId != 0);
 		self->session().api().peerPhoto().upload(
 			self,
 			{
@@ -333,6 +334,9 @@ void SetupPhoto(
 				chosen.markup.documentId,
 				chosen.markup.colors,
 			});
+		if (!isMarkup) {
+			photo->showUploadProgress();
+		}
 	}, upload->lifetime());
 
 	const auto name = Ui::CreateChild<Ui::FlatLabel>(
