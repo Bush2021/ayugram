@@ -13,6 +13,8 @@ The build is done in **Visual Studio 2026** with **10.0.26100.0** SDK version.
 
 Choose an empty folder for the future build, for example **D:\\TBuild**. It will be named ***BuildPath*** in the rest of this document. Create two folders there, ***BuildPath*\\ThirdParty** and ***BuildPath*\\Libraries**.
 
+The default modern toolset from Visual Studio 2026 (`v145`) does not support Windows 7, so for Telegram Desktop you must use `-vcvars_ver=14.44` (`v144.4`, based on `v143` with Windows 7 support).
+
 ## Install third party software
 
 * Download **Python 3.14** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
@@ -20,13 +22,16 @@ Choose an empty folder for the future build, for example **D:\\TBuild**. It will
 
 ## Choose architecture and initialize terminal
 
+Before preparing libraries and running build commands, initialize the Visual Studio environment for your target architecture.
+The default modern toolset from Visual Studio 2026 (`v145`) does not support Windows 7, so for Telegram Desktop you must use `-vcvars_ver=14.44` (`v144.4`, based on `v143` with Windows 7 support).
+
 For `win` (32-bit):
 
-    %comspec% /k "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
+    %comspec% /k "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars32.bat" -vcvars_ver=14.44
 
 For `win64` (64-bit):
 
-    %comspec% /k "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+    %comspec% /k "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat" -vcvars_ver=14.44
 
 Run both `Clone source code and prepare libraries` and `Build the project` sections in the terminal initialized with one of the commands above.
 
