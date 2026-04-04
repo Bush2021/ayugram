@@ -6,6 +6,8 @@
 // Copyright @Radolyn, 2026
 #include "ayu/ui/settings/settings_ayu_utils.h"
 
+#include "lang_auto.h"
+#include "core/application.h"
 #include "lang/lang_text_entity.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_styles.h"
@@ -14,6 +16,7 @@
 #include "styles/style_settings.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
@@ -29,6 +32,17 @@
 class PainterHighQualityEnabler;
 
 namespace Settings {
+
+void ShowRestartPrompt(not_null<Window::SessionController*> controller) {
+	crl::on_main([=] {
+		controller->show(Ui::MakeConfirmBox({
+			.text = tr::lng_settings_need_restart(),
+			.confirmed = [] { Core::Restart(); },
+			.confirmText = tr::lng_settings_restart_now(),
+			.cancelText = tr::lng_settings_restart_later(),
+		}));
+	});
+}
 
 void AddBetaBadge(not_null<Button*> parent) {
 	const auto badge = Ui::CreateChild<Ui::PaddingWrap<Ui::FlatLabel>>(

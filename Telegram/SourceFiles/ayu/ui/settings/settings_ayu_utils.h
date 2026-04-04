@@ -32,6 +32,8 @@ struct NestedEntry
 
 void AddBetaBadge(not_null<Button*> parent);
 
+void ShowRestartPrompt(not_null<Window::SessionController*> controller);
+
 not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
 									   const style::SettingsButton &st,
 									   std::vector<not_null<Ui::AbstractCheckView*>> innerCheckViews,

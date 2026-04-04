@@ -16,7 +16,6 @@
 #include "settings/settings_common.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
-#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
@@ -182,12 +181,7 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		) | on_next(
 			[=](bool enabled) {
 				AyuSettings::getInstance().setFilterZalgo(enabled);
-				controller->show(Ui::MakeConfirmBox({
-					.text = tr::lng_settings_need_restart(),
-					.confirmed = [] { Core::Restart(); },
-					.confirmText = tr::lng_settings_restart_now(),
-					.cancelText = tr::lng_settings_restart_later(),
-				}));
+				ShowRestartPrompt(controller);
 			},
 			zalgoButton->lifetime());
 		ayu.addBetaBadge(zalgoButton);
