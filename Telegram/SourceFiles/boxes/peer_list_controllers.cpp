@@ -87,7 +87,7 @@ protected:
 	}
 
 	bool rightActionDisabled() const override {
-		return true;
+		return false;
 	}
 
 	void rightActionPaint(
@@ -100,7 +100,7 @@ protected:
 		if (!isMutualContact()) {
 			return;
 		}
-		(selected
+		(selected || actionSelected
 			? st::ayuContactsMutualIconOver
 			: st::ayuContactsMutualIcon).paint(p, x, y, outerWidth);
 	}
@@ -137,6 +137,15 @@ object_ptr<Ui::BoxContent> PrepareContactsBox(
 		void rowMiddleClicked(
 				not_null<PeerListRow*> row) override {
 			_wheelClicks.fire(row->peer());
+		}
+
+		void rowRightActionClicked(
+				not_null<PeerListRow*> row) override {
+			if (const auto user = row->peer()->asUser();
+				user && (user->flags() & UserDataFlag::MutualContact)) {
+				delegate()->peerListUiShow()->showToast(
+					tr::ayu_MutualContactInfo(tr::now));
+			}
 		}
 
 	private:

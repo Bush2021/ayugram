@@ -8272,6 +8272,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ReadDateMenuText" = "Read Date";
 "ayu_ContentsReadDateMenuText" = "Contents Read Date";
 "ayu_UnforwardableContextMenuText" = "Plain forwarding is not allowed.";
+"ayu_LastSeenPillAutoRefresh" = "Auto-Refresh";
 "ayu_LikelyOfflineStatus" = "offline ?";
 "ayu_GhostModeShortcut" = "Enter with Ghost";
 "ayu_SettingsShowMessageSeconds" = "Show Message Seconds";
@@ -8295,6 +8296,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DeveloperPopup" = "**{item}** is a member of the **exteraGram** development team.";
 "ayu_SupporterPopup" = "**{item}** supported the development of **exteraGram** or **AyuGram** and received an unique badge.";
 "ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **AyuGram**.";
+"ayu_MutualContactInfo" = "This contact is mutual.";
+"ayu_SessionInfoOfficialApp" = "Official app";
 "ayu_SettingsWatermark" = "AyuGram is developed and maintained by Radolyn Labs.";
 "ayu_SettingsDescription" = "Telegram Desktop fork focused on customization and ToS-breaking features.";
 "ayu_ConfirmationSticker" = "Do you want to send this sticker?";
