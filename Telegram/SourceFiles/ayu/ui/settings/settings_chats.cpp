@@ -13,13 +13,11 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
-#include "core/application.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_icons.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
-#include "ui/boxes/confirm_box.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -35,17 +33,6 @@ namespace {
 struct PreviewState {
 	MessagePreview *widget = nullptr;
 };
-
-void ShowRestartPrompt(not_null<Window::SessionController*> controller) {
-	crl::on_main([=] {
-		controller->show(Ui::MakeConfirmBox({
-			.text = tr::lng_settings_need_restart(),
-			.confirmed = [] { Core::Restart(); },
-			.confirmText = tr::lng_settings_restart_now(),
-			.cancelText = tr::lng_settings_restart_later(),
-		}));
-	});
-}
 
 void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::lng_settings_stickers_emoji());

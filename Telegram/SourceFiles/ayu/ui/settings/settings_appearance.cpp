@@ -13,8 +13,8 @@
 #include "ayu/ui/components/avatar_corners_preview.h"
 #include "ayu/ui/components/icon_picker.h"
 #include "ayu/ui/settings/ayu_builder.h"
+#include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
-#include "core/application.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "main/main_session.h"
 #include "settings/settings_builder.h"
@@ -26,7 +26,6 @@
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/painter.h"
-#include "ui/boxes/confirm_box.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -170,14 +169,7 @@ void BuildAvatarCorners(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		},
 		.onFinalChanged = [=](int val) {
 			AyuSettings::getInstance().setAvatarCorners(val);
-			crl::on_main([=] {
-				controller->show(Ui::MakeConfirmBox({
-					.text = tr::lng_settings_need_restart(),
-					.confirmed = [] { Core::Restart(); },
-					.confirmText = tr::lng_settings_restart_now(),
-					.cancelText = tr::lng_settings_restart_later(),
-				}));
-			});
+			ShowRestartPrompt(controller);
 		},
 	});
 
