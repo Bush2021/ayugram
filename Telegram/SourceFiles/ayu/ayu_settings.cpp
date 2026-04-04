@@ -473,6 +473,7 @@ void AyuSettings::validate() {
 
 	validateEnum(_translationProvider, defaults._translationProvider);
 
+	validateRange(_messageBubbleRadius, 0, 16, defaults._messageBubbleRadius);
 	validateRange(_wideMultiplier, 0.5, 4.0, defaults._wideMultiplier);
 	validateRange(_recentStickersCount, 1, 200, defaults._recentStickersCount);
 	validateRange(_avatarCorners, 0, AyuUiSettings::kMaxAvatarCorners, defaults._avatarCorners);
@@ -571,6 +572,12 @@ void AyuSettings::setCollapseSimilarChannels(bool val) {
 void AyuSettings::setHideSimilarChannels(bool val) {
 	if (_hideSimilarChannels.current() == val) return;
 	_hideSimilarChannels = val;
+	save();
+}
+
+void AyuSettings::setMessageBubbleRadius(int val) {
+	if (_messageBubbleRadius.current() == val) return;
+	_messageBubbleRadius = val;
 	save();
 }
 
@@ -1007,6 +1014,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showOnlyAddedEmojisAndStickers", s._showOnlyAddedEmojisAndStickers.current()},
 		{"collapseSimilarChannels", s._collapseSimilarChannels.current()},
 		{"hideSimilarChannels", s._hideSimilarChannels.current()},
+		{"messageBubbleRadius", s._messageBubbleRadius.current()},
 		{"disableOpenLinkWarning", s._disableOpenLinkWarning.current()},
 		{"wideMultiplier", s._wideMultiplier.current()},
 		{"spoofWebviewAsAndroid", s._spoofWebviewAsAndroid.current()},
@@ -1104,6 +1112,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showOnlyAddedEmojisAndStickers = j.value("showOnlyAddedEmojisAndStickers", defaults._showOnlyAddedEmojisAndStickers.current());
 	s._collapseSimilarChannels = j.value("collapseSimilarChannels", defaults._collapseSimilarChannels.current());
 	s._hideSimilarChannels = j.value("hideSimilarChannels", defaults._hideSimilarChannels.current());
+	s._messageBubbleRadius = j.value("messageBubbleRadius", defaults._messageBubbleRadius.current());
 	s._disableOpenLinkWarning = j.value("disableOpenLinkWarning", defaults._disableOpenLinkWarning.current());
 	s._wideMultiplier = j.value("wideMultiplier", defaults._wideMultiplier.current());
 	s._spoofWebviewAsAndroid = j.value("spoofWebviewAsAndroid", defaults._spoofWebviewAsAndroid.current());

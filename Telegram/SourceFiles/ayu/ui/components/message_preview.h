@@ -18,6 +18,8 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller);
 
+	void setBubbleRadius(int radius);
+
 protected:
 	void paintEvent(QPaintEvent *e) override;
 
@@ -30,4 +32,5 @@ private:
 	class PreviewDelegate;
 	struct State;
 	const not_null<State*> _state;
+
 };

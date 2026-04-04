@@ -14,6 +14,7 @@
 #include "ayu/ui/ayu_logo.h"
 #include "features/translator/ayu_translator.h"
 #include "lang/lang_instance.h"
+#include "ui/chat/chat_style_radius.h"
 #include "utils/rc_manager.h"
 
 #ifdef Q_OS_WIN
@@ -40,6 +41,7 @@ void initUiSettings() {
 	AyuUiSettings::setWideMultiplier(settings.wideMultiplier());
 	AyuUiSettings::setMaterialSwitches(settings.materialSwitches());
 	AyuUiSettings::setAvatarCorners(settings.avatarCorners());
+	Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
 }
 
 void initDatabase() {

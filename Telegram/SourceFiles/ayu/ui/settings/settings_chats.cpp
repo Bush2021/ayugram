@@ -23,12 +23,29 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include <memory>
+
 namespace Settings {
 
 using namespace Builder;
 using namespace AyBuilder;
 
 namespace {
+
+struct PreviewState {
+	MessagePreview *widget = nullptr;
+};
+
+void ShowRestartPrompt(not_null<Window::SessionController*> controller) {
+	crl::on_main([=] {
+		controller->show(Ui::MakeConfirmBox({
+			.text = tr::lng_settings_need_restart(),
+			.confirmed = [] { Core::Restart(); },
+			.confirmText = tr::lng_settings_restart_now(),
+			.cancelText = tr::lng_settings_restart_later(),
+		}));
+	});
+}
 
 void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::lng_settings_stickers_emoji());
@@ -125,15 +142,20 @@ void BuildGroupsAndChannels(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSkip();
 }
 
-void BuildMarks(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+void BuildMarks(
+		SectionBuilder &builder,
+		AyuSectionBuilder &ayu,
+		std::shared_ptr<PreviewState> previewState) {
 	auto *settings = &AyuSettings::getInstance();
 	const auto controller = builder.controller();
 
 	builder.addSubsectionTitle(tr::lng_settings_messages());
 
 	builder.add([=](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		auto preview = object_ptr<MessagePreview>(ctx.container, controller);
+		previewState->widget = preview.data();
 		return {
-			.widget = object_ptr<MessagePreview>(ctx.container, controller),
+			.widget = std::move(preview),
 			.margin = style::margins(
 				0,
 				st::defaultVerticalListSkip,
@@ -223,10 +245,12 @@ void BuildMarks(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	ayu.addSectionDivider();
 }
 
-void BuildWideMessagesMultiplier(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+void BuildWideMessagesMultiplier(
+		SectionBuilder &builder,
+		AyuSectionBuilder &ayu,
+		std::shared_ptr<PreviewState> previewState) {
 	auto *settings = &AyuSettings::getInstance();
 
-	constexpr auto kSizeAmount = 61; // (4.00 - 1.00) / 0.05 + 1
 	constexpr auto kMinSize = 1.00;
 	constexpr auto kStep = 0.05;
 
@@ -236,23 +260,41 @@ void BuildWideMessagesMultiplier(SectionBuilder &builder, AyuSectionBuilder &ayu
 
 	const auto controller = builder.controller();
 	ayu.addSlider({
+		.id = u"ayu/messageBubbleRadius"_q,
+		.title = tr::ayu_MessageBubbleRadius(),
+		.steps = 17,
+		.current = settings->messageBubbleRadius(),
+		.indexToValue = [](int index) { return index; },
+		.onChanged = [=](int index) {
+			if (previewState->widget) {
+				previewState->widget->setBubbleRadius(index);
+			}
+		},
+		.onFinalChanged = [=](int index) {
+			if (previewState->widget) {
+				previewState->widget->setBubbleRadius(index);
+			}
+			AyuSettings::getInstance().setMessageBubbleRadius(index);
+			ShowRestartPrompt(controller);
+		},
+		.formatLabel = [](int index) {
+			return QString::number(index);
+		},
+	});
+
+	ayu.addSectionDivider();
+
+	ayu.addSlider({
 		.id = u"ayu/wideMultiplier"_q,
 		.title = tr::ayu_SettingsWideMultiplier(),
-		.steps = kSizeAmount,
+		.steps = 61, // (4.00 - 1.00) / 0.05 + 1
 		.current = valueToIndex(settings->wideMultiplier()),
 		.indexToValue = [](int index) { return index; },
 		.onChanged = nullptr,
 		.onFinalChanged = [=](int index) {
 			AyuSettings::getInstance().setWideMultiplier(
 				kMinSize + index * kStep);
-			crl::on_main([=] {
-				controller->show(Ui::MakeConfirmBox({
-					.text = tr::lng_settings_need_restart(),
-					.confirmed = [] { Core::Restart(); },
-					.confirmText = tr::lng_settings_restart_now(),
-					.cancelText = tr::lng_settings_restart_later(),
-				}));
-			});
+			ShowRestartPrompt(controller);
 		},
 		.formatLabel = [=](int index) {
 			return QString::number(kMinSize + index * kStep, 'f', 2);
@@ -414,13 +456,14 @@ const auto kMeta = BuildHelper({
 	.icon = &st::menuIconChatBubble,
 }, [](SectionBuilder &builder) {
 	auto ayu = AyuSectionBuilder(builder);
+	const auto previewState = std::make_shared<PreviewState>();
 
 	builder.addSkip();
 	BuildStickersAndEmoji(builder, ayu);
 	BuildRecentStickersLimit(builder, ayu);
 	BuildGroupsAndChannels(builder, ayu);
-	BuildMarks(builder, ayu);
-	BuildWideMessagesMultiplier(builder, ayu);
+	BuildMarks(builder, ayu, previewState);
+	BuildWideMessagesMultiplier(builder, ayu, previewState);
 	BuildContextMenuElements(builder, ayu);
 	BuildMessageFieldElements(builder, ayu);
 	BuildMessageFieldPopups(builder, ayu);
