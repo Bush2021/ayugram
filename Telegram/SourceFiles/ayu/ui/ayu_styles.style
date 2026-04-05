@@ -117,3 +117,10 @@ ghostPickerButton: LinkButton(defaultLinkButton) {
 }
 
 ayuBetaBadgePadding: margins(4px, 1px, 4px, 1px);
+
+ayuServiceTimeBadgeFont: font(11px semibold);
+ayuServiceTimeBadgeHorizontalPadding: 7px;
+ayuServiceTimeBadgeVerticalPadding: 2px;
+ayuServiceTimeBadgeGap: 8px;
+ayuServiceTimeBadgeTrailingInset: 3px;
+ayuServiceTimeBadgeLastLineWidthAdd: 9px;

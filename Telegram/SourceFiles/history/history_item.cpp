@@ -1367,20 +1367,11 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 }
 
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
-	auto text = std::move(prepared.text);
-
-	if (date() > 0) {
-		const auto timeString = QString(" (%1)").arg(formatMessageTime(base::unixtime::parse(_date).time()));
-		if (!text.text.isEmpty() && !text.text.contains(timeString)) {
-			text = text.append(timeString);
-		}
-	}
-
 	AddComponents(HistoryServiceData::Bit());
 	_flags &= ~MessageFlag::HasTextLinks;
 	const auto data = Get<HistoryServiceData>();
 	const auto had = !_text.empty();
-	_text = std::move(text);
+	_text = std::move(prepared.text);
 	data->textLinks = std::move(prepared.links);
 	if (had) {
 		_history->owner().requestItemTextRefresh(this);
