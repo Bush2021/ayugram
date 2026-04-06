@@ -1580,6 +1580,7 @@ void Element::overrideRightBadge(const QString &text, BadgeRole role) {
 	const auto badge = Get<RightBadge>();
 	badge->overridden = true;
 	badge->role = role;
+	badge->channel = false;
 	badge->tag.setMarkedText(
 		st::defaultTextStyle,
 		{ text },
