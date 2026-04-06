@@ -1128,7 +1128,7 @@ void TopBarWidget::updateControlsGeometry() {
 
 	_messageShot->moveToLeft(buttonsLeft, selectedButtonsTop);
 	{
-		const auto large = _forward->height() / 3;
+		const auto large = st::topBarActionButtonLargeRadius;
 		const auto &buttonSt = st::defaultActiveButton;
 		const auto small = buttonSt.radius
 			? buttonSt.radius
@@ -1526,7 +1526,8 @@ void TopBarWidget::showSelected(SelectedState state) {
 			_messageShot->finishNumbersAnimation();
 		}
 	}
-	if (visibilityChanged) {
+	if (visibilityChanged
+		|| (!wasSelectedState && nowSelectedState)) {
 		updateControlsVisibility();
 	}
 	if (wasSelectedState != nowSelectedState && !_chooseForReportReason) {
