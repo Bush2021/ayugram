@@ -1474,3 +1474,6 @@ infoMusicButtonBottom: 8px;
 infoMusicButtonLine: 2px;
 
 memberTagPillPadding: margins(5px, -1px, 5px, 0px);
+
+infoSecurityRiskIconSize: 16px;
+infoSecurityRiskIconMargin: margins(0px, 2px, 0px, 0px);
