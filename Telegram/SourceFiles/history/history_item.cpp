@@ -4115,15 +4115,7 @@ FullReplyTo HistoryItem::replyTo() const {
 
 void HistoryItem::detectTextLinks(
 		const TextWithEntities &textWithEntities) {
-	auto text = textWithEntities;
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.filterZalgo()) {
-		text.text = filterZalgo(text.text);
-	}
-
-	applyLocalPremiumEmoji(text);
-
-	for (const auto &entity : text.entities) {
+	for (const auto &entity : textWithEntities.entities) {
 		auto type = entity.type();
 		if (type == EntityType::Url
 			|| type == EntityType::CustomUrl
@@ -4137,7 +4129,15 @@ void HistoryItem::detectTextLinks(
 }
 
 void HistoryItem::setText(const TextWithEntities &textWithEntities) {
-	detectTextLinks(textWithEntities);
+	auto text = textWithEntities;
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.filterZalgo()) {
+		text.text = filterZalgo(text.text);
+	}
+
+	applyLocalPremiumEmoji(text);
+
+	detectTextLinks(text);
 	setTextValue((_media && _media->consumeMessageText(text))
 		? TextWithEntities()
 		: std::move(text));
