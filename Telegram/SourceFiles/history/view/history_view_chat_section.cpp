@@ -95,8 +95,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 
 // AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "base/unixtime.h"
 
@@ -1420,13 +1418,6 @@ void ChatWidget::sendVoice(const ComposeControls::VoiceToSend &data) {
 }
 
 void ChatWidget::send(Api::SendOptions options) {
-	const auto &ghost = AyuSettings::ghost(&controller()->session());
-
-	auto lastMessage = _history->lastMessage();
-	if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && lastMessage) {
-		readHistory(lastMessage);
-	}
-
 	if (!options.scheduled && showSlowmodeError()) {
 		return;
 	}

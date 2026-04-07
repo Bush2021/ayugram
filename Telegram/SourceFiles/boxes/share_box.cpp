@@ -64,8 +64,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 
 // AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/forward/ayu_forward.h"
 
 
@@ -1878,12 +1876,6 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			const auto requestDone = [=](
 					const MTPUpdates &updates,
 					mtpRequestId requestKey) {
-				const auto &ghost = AyuSettings::ghost(&history->owner().session());
-				if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && history->lastMessage())
-				{
-					readHistory(history->lastMessage());
-				}
-
 				if (showRecentForwardsToSelf) {
 					ApiWrap::ProcessRecentSelfForwards(
 						&threadHistory->session(),

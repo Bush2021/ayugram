@@ -2164,12 +2164,6 @@ void HistoryWidget::fileChosen(ChatHelpers::FileChosen &&data) {
 			Data::InsertCustomEmoji(_field.data(), data.document);
 		}
 	} else if (_history) {
-		const auto &ghost = AyuSettings::ghost(&controller()->session());
-		if (!ghost.sendReadMessages() && ghost.markReadAfterAction()) {
-			if (const auto lastMessage = history()->lastMessage()) {
-				readHistory(lastMessage);
-			}
-		}
 		controller()->sendingAnimation().appendSending(
 			data.messageSendingFrom);
 		const auto localId = data.messageSendingFrom.localId;
@@ -5089,13 +5083,6 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 }
 
 void HistoryWidget::send(Api::SendOptions options) {
-	const auto &ghost = AyuSettings::ghost(&controller()->session());
-
-	auto lastMessage = _history->lastMessage();
-	if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && lastMessage) {
-		readHistory(lastMessage);
-	}
-
 	if (!_history) {
 		return;
 	} else if (_editMsgId) {

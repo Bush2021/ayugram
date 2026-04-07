@@ -421,6 +421,16 @@ void readHistory(not_null<HistoryItem*> message) {
 	}
 }
 
+void markReadAfterAction(not_null<History*> history) {
+	const auto &ghost = AyuSettings::ghost(&history->session());
+	if (ghost.sendReadMessages() || !ghost.markReadAfterAction()) {
+		return;
+	}
+	if (const auto last = history->lastServerMessage()) {
+		readHistory(last);
+	}
+}
+
 QString formatTTL(int time, bool isDoc) {
 	if (time == 0x7FFFFFFF) {
 		return isDoc ? tr::ayu_OnePlayTTL(tr::now) : tr::ayu_OneViewTTL(tr::now);

@@ -1873,6 +1873,7 @@ void Reactions::sendPaidRequest(
 		return;
 	}
 
+	markReadAfterAction(item->history());
 	const auto id = item->fullId();
 	const auto randomId = base::unixtime::mtproto_msg_id();
 	auto &api = _owner->session().api();

@@ -3664,12 +3664,6 @@ void ApiWrap::forwardMessages(
 					shared->callback();
 				}
 
-				const auto &ghost = AyuSettings::ghost(_session);
-				if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && history->lastMessage())
-				{
-					readHistory(history->lastMessage());
-				}
-
 				if (peer->isSelf() && _session->premium()) {
 					ProcessRecentSelfForwards(
 						_session,
@@ -4046,6 +4040,7 @@ void ApiWrap::cancelLocalItem(not_null<HistoryItem*> item) {
 void ApiWrap::sendShortcutMessages(
 		not_null<PeerData*> peer,
 		BusinessShortcutId id) {
+	markReadAfterAction(peer->owner().history(peer));
 	auto ids = QVector<MTPint>();
 	auto randomIds = QVector<MTPlong>();
 	request(MTPmessages_SendQuickReplyMessages(
