@@ -292,7 +292,6 @@ public:
 	[[nodiscard]] bool showEmojiButtonInMessageField() const { return _showEmojiButtonInMessageField.current(); }
 	[[nodiscard]] bool showMicrophoneButtonInMessageField() const { return _showMicrophoneButtonInMessageField.current(); }
 	[[nodiscard]] bool showAutoDeleteButtonInMessageField() const { return _showAutoDeleteButtonInMessageField.current(); }
-	[[nodiscard]] bool showCocoonAiButtonInMessageField() const { return _showCocoonAiButtonInMessageField.current(); }
 	[[nodiscard]] bool showAttachPopup() const { return _showAttachPopup.current(); }
 	[[nodiscard]] bool showEmojiPopup() const { return _showEmojiPopup.current(); }
 	[[nodiscard]] bool showMyProfileInDrawer() const { return _showMyProfileInDrawer.current(); }
@@ -375,7 +374,6 @@ public:
 	void setShowEmojiButtonInMessageField(bool val);
 	void setShowMicrophoneButtonInMessageField(bool val);
 	void setShowAutoDeleteButtonInMessageField(bool val);
-	void setShowCocoonAiButtonInMessageField(bool val);
 	void setShowAttachPopup(bool val);
 	void setShowEmojiPopup(bool val);
 	void setShowMyProfileInDrawer(bool val);
@@ -506,8 +504,6 @@ public:
 	[[nodiscard]] rpl::producer<bool> showMicrophoneButtonInMessageFieldChanges() const { return _showMicrophoneButtonInMessageField.changes(); }
 	[[nodiscard]] rpl::producer<bool> showAutoDeleteButtonInMessageFieldValue() const { return _showAutoDeleteButtonInMessageField.value(); }
 	[[nodiscard]] rpl::producer<bool> showAutoDeleteButtonInMessageFieldChanges() const { return _showAutoDeleteButtonInMessageField.changes(); }
-	[[nodiscard]] rpl::producer<bool> showCocoonAiButtonInMessageFieldValue() const { return _showCocoonAiButtonInMessageField.value(); }
-	[[nodiscard]] rpl::producer<bool> showCocoonAiButtonInMessageFieldChanges() const { return _showCocoonAiButtonInMessageField.changes(); }
 	[[nodiscard]] rpl::producer<bool> showAttachPopupValue() const { return _showAttachPopup.value(); }
 	[[nodiscard]] rpl::producer<bool> showAttachPopupChanges() const { return _showAttachPopup.changes(); }
 	[[nodiscard]] rpl::producer<bool> showEmojiPopupValue() const { return _showEmojiPopup.value(); }
@@ -633,7 +629,6 @@ private:
 	rpl::variable<bool> _showEmojiButtonInMessageField = true;
 	rpl::variable<bool> _showMicrophoneButtonInMessageField = true;
 	rpl::variable<bool> _showAutoDeleteButtonInMessageField = true;
-	rpl::variable<bool> _showCocoonAiButtonInMessageField = true;
 	rpl::variable<bool> _showAttachPopup = true;
 	rpl::variable<bool> _showEmojiPopup = true;
 	rpl::variable<bool> _showMyProfileInDrawer = true;

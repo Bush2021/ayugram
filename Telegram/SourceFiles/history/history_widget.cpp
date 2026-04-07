@@ -832,7 +832,6 @@ HistoryWidget::HistoryWidget(
 		AyuSettings::getInstance().showEmojiButtonInMessageFieldChanges() | rpl::to_empty,
 		AyuSettings::getInstance().showMicrophoneButtonInMessageFieldChanges() | rpl::to_empty,
 		AyuSettings::getInstance().showAutoDeleteButtonInMessageFieldChanges() | rpl::to_empty,
-		AyuSettings::getInstance().showCocoonAiButtonInMessageFieldChanges() | rpl::to_empty,
 		AyuSettings::getInstance().showAttachPopupChanges() | rpl::to_empty,
 		AyuSettings::getInstance().showEmojiPopupChanges() | rpl::to_empty,
 		AyuSettings::getInstance().channelBottomButtonChanges() | rpl::to_empty,
@@ -6442,7 +6441,6 @@ bool HistoryWidget::fieldOrDisabledShown() const {
 bool HistoryWidget::hasEnoughLinesForAi() const {
 	if (!_history
 		|| _voiceRecordBar->isActive()
-		|| !AyuSettings::getInstance().showCocoonAiButtonInMessageField()
 		|| session().appConfig().aiComposeStyles().empty()) {
 		return false;
 	}
