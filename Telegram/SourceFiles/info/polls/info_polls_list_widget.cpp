@@ -270,8 +270,6 @@ void ListWidget::Inner::setupHistory() {
 		_scroll.get(),
 		tr::lng_polls_create_title(),
 		st::defaultActiveButton);
-	_newPollButton->setTextTransform(
-		Ui::RoundButton::TextTransform::NoTransform);
 	_newPollButton->setFullRadius(true);
 	_newPollButton->setClickedCallback([=] {
 		Window::PeerMenuCreatePoll(

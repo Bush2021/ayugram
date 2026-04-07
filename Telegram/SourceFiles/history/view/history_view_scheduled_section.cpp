@@ -1751,7 +1751,6 @@ bool ShowScheduledVideoPublished(
 		widget.get(),
 		rpl::single(view),
 		st::processingVideoView);
-	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	button->show();
 	rpl::combine(
 		widget->sizeValue(),
