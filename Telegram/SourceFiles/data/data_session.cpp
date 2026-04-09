@@ -2117,14 +2117,6 @@ void Session::requestItemTextRefresh(not_null<HistoryItem*> item) {
 	}
 }
 
-void Session::requestItemTextRefreshStreaming(
-		not_null<HistoryItem*> item) {
-	enumerateItemViews(item, [&](not_null<ViewElement*> view) {
-		view->itemTextUpdatedStreaming();
-	});
-	requestItemResize(item);
-}
-
 void Session::registerRestricted(
 		not_null<const HistoryItem*> item,
 		const QString &reason) {

@@ -2672,12 +2672,6 @@ void Element::itemTextUpdated() {
 	}
 }
 
-void Element::itemTextUpdatedStreaming() {
-	clearSpecialOnlyEmoji();
-	_text = Ui::Text::String(st::msgMinWidth);
-	invalidateTextSizeCache();
-}
-
 void Element::blockquoteExpandChanged() {
 	invalidateTextSizeCache();
 	history()->owner().requestViewResize(this);
