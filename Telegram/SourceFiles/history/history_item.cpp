@@ -444,6 +444,12 @@ HistoryItem::HistoryItem(
 		_flags |= MessageFlag::Legacy;
 		createComponents(data);
 		setText(UnsupportedMessageText());
+		if (!Has<HistoryMessageReplyMarkup>()) {
+			AddComponents(HistoryMessageReplyMarkup::Bit());
+		}
+		_flags |= MessageFlag::HasReplyMarkup;
+		Get<HistoryMessageReplyMarkup>()->updateData(
+			UnsupportedMessageMarkup());
 	} else if (checked == MediaCheckResult::Empty) {
 		AddComponents(HistoryServiceData::Bit());
 		setServiceText({
@@ -2188,6 +2194,9 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 		setText(std::move(updatedText));
 		addToSharedMediaIndex();
 	}
+	if (mediaCheck == MediaCheckResult::Unsupported) {
+		setReplyMarkup(UnsupportedMessageMarkup());
+	}
 	if (!edition.useSameReplies) {
 		if (!edition.replies.isNull) {
 			if (checkRepliesPts(edition.replies)) {
@@ -2443,6 +2452,7 @@ void HistoryItem::updateSentContent(
 		_flags &= ~MessageFlag::HasPostAuthor;
 		_flags |= MessageFlag::Legacy;
 		setText(UnsupportedMessageText());
+		setReplyMarkup(UnsupportedMessageMarkup());
 	} else {
 		if (_flags & MessageFlag::Legacy) {
 			_flags &= ~MessageFlag::Legacy;
