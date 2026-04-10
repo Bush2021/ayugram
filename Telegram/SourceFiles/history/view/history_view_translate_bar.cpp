@@ -495,8 +495,8 @@ void TranslateBar::showMenu(base::unique_qptr<Ui::PopupMenu> menu) {
 		_menu->addSeparator();
 		const auto cocoon = ChatHelpers::GenerateLocalTgsSticker(
 			&_history->session(),
-			u"cocoon"_q);
-		cocoon->overrideEmojiUsesTextColor(true);
+			u"cocoon"_q,
+		true);
 		auto item = base::make_unique_q<Ui::Menu::MultilineAction>(
 			_menu->menu(),
 			st::defaultMenu,

@@ -345,8 +345,11 @@ public:
 	[[nodiscard]] bool canBeSummarized() const {
 		return _flags & MessageFlag::CanBeSummarized;
 	}
-	[[nodiscard]] bool isTextAppearing() const {
+	[[nodiscard]] bool textAppearing() const {
 		return _flags & MessageFlag::TextAppearing;
+	}
+	[[nodiscard]] bool textAppearingStarted() const {
+		return _flags & MessageFlag::TextAppearingStarted;
 	}
 	[[nodiscard]] bool hasRealFromId() const;
 	[[nodiscard]] bool isPostHidingAuthor() const;
@@ -449,6 +452,7 @@ public:
 	void applyTTL(TimeId destroyAt);
 	void setAyuHint(const QString &hint);
 	void setRealId(MsgId newId);
+	void markTextAppearingStarted();
 	void incrementReplyToTopCounter();
 	void applyEffectWatchedOnUnreadKnown();
 
