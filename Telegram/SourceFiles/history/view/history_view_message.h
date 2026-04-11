@@ -398,6 +398,8 @@ private:
 	void textAppearStartHeightAnimation(not_null<TextAppearing*> appearing);
 	void textAppearWidthCallback();
 	void textAppearHeightCallback();
+	[[nodiscard]] int textAppearTargetHeight(
+		not_null<TextAppearing*> appearing) const;
 
 	void refreshRightBadge();
 	[[nodiscard]] int rightBadgeWidth() const;
