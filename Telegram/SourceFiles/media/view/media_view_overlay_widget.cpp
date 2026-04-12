@@ -1976,6 +1976,7 @@ void OverlayWidget::fillContextMenuActions(
 		const auto media = _message ? _message->media() : nullptr;
 		const auto poll = media ? media->poll() : nullptr;
 		if (poll
+			&& poll->voted()
 			&& !poll->closed()
 			&& !poll->quiz()
 			&& !poll->revotingDisabled()) {

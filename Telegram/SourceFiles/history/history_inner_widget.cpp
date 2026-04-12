@@ -3504,6 +3504,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				&session->data(),
 				pollItemId,
 				pollOptionLink,
+				_controller,
 				[=] {
 					_widget->replyToMessage({
 						.messageId = pollItemId,

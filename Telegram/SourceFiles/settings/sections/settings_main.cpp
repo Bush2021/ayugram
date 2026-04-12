@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_instance.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
+#include "menu/menu_checked_action.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
 #include "main/main_domain.h"
@@ -113,7 +114,9 @@ public:
 private:
 	void setupChildGeometry();
 	void initViewers();
+	void updatePhoneText();
 	void refreshNameGeometry(int newWidth);
+	void refreshPhoneGeometry(int newWidth);
 	void refreshIdGeometry(int newWidth);
 	void refreshUsernameGeometry(int newWidth);
 	void refreshQrButtonGeometry(int newWidth);
@@ -126,6 +129,8 @@ private:
 
 	object_ptr<Ui::UserpicButton> _userpic;
 	object_ptr<Ui::FlatLabel> _name = { nullptr };
+	object_ptr<Ui::FlatLabel> _phone = { nullptr };
+	QString _phoneText;
 	object_ptr<Ui::FlatLabel> _id = { nullptr };
 	object_ptr<Ui::FlatLabel> _username = { nullptr };
 	object_ptr<Ui::IconButton> _qrButton = { nullptr };
@@ -140,7 +145,8 @@ Cover::Cover(
 	parent,
 	st::settingsPhotoTop
 		+ st::infoProfileCover.photo.size.height()
-		+ st::settingsPhotoBottom)
+		+ st::settingsPhotoBottom
+		+ (st::settingsUsernameTop - st::settingsPhoneTop))
 , _controller(controller)
 , _user(user)
 , _badge(
@@ -175,27 +181,60 @@ Cover::Cover(
 	Ui::UserpicButton::Source::PeerPhoto,
 	st::infoProfileCover.photo)
 , _name(this, st::infoProfileCover.name)
-, _id(this, st::defaultFlatLabel)
+, _phone(this, st::defaultFlatLabel, st::popupMenuWithIcons)
+, _id(this, st::defaultFlatLabel, st::popupMenuWithIcons)
 , _username(this, st::infoProfileMegagroupCover.status) {
 	_user->updateFull();
 
 	_name->setSelectable(true);
 	_name->setContextCopyText(tr::lng_profile_copy_fullname(tr::now));
 
+	_phone->setSelectable(true);
+	_phone->setContextCopyText(tr::lng_profile_copy_phone(tr::now));
+	_phone->setContextMenuHook([=](Ui::FlatLabel::ContextMenuRequest request) {
+		if (request.selection.empty()) {
+			const auto callback = [=] {
+				auto phone = _phoneText;
+				phone.replace(' ', QString()).replace('-', QString());
+				TextUtilities::SetClipboardText({ phone });
+			};
+			request.menu->addAction(
+				tr::lng_profile_copy_phone(tr::now),
+				callback,
+				&st::menuIconCopy);
+		} else {
+			_phone->fillContextMenu(request);
+		}
+		const auto hidden = _user->session().settings().phoneNumberHidden();
+		const auto toggle = [=] {
+			_user->session().settings().setPhoneNumberHidden(
+				!_user->session().settings().phoneNumberHidden());
+			_user->session().saveSettingsDelayed();
+			updatePhoneText();
+		};
+		Menu::AddCheckedAction(
+			request.menu,
+			tr::lng_context_spoiler_effect(tr::now),
+			toggle,
+			&st::menuIconSpoiler,
+			hidden);
+	});
+
 	_id->setSelectable(true);
 	_id->setContextCopyText(tr::ayu_ContextCopyID(tr::now));
-	const auto hook = [=](Ui::FlatLabel::ContextMenuRequest request) {
+	_id->setContextMenuHook([=](Ui::FlatLabel::ContextMenuRequest request) {
 		if (request.selection.empty()) {
-			const auto c = [=] {
-				auto id = IDString(_user);
-				TextUtilities::SetClipboardText({ id });
+			const auto callback = [=] {
+				TextUtilities::SetClipboardText({ IDString(_user) });
 			};
-			request.menu->addAction(tr::ayu_ContextCopyID(tr::now), c);
+			request.menu->addAction(
+				tr::ayu_ContextCopyID(tr::now),
+				callback,
+				&st::menuIconCopy);
 		} else {
 			_id->fillContextMenu(request);
 		}
-	};
-	_id->setContextMenuHook(hook);
+	});
 
 	initViewers();
 	setupChildGeometry();
@@ -261,6 +300,7 @@ void Cover::setupChildGeometry() {
 			st::settingsPhotoTop,
 			newWidth);
 		refreshNameGeometry(newWidth);
+		refreshPhoneGeometry(newWidth);
 		refreshIdGeometry(newWidth);
 		refreshUsernameGeometry(newWidth);
 		refreshQrButtonGeometry(newWidth);
@@ -273,6 +313,13 @@ void Cover::initViewers() {
 	) | rpl::on_next([=](const QString &name) {
 		_name->setText(name);
 		refreshNameGeometry(width());
+	}, lifetime());
+
+	Info::Profile::PhoneValue(
+		_user
+	) | rpl::on_next([=](const TextWithEntities &value) {
+		_phoneText = value.text;
+		updatePhoneText();
 	}, lifetime());
 
 	rpl::single(
@@ -335,9 +382,29 @@ void Cover::refreshNameGeometry(int newWidth) {
 	_exteraBadge.move(exteraBadgeLeft, badgeTop, badgeBottom);
 }
 
+void Cover::updatePhoneText() {
+	if (_user->session().settings().phoneNumberHidden()) {
+		_phone->setMarkedText(
+			Ui::Text::Wrapped({ _phoneText }, EntityType::Spoiler));
+	} else {
+		_phone->setText(_phoneText);
+	}
+	refreshPhoneGeometry(width());
+}
+
+void Cover::refreshPhoneGeometry(int newWidth) {
+	const auto phoneLeft = st::settingsPhoneLeft;
+	const auto phoneTop = st::settingsPhoneTop;
+	const auto phoneWidth = newWidth
+		- phoneLeft
+		- st::infoProfileCover.rightSkip;
+	_phone->resizeToWidth(phoneWidth);
+	_phone->moveToLeft(phoneLeft, phoneTop, newWidth);
+}
+
 void Cover::refreshIdGeometry(int newWidth) {
 	const auto idLeft = st::settingsPhoneLeft;
-	const auto idTop = st::settingsPhoneTop;
+	const auto idTop = st::settingsUsernameTop;
 	const auto idWidth = newWidth
 		- idLeft
 		- st::infoProfileCover.rightSkip;
@@ -347,7 +414,8 @@ void Cover::refreshIdGeometry(int newWidth) {
 
 void Cover::refreshUsernameGeometry(int newWidth) {
 	const auto usernameLeft = st::settingsUsernameLeft;
-	const auto usernameTop = st::settingsUsernameTop;
+	const auto usernameTop = st::settingsUsernameTop
+		+ (st::settingsUsernameTop - st::settingsPhoneTop);
 	const auto usernameRight = st::infoProfileCover.rightSkip;
 	const auto usernameWidth = newWidth - usernameLeft - usernameRight;
 	_username->resizeToWidth(usernameWidth);
