@@ -5068,9 +5068,8 @@ QRect Message::countGeometry() const {
 	const auto centeredView = item->isFakeAboutView()
 		|| isCommentsRootView();
 	const auto media = this->media();
-	const auto mediaWidth = (media && media->isDisplayed())
-		? media->width()
-		: width();
+	const auto mediaDisplayed = media && media->isDisplayed();
+	const auto mediaWidth = mediaDisplayed ? media->width() : width();
 	const auto outbg = hasOutLayout();
 	const auto useMoreSpace = (delegate()->elementChatMode()
 		== ElementChatMode::Narrow);
@@ -5100,7 +5099,7 @@ QRect Message::countGeometry() const {
 		} else {
 			contentWidth = mediaWidth;
 		}
-	} else {
+	} else if (!mediaDisplayed) {
 		const auto appearing = Get<TextAppearing>();
 		const auto use = (appearing && appearing->use)
 			? appearing->shownWidth

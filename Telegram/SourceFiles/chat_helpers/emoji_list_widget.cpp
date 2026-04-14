@@ -68,8 +68,10 @@ namespace {
 constexpr auto kCollapsedRows = 3;
 constexpr auto kAppearDuration = 0.3;
 constexpr auto kCustomSearchLimit = 256;
+constexpr auto kCloudSearchPageLimit = 50;
 constexpr auto kColorPickerDelay = crl::time(500);
 constexpr auto kSearchRequestDelay = 400;
+constexpr auto kPreloadSearchPages = 4;
 
 using Core::RecentEmojiId;
 using Core::RecentEmojiDocument;
@@ -711,13 +713,13 @@ void EmojiListWidget::applyNextSearchQuery() {
 			_api.request(requestId).cancel();
 		}
 		_searchNextRequestQuery = _searchQueryText;
-		const auto cloudCached = _searchCloudCache.find(_searchQueryText)
+		_searchRequestQuery = _searchQueryText;
+		const auto cloudCached = _searchCloudCache.find(_searchRequestQuery)
 			!= _searchCloudCache.cend();
-		const auto setsCached = _searchSetsCache.find(_searchQueryText)
+		const auto setsCached = _searchSetsCache.find(_searchRequestQuery)
 			!= _searchSetsCache.cend();
 		if (cloudCached || setsCached) {
 			_searchRequestTimer.cancel();
-			_searchRequestQuery = _searchQueryText;
 			fillCloudSearchResults();
 			fillCloudSearchSets();
 			if (!cloudCached || !setsCached) {
@@ -891,70 +893,72 @@ void EmojiListWidget::toggleSearchLoading(bool loading) {
 }
 
 void EmojiListWidget::sendSearchRequest() {
-	_searchRequestQuery = _searchQueryText;
+	_searchRequestQuery = _searchNextRequestQuery;
 	if (_searchRequestQuery.isEmpty()) {
 		return;
 	}
+	const auto query = _searchRequestQuery;
 
 	const auto cloudCached = _searchCloudCache.find(
-		_searchRequestQuery) != _searchCloudCache.cend();
+		query) != _searchCloudCache.cend();
 	const auto setsCached = _searchSetsCache.find(
-		_searchRequestQuery) != _searchSetsCache.cend();
+		query) != _searchSetsCache.cend();
 	if (cloudCached && setsCached) {
 		toggleSearchLoading(false);
 		return;
 	}
 	toggleSearchLoading(true);
 
-	const auto hash = uint64(0);
 	if (!cloudCached) {
-		auto langCodes = QVector<MTPstring>();
-		const auto method = QGuiApplication::inputMethod();
-		if (method) {
-			for (const auto &lang : method->locale().uiLanguages()) {
-				langCodes.push_back(MTP_string(lang));
-			}
-		}
-		using Flag = MTPmessages_SearchStickers::Flag;
-		_searchCloudRequestId = _api.request(MTPmessages_SearchStickers(
-			MTP_flags(Flag::f_emojis),
-			MTP_string(_searchRequestQuery),
-			MTP_string(_searchEmoticon),
-			MTP_vector<MTPstring>(langCodes),
-			MTP_int(0),
-			MTP_int(50),
-			MTP_long(hash)
-		)).done([=](const MTPmessages_FoundStickers &result) {
-			searchCloudResultsDone(result);
-		}).fail([=] {
-			_searchCloudRequestId = 0;
-			_searchCloudCache.emplace(
-				_searchRequestQuery,
-				std::vector<DocumentId>());
-			if (!_searchSetsRequestId) {
-				toggleSearchLoading(false);
-				showSearchResults();
-			}
-		}).handleAllErrors().send();
+		requestSearchCloud(query, 0, true);
 	}
 	if (!setsCached) {
-		sendSearchSetsRequest();
+		sendSearchSetsRequest(query);
 	}
 }
 
-void EmojiListWidget::sendSearchSetsRequest() {
+void EmojiListWidget::sendSearchSetsRequest(const QString &query) {
 	const auto hash = uint64(0);
 	_searchSetsRequestId = _api.request(
 		MTPmessages_SearchEmojiStickerSets(
 			MTP_flags(0),
-			MTP_string(_searchRequestQuery),
+			MTP_string(query),
 			MTP_long(hash))
 	).done([=](const MTPmessages_FoundStickerSets &result) {
-		searchSetsResultsDone(result);
+		searchSetsResultsDone(query, result);
 	}).fail([=] {
 		_searchSetsRequestId = 0;
-		if (!_searchCloudRequestId) {
+		if ((_searchRequestQuery == query) && !_searchCloudRequestId) {
 			toggleSearchLoading(false);
+		}
+	}).handleAllErrors().send();
+}
+
+void EmojiListWidget::requestSearchCloud(
+		const QString &query,
+		int offset,
+		bool fallbackToEmpty) {
+	using Flag = MTPmessages_SearchStickers::Flag;
+	const auto hash = uint64(0);
+	_searchCloudRequestId = _api.request(MTPmessages_SearchStickers(
+		MTP_flags(Flag::f_emojis),
+		MTP_string(query),
+		MTP_string(_searchEmoticon),
+		MTP_vector<MTPstring>(SearchStickersLangCodes()),
+		MTP_int(offset),
+		MTP_int(kCloudSearchPageLimit),
+		MTP_long(hash)
+	)).done([=](const MTPmessages_FoundStickers &result) {
+		searchCloudResultsDone(query, offset, result);
+	}).fail([=] {
+		_searchCloudRequestId = 0;
+		if (!fallbackToEmpty) {
+			return;
+		}
+		_searchCloudCache.emplace(query, std::vector<DocumentId>());
+		if ((_searchRequestQuery == query) && !_searchSetsRequestId) {
+			toggleSearchLoading(false);
+			showSearchResults();
 		}
 	}).handleAllErrors().send();
 }
@@ -971,21 +975,48 @@ void EmojiListWidget::cancelSearchRequest() {
 	_searchRequestQuery = QString();
 	_searchNextRequestQuery = QString();
 	_searchCloudCache.clear();
+	_searchCloudNextOffset.clear();
 	_searchSetsCache.clear();
 	_searchSets.clear();
 }
 
 void EmojiListWidget::searchCloudResultsDone(
+		const QString &query,
+		int requestedOffset,
 		const MTPmessages_FoundStickers &result) {
 	_searchCloudRequestId = 0;
+	const auto active = (_searchRequestQuery == query);
 
-	result.match([&](const MTPDmessages_foundStickersNotModified &) {
+	result.match([&](const MTPDmessages_foundStickersNotModified &data) {
 		LOG(("API: messages.foundStickersNotModified."));
-	}, [&](const MTPDmessages_foundStickers &data) {
-		auto it = _searchCloudCache.find(_searchRequestQuery);
+		auto it = _searchCloudCache.find(query);
 		if (it == _searchCloudCache.cend()) {
 			it = _searchCloudCache.emplace(
-				_searchRequestQuery,
+				query,
+				std::vector<DocumentId>()).first;
+		}
+		if (const auto next = data.vnext_offset()) {
+			if (next->v > requestedOffset) {
+				_searchCloudNextOffset[query] = next->v;
+			} else {
+				_searchCloudNextOffset.erase(query);
+			}
+		} else {
+			_searchCloudNextOffset.erase(query);
+		}
+		if (!active) {
+			return;
+		}
+		if (!_searchSetsRequestId) {
+			toggleSearchLoading(false);
+		}
+		showSearchResults();
+		checkPaginateSearchCloud(getVisibleTop(), getVisibleBottom());
+	}, [&](const MTPDmessages_foundStickers &data) {
+		auto it = _searchCloudCache.find(query);
+		if (it == _searchCloudCache.cend()) {
+			it = _searchCloudCache.emplace(
+				query,
 				std::vector<DocumentId>()).first;
 		}
 
@@ -996,17 +1027,67 @@ void EmojiListWidget::searchCloudResultsDone(
 			}
 		}
 
+		if (const auto next = data.vnext_offset()) {
+			if (next->v > requestedOffset) {
+				_searchCloudNextOffset[query] = next->v;
+			} else {
+				_searchCloudNextOffset.erase(query);
+			}
+		} else {
+			_searchCloudNextOffset.erase(query);
+		}
+
+		if (!active) {
+			return;
+		}
+
 		if (!_searchSetsRequestId) {
 			toggleSearchLoading(false);
 		}
 		showSearchResults();
+		checkPaginateSearchCloud(
+			getVisibleTop(),
+			getVisibleBottom());
 	});
 }
 
+void EmojiListWidget::loadMoreSearchCloud() {
+	if (_searchCloudRequestId
+		|| _searchRequestQuery.isEmpty()
+		|| (_searchRequestQuery != _searchNextRequestQuery)) {
+		return;
+	}
+	const auto query = _searchRequestQuery;
+	const auto offsetIt = _searchCloudNextOffset.find(query);
+	if (offsetIt == _searchCloudNextOffset.end()) {
+		return;
+	}
+	requestSearchCloud(query, offsetIt->second, false);
+}
+
+void EmojiListWidget::checkPaginateSearchCloud(
+		int visibleTop,
+		int visibleBottom) {
+	if (!_searchMode
+		|| _searchRequestQuery.isEmpty()
+		|| (_searchRequestQuery != _searchNextRequestQuery)
+		|| _searchCloudRequestId) {
+		return;
+	}
+	const auto visibleHeight = visibleBottom - visibleTop;
+	if (visibleHeight <= 0) {
+		return;
+	}
+	if (visibleBottom > height() - visibleHeight * kPreloadSearchPages) {
+		loadMoreSearchCloud();
+	}
+}
+
 void EmojiListWidget::searchSetsResultsDone(
+		const QString &query,
 		const MTPmessages_FoundStickerSets &result) {
 	_searchSetsRequestId = 0;
-	if (!_searchCloudRequestId) {
+	if ((_searchRequestQuery == query) && !_searchCloudRequestId) {
 		toggleSearchLoading(false);
 	}
 
@@ -1014,10 +1095,10 @@ void EmojiListWidget::searchSetsResultsDone(
 		LOG(("API Error: "
 			"messages.foundStickerSetsNotModified not expected."));
 	}, [&](const MTPDmessages_foundStickerSets &data) {
-		auto it = _searchSetsCache.find(_searchRequestQuery);
+		auto it = _searchSetsCache.find(query);
 		if (it == _searchSetsCache.cend()) {
 			it = _searchSetsCache.emplace(
-				_searchRequestQuery,
+				query,
 				std::vector<uint64>()).first;
 		}
 		for (const auto &setData : data.vsets().v) {
@@ -1028,7 +1109,9 @@ void EmojiListWidget::searchSetsResultsDone(
 			}
 			it->second.push_back(set->id);
 		}
-		showSearchResults();
+		if (_searchRequestQuery == query) {
+			showSearchResults();
+		}
 	});
 }
 
@@ -1070,9 +1153,6 @@ void EmojiListWidget::fillCloudSearchResults() {
 	}
 	const auto test = session().isTestMode();
 	for (const auto id : it->second) {
-		if (_searchResults.size() >= kCustomSearchLimit) {
-			break;
-		}
 		if (!_searchCustomIds.emplace(id).second) {
 			continue;
 		}
@@ -1268,6 +1348,7 @@ void EmojiListWidget::visibleTopBottomUpdated(
 			ValidateIconAnimations::Full);
 	}
 	unloadNotSeenCustom(visibleTop, visibleBottom);
+	checkPaginateSearchCloud(visibleTop, visibleBottom);
 }
 
 void EmojiListWidget::unloadNotSeenCustom(
