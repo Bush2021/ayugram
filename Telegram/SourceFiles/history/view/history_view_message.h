@@ -97,6 +97,7 @@ struct TextAppearing : RuntimeComponent<TextAppearing, Element> {
 	Ui::Animations::Simple widthAnimation;
 	Ui::Animations::Simple heightAnimation;
 	bool geometryValid = false;
+	bool startedForText = false;
 	bool finalizing = false;
 	bool use = false;
 	mutable QImage lineCache;
