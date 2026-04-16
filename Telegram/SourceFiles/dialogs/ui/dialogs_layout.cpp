@@ -31,7 +31,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/view/history_view_send_action.h"
-#include "lang/lang_instance.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "main/main_session.h"
@@ -91,8 +90,11 @@ void PaintRowTopRight(
 		QPainter &p,
 		const QString &text,
 		QRect &rectForName,
-		const PaintContext &context) {
-	const auto width = st::dialogsDateFont->width(text);
+		const PaintContext &context,
+		int precomputedWidth = -1) {
+	const auto width = (precomputedWidth >= 0)
+		? precomputedWidth
+		: st::dialogsDateFont->width(text);
 	rectForName.setWidth(rectForName.width() - width - st::dialogsDateSkip);
 	p.setFont(st::dialogsDateFont);
 	p.setPen(context.active
@@ -384,6 +386,19 @@ enum class Flag {
 };
 inline constexpr bool is_flag_type(Flag) { return true; }
 
+void PaintDialogDate(
+		QPainter &p,
+		not_null<const Entry*> entry,
+		const FakeRow *fakeRow,
+		TimeId date,
+		QRect &rectForName,
+		const PaintContext &context) {
+	const auto resolved = fakeRow
+		? fakeRow->dateText(date, context.now)
+		: entry->chatListTimestampText(date, context.now);
+	PaintRowTopRight(p, resolved.text, rectForName, context, resolved.width);
+}
+
 template <typename PaintItemCallback>
 void PaintRow(
 		Painter &p,
@@ -398,8 +413,9 @@ void PaintRow(
 		const HiddenSenderInfo *hiddenSenderInfo,
 		HistoryItem *item,
 		const Data::Draft *draft,
-		QDateTime date,
+		TimeId date,
 		const PaintContext &context,
+		const FakeRow *fakeRow,
 		BadgesState badgesState,
 		base::flags<Flag> flags,
 		PaintItemCallback &&paintItemCallback) {
@@ -593,8 +609,7 @@ void PaintRow(
 		|| (supportMode
 			&& entry->session().supportHelper().isOccupiedBySomeone(history))) {
 		if (!promoted) {
-			const auto dateString = Ui::FormatDialogsDate(date);
-			PaintRowTopRight(p, dateString, rectForName, context);
+			PaintDialogDate(p, entry, fakeRow, date, rectForName, context);
 		}
 
 		auto availableWidth = namewidth;
@@ -725,8 +740,7 @@ void PaintRow(
 		}
 	} else if (!item->isEmpty()) {
 		if ((thread || sublist) && !promoted) {
-			const auto dateString = Ui::FormatDialogsDate(date);
-			PaintRowTopRight(p, dateString, rectForName, context);
+			PaintDialogDate(p, entry, fakeRow, date, rectForName, context);
 		}
 
 		paintItemCallback(nameleft, namewidth);
@@ -1073,18 +1087,10 @@ void RowPainter::Paint(
 		}
 		return nullptr;
 	}();
-	const auto displayDate = [&] {
-		if (item) {
-			if (cloudDraft) {
-				return (item->date() > cloudDraft->date)
-					? ItemDateTime(item)
-					: base::unixtime::parse(cloudDraft->date);
-			}
-			return ItemDateTime(item);
-		}
-		return cloudDraft
-			? base::unixtime::parse(cloudDraft->date)
-			: QDateTime();
+	const auto displayDate = [&]() -> TimeId {
+		const auto itemDate = item ? item->date() : TimeId(0);
+		const auto draftDate = cloudDraft ? cloudDraft->date : TimeId(0);
+		return std::max(itemDate, draftDate);
 	}();
 	const auto displayPinnedIcon = badgesState.empty()
 		&& entry->isPinnedDialog(context.filter)
@@ -1184,6 +1190,7 @@ void RowPainter::Paint(
 		cloudDraft,
 		displayDate,
 		context,
+		nullptr,
 		badgesState,
 		flags,
 		paintItemCallback);
@@ -1293,8 +1300,9 @@ void RowPainter::Paint(
 		hiddenSenderInfo,
 		item,
 		cloudDraft,
-		ItemDateTime(item),
+		item->date(),
 		context,
+		row,
 		badgesState,
 		flags,
 		paintItemCallback);
