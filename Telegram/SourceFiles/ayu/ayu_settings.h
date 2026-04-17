@@ -43,6 +43,7 @@ enum class TranslationProvider {
 	Google = 1,
 	Yandex = 2,
 	Native = 3,
+	OpenAI = 4,
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(PeerIdDisplay, {
@@ -68,6 +69,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(TranslationProvider, {
 	{TranslationProvider::Google, "google"},
 	{TranslationProvider::Yandex, "yandex"},
 	{TranslationProvider::Native, "native"},
+	{TranslationProvider::OpenAI, "openai"},
 })
 
 class GhostModeAccountSettings {
@@ -216,6 +218,54 @@ private:
 void to_json(nlohmann::json &j, const MessageShotSettings &s);
 void from_json(const nlohmann::json &j, MessageShotSettings &s);
 
+class OpenAiTranslationSettings {
+public:
+	[[nodiscard]] static QString DefaultModel();
+	[[nodiscard]] static QString DefaultApiBaseOrEndpoint();
+	[[nodiscard]] static QString DefaultSystemPrompt();
+	[[nodiscard]] static QString DefaultPromptTemplate();
+
+	[[nodiscard]] const QString &model() const { return _model.current(); }
+	[[nodiscard]] const QString &apiBaseOrEndpoint() const { return _apiBaseOrEndpoint.current(); }
+	[[nodiscard]] const QString &apiKey() const { return _apiKey.current(); }
+	[[nodiscard]] const QString &systemPrompt() const { return _systemPrompt.current(); }
+	[[nodiscard]] const QString &promptTemplate() const { return _promptTemplate.current(); }
+
+	void setModel(const QString &val);
+	void setApiBaseOrEndpoint(const QString &val);
+	void setApiKey(const QString &val);
+	void setSystemPrompt(const QString &val);
+	void setPromptTemplate(const QString &val);
+	void apply(
+		const QString &model,
+		const QString &apiBaseOrEndpoint,
+		const QString &apiKey,
+		const QString &systemPrompt,
+		const QString &promptTemplate);
+
+	[[nodiscard]] rpl::producer<QString> modelValue() const { return _model.value(); }
+	[[nodiscard]] rpl::producer<QString> apiBaseOrEndpointValue() const { return _apiBaseOrEndpoint.value(); }
+	[[nodiscard]] rpl::producer<QString> apiKeyValue() const { return _apiKey.value(); }
+	[[nodiscard]] rpl::producer<QString> systemPromptValue() const { return _systemPrompt.value(); }
+	[[nodiscard]] rpl::producer<QString> promptTemplateValue() const { return _promptTemplate.value(); }
+
+	friend void to_json(nlohmann::json &j, const OpenAiTranslationSettings &s);
+	friend void from_json(const nlohmann::json &j, OpenAiTranslationSettings &s);
+
+private:
+	friend class AyuSettings;
+
+	rpl::variable<QString> _model = DefaultModel();
+	rpl::variable<QString> _apiBaseOrEndpoint = DefaultApiBaseOrEndpoint();
+	rpl::variable<QString> _apiKey;
+	rpl::variable<QString> _systemPrompt = DefaultSystemPrompt();
+	rpl::variable<QString> _promptTemplate = DefaultPromptTemplate();
+
+};
+
+void to_json(nlohmann::json &j, const OpenAiTranslationSettings &s);
+void from_json(const nlohmann::json &j, OpenAiTranslationSettings &s);
+
 class AyuSettings {
 public:
 	AyuSettings(const AyuSettings &) = delete;
@@ -238,6 +288,8 @@ public:
 
 	[[nodiscard]] MessageShotSettings &messageShotSettings() { return _messageShotSettings; }
 	[[nodiscard]] const MessageShotSettings &messageShotSettings() const { return _messageShotSettings; }
+	[[nodiscard]] OpenAiTranslationSettings &openAiTranslationSettings() { return _openAiTranslationSettings; }
+	[[nodiscard]] const OpenAiTranslationSettings &openAiTranslationSettings() const { return _openAiTranslationSettings; }
 
 	void addShadowBan(int64 id);
 	void removeShadowBan(int64 id);
@@ -679,6 +731,7 @@ private:
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
 
+	OpenAiTranslationSettings _openAiTranslationSettings;
 	MessageShotSettings _messageShotSettings;
 };
 

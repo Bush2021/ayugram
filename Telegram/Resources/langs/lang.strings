@@ -8001,6 +8001,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_HideReactionsInPrivateChats" = "Private Chats";
 "ayu_QuickAdminShortcuts" = "Quick Admin Shortcuts";
 "ayu_TranslationProvider" = "Translation Provider";
+"ayu_OpenAiTranslationSettings" = "OpenAI Settings";
+"ayu_OpenAiTranslationModel" = "Model";
+"ayu_OpenAiTranslationApiUrl" = "API URL";
+"ayu_OpenAiTranslationApiKey" = "API Key";
+"ayu_OpenAiTranslationSystemPrompt" = "System Prompt";
+"ayu_OpenAiTranslationPrompt" = "Prompt";
+"ayu_OpenAiTranslationAbout" = "Placeholders: to, message_count, messages_json. The default template is for chat message batches. API URL accepts a base URL or a full /v1/responses endpoint.";
 "ayu_LinksHeader" = "Links";
 "ayu_LinksChannel" = "Channel";
 "ayu_LinksChats" = "Chats";

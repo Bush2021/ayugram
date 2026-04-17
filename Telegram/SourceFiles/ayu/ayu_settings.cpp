@@ -37,6 +37,12 @@ void repaintApp() {
 	}
 }
 
+void resetTranslationCache() {
+	if (const auto manager = Ayu::Translator::TranslateManager::currentInstance()) {
+		manager->resetCache();
+	}
+}
+
 rpl::lifetime lifetime; // idk reactivity dies when placed in `GhostModeAccountSettings` as field
 
 } // namespace
@@ -317,6 +323,134 @@ void from_json(const nlohmann::json &j, MessageShotSettings &s) {
 	s._cloudThemeAccountId = j.value("cloudThemeAccountId", uint64(0));
 }
 
+QString OpenAiTranslationSettings::DefaultModel() {
+	return QStringLiteral("gpt-5.4-mini");
+}
+
+QString OpenAiTranslationSettings::DefaultApiBaseOrEndpoint() {
+	return QStringLiteral("https://api.openai.com");
+}
+
+QString OpenAiTranslationSettings::DefaultSystemPrompt() {
+	return QStringLiteral(
+		"You are a professional {to} native translator for in-app chat messages.\n\n"
+		"## Translation Rules\n"
+		"1. Translate each input message independently into {to}.\n"
+		"2. Output only the translation content required by the response schema.\n"
+		"3. Preserve message order and message count exactly.\n"
+		"4. Preserve line breaks, paragraph boundaries, emoji, mentions, hashtags, slash commands, usernames, URLs, placeholders, and HTML or Markdown fragments.\n"
+		"5. Keep code, identifiers, tags, bot commands, proper nouns, and already-correct target-language text unchanged when translating them would be harmful.\n"
+		"6. Do not add explanations, summaries, notes, labels, or extra wrappers.\n"
+		"7. Do not merge messages or split one message into multiple messages.");
+}
+
+QString OpenAiTranslationSettings::DefaultPromptTemplate() {
+	return QStringLiteral(
+		"Translate the following chat messages into {to}. Return one translation for each message in the same order.\n\n"
+		"Message count: {message_count}\n\n"
+		"Messages JSON:\n"
+		"{messages_json}");
+}
+
+void OpenAiTranslationSettings::setModel(const QString &val) {
+	apply(
+		val,
+		apiBaseOrEndpoint(),
+		apiKey(),
+		systemPrompt(),
+		promptTemplate());
+}
+
+void OpenAiTranslationSettings::setApiBaseOrEndpoint(const QString &val) {
+	apply(
+		model(),
+		val,
+		apiKey(),
+		systemPrompt(),
+		promptTemplate());
+}
+
+void OpenAiTranslationSettings::setApiKey(const QString &val) {
+	apply(
+		model(),
+		apiBaseOrEndpoint(),
+		val,
+		systemPrompt(),
+		promptTemplate());
+}
+
+void OpenAiTranslationSettings::setSystemPrompt(const QString &val) {
+	apply(
+		model(),
+		apiBaseOrEndpoint(),
+		apiKey(),
+		val,
+		promptTemplate());
+}
+
+void OpenAiTranslationSettings::setPromptTemplate(const QString &val) {
+	apply(
+		model(),
+		apiBaseOrEndpoint(),
+		apiKey(),
+		systemPrompt(),
+		val);
+}
+
+void OpenAiTranslationSettings::apply(
+		const QString &model,
+		const QString &apiBaseOrEndpoint,
+		const QString &apiKey,
+		const QString &systemPrompt,
+		const QString &promptTemplate) {
+	const auto normalizedModel = model.trimmed().isEmpty()
+		? DefaultModel()
+		: model.trimmed();
+	const auto normalizedApiBaseOrEndpoint = apiBaseOrEndpoint.trimmed().isEmpty()
+		? DefaultApiBaseOrEndpoint()
+		: apiBaseOrEndpoint.trimmed();
+	const auto normalizedApiKey = apiKey.trimmed();
+	const auto changed = (_model.current() != normalizedModel)
+		|| (_apiBaseOrEndpoint.current() != normalizedApiBaseOrEndpoint)
+		|| (_apiKey.current() != normalizedApiKey)
+		|| (_systemPrompt.current() != systemPrompt)
+		|| (_promptTemplate.current() != promptTemplate);
+	if (!changed) {
+		return;
+	}
+	_model = normalizedModel;
+	_apiBaseOrEndpoint = normalizedApiBaseOrEndpoint;
+	_apiKey = normalizedApiKey;
+	_systemPrompt = systemPrompt;
+	_promptTemplate = promptTemplate;
+	resetTranslationCache();
+	AyuSettings::save();
+}
+
+void to_json(nlohmann::json &j, const OpenAiTranslationSettings &s) {
+	j = nlohmann::json{
+		{"model", s._model.current()},
+		{"apiBaseOrEndpoint", s._apiBaseOrEndpoint.current()},
+		{"apiKey", s._apiKey.current()},
+		{"systemPrompt", s._systemPrompt.current()},
+		{"promptTemplate", s._promptTemplate.current()}
+	};
+}
+
+void from_json(const nlohmann::json &j, OpenAiTranslationSettings &s) {
+	s._model = j.value("model", OpenAiTranslationSettings::DefaultModel());
+	s._apiBaseOrEndpoint = j.value(
+		"apiBaseOrEndpoint",
+		OpenAiTranslationSettings::DefaultApiBaseOrEndpoint());
+	s._apiKey = j.value("apiKey", QString());
+	s._systemPrompt = j.value(
+		"systemPrompt",
+		OpenAiTranslationSettings::DefaultSystemPrompt());
+	s._promptTemplate = j.value(
+		"promptTemplate",
+		OpenAiTranslationSettings::DefaultPromptTemplate());
+}
+
 AyuSettings::AyuSettings()
 : _appIcon(AyuAssets::DEFAULT_ICON)
 , _editedMark(Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited")) {
@@ -471,10 +605,19 @@ void AyuSettings::validate() {
 	validateEnum(_showRepeatMessageInContextMenu, defaults._showRepeatMessageInContextMenu);
 	validateEnum(_showAddFilterInContextMenu, defaults._showAddFilterInContextMenu);
 
-	validateEnum(_translationProvider, defaults._translationProvider, 3);
+	validateEnum(_translationProvider, defaults._translationProvider, 4);
 	if ((_translationProvider.current() == TranslationProvider::Native)
 		&& !Platform::IsTranslateProviderAvailable()) {
 		_translationProvider = defaults._translationProvider.current();
+		modified = true;
+	}
+	if (_openAiTranslationSettings._model.current().trimmed().isEmpty()) {
+		_openAiTranslationSettings._model = OpenAiTranslationSettings::DefaultModel();
+		modified = true;
+	}
+	if (_openAiTranslationSettings._apiBaseOrEndpoint.current().trimmed().isEmpty()) {
+		_openAiTranslationSettings._apiBaseOrEndpoint
+			= OpenAiTranslationSettings::DefaultApiBaseOrEndpoint();
 		modified = true;
 	}
 
@@ -976,9 +1119,7 @@ void AyuSettings::setTranslationProvider(TranslationProvider val) {
 	}
 	if (_translationProvider.current() == val) return;
 	_translationProvider = val;
-	if (const auto manager = Ayu::Translator::TranslateManager::currentInstance()) {
-		manager->resetCache();
-	}
+	resetTranslationCache();
 	save();
 }
 
@@ -1101,6 +1242,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"gifConfirmation", s._gifConfirmation.current()},
 		{"voiceConfirmation", s._voiceConfirmation.current()},
 		{"translationProvider", s._translationProvider.current()},
+		{"openAiTranslationSettings", s._openAiTranslationSettings},
 		{"adaptiveCoverColor", s._adaptiveCoverColor.current()},
 		{"improveLinkPreviews", s._improveLinkPreviews.current()},
 		{"crashReporting", s._crashReporting.current()},
@@ -1201,6 +1343,9 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._gifConfirmation = j.value("gifConfirmation", defaults._gifConfirmation.current());
 	s._voiceConfirmation = j.value("voiceConfirmation", defaults._voiceConfirmation.current());
 	s._translationProvider = j.value("translationProvider", defaults._translationProvider.current());
+	if (j.contains("openAiTranslationSettings") && j["openAiTranslationSettings"].is_object()) {
+		j["openAiTranslationSettings"].get_to(s._openAiTranslationSettings);
+	}
 	s._adaptiveCoverColor = j.value("adaptiveCoverColor", defaults._adaptiveCoverColor.current());
 	s._improveLinkPreviews = j.value("improveLinkPreviews", defaults._improveLinkPreviews.current());
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
