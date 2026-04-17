@@ -237,6 +237,8 @@ set(ayugram_files
         ayu/features/translator/html_parser.h
         ayu/features/translator/implementations/google.cpp
         ayu/features/translator/implementations/google.h
+        ayu/features/translator/implementations/openai.cpp
+        ayu/features/translator/implementations/openai.h
         ayu/features/translator/implementations/yandex.cpp
         ayu/features/translator/implementations/yandex.h
         ayu/features/translator/implementations/base.cpp

@@ -70,17 +70,22 @@ public:
 				const MTPmessages_TranslatedText &result) {
 			const auto &list = result.data().vresult().v;
 			for (auto i = 0; i != requests.size(); ++i) {
+				if (i < list.size()) {
+					const auto parsed = Api::ParseTextWithEntities(
+						session,
+						list[i]);
+					doneOne(
+						i,
+						Ui::TranslateProviderResult{
+							.text = std::move(parsed),
+						});
+					continue;
+				}
 				doneOne(
 					i,
-					(i < list.size())
-						? Ui::TranslateProviderResult{
-							.text = Api::ParseTextWithEntities(
-								session,
-								list[i]),
-						}
-						: Ui::TranslateProviderResult{
-							.error = Ui::TranslateProviderError::Unknown,
-						});
+					Ui::TranslateProviderResult{
+						.error = Ui::TranslateProviderError::Unknown,
+					});
 			}
 			doneAll();
 		};
