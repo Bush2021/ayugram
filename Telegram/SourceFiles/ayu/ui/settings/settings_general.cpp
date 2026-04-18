@@ -33,6 +33,8 @@
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 
+#include <memory>
+
 namespace Settings {
 
 using namespace Builder;
@@ -67,21 +69,58 @@ void EditOpenAiTranslationSettings(
 			st::defaultInputField,
 			tr::ayu_OpenAiTranslationApiUrl(),
 			current.apiBaseOrEndpoint()));
+		Ui::AddDividerText(
+			box->verticalLayout(),
+			tr::ayu_OpenAiTranslationApiUrlAbout());
 		const auto apiKeyWrap = box->addRow(object_ptr<Ui::RpWidget>(box));
 		const auto apiKey = Ui::CreateChild<Ui::PasswordInput>(
 			apiKeyWrap,
 			st::defaultInputField,
 			tr::ayu_OpenAiTranslationApiKey(),
 			current.apiKey());
-		apiKey->move(0, 0);
+		const auto apiKeyVisible = std::make_shared<bool>(false);
+		const auto apiKeyToggle = Ui::CreateChild<Ui::LinkButton>(
+			apiKeyWrap,
+			tr::lng_usernames_activate_confirm(tr::now));
+		const auto updateApiKeyLayout = [=] {
+			const auto width = apiKeyWrap->width();
+			const auto height = (apiKey->height() > apiKeyToggle->height())
+				? apiKey->height()
+				: apiKeyToggle->height();
+			const auto fieldWidth = (width > apiKeyToggle->width())
+				? (width - apiKeyToggle->width())
+				: 0;
+			apiKeyWrap->resize(width, height);
+			apiKey->resize(fieldWidth, apiKey->height());
+			apiKey->move(0, (height - apiKey->height()) / 2);
+			apiKeyToggle->moveToRight(0, (height - apiKeyToggle->height()) / 2);
+		};
+		const auto updateApiKeyVisibility = [=] {
+			apiKey->setEchoMode(*apiKeyVisible
+				? QLineEdit::Normal
+				: QLineEdit::Password);
+			apiKeyToggle->setText(*apiKeyVisible
+				? tr::lng_usernames_deactivate_confirm(tr::now)
+				: tr::lng_usernames_activate_confirm(tr::now));
+		};
+		updateApiKeyVisibility();
+		apiKeyToggle->setClickedCallback([=] {
+			*apiKeyVisible = !*apiKeyVisible;
+			updateApiKeyVisibility();
+		});
 		apiKey->heightValue(
-		) | rpl::on_next([=](int height) {
-			apiKeyWrap->resize(apiKeyWrap->width(), height);
+		) | rpl::on_next([=](int) {
+			updateApiKeyLayout();
 		}, apiKey->lifetime());
 		apiKeyWrap->widthValue(
-		) | rpl::on_next([=](int width) {
-			apiKey->resize(width, apiKey->height());
+		) | rpl::on_next([=](int) {
+			updateApiKeyLayout();
 		}, apiKey->lifetime());
+		apiKeyToggle->widthValue(
+		) | rpl::on_next([=](int) {
+			updateApiKeyLayout();
+		}, apiKey->lifetime());
+		updateApiKeyLayout();
 
 		const auto systemPrompt = box->addRow(object_ptr<Ui::InputField>(
 			box,
@@ -99,15 +138,25 @@ void EditOpenAiTranslationSettings(
 			current.promptTemplate()));
 		PrepareMultilineInput(promptTemplate);
 
+		Ui::AddSkip(box->verticalLayout());
 		Ui::AddDividerText(
 			box->verticalLayout(),
-			tr::ayu_OpenAiTranslationAbout());
+			rpl::single(tr::ayu_OpenAiTranslationAbout(
+				tr::now,
+				lt_to,
+				QStringLiteral("{to}"),
+				lt_message_count,
+				QStringLiteral("{message_count}"),
+				lt_messages_json,
+				QStringLiteral("{messages_json}"))));
 
 		const auto reset = [=] {
 			model->setText(OpenAiTranslationSettings::DefaultModel());
 			apiBaseOrEndpoint->setText(
 				OpenAiTranslationSettings::DefaultApiBaseOrEndpoint());
 			apiKey->setText(QString());
+			*apiKeyVisible = false;
+			updateApiKeyVisibility();
 			systemPrompt->setText(
 				OpenAiTranslationSettings::DefaultSystemPrompt());
 			promptTemplate->setText(
