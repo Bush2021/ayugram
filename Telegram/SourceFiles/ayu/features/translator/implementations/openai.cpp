@@ -37,33 +37,51 @@ QString ApplyPromptPlaceholders(
 	return value;
 }
 
-QUrl NormalizeEndpoint(const QString &endpointText) {
+enum class OpenAiApiType {
+	Responses,
+	ChatCompletions,
+};
+
+struct NormalizedEndpoint {
+	QUrl url;
+	OpenAiApiType apiType = OpenAiApiType::Responses;
+};
+
+std::optional<NormalizedEndpoint> NormalizeEndpoint(const QString &endpointText) {
 	auto url = QUrl::fromUserInput(endpointText.trimmed());
 	if (!url.isValid()) {
-		return {};
+		return std::nullopt;
 	}
 	const auto scheme = url.scheme().toLower();
 	if ((scheme != QStringLiteral("http"))
 		&& (scheme != QStringLiteral("https"))) {
-		return {};
+		return std::nullopt;
 	}
 	if (url.host().isEmpty()) {
-		return {};
+		return std::nullopt;
 	}
 
 	auto path = url.path();
 	while ((path.size() > 1) && path.endsWith('/')) {
 		path.chop(1);
 	}
+	auto result = NormalizedEndpoint();
 	if (path.isEmpty() || (path == QStringLiteral("/"))) {
 		path = QStringLiteral("/v1/responses");
 	} else if (path == QStringLiteral("/v1")) {
 		path = QStringLiteral("/v1/responses");
-	} else if (path != QStringLiteral("/v1/responses")) {
-		return {};
+	} else if ((path == QStringLiteral("/v1/responses"))
+		|| (path == QStringLiteral("/responses"))) {
+		result.apiType = OpenAiApiType::Responses;
+	} else if ((path == QStringLiteral("/v1/chat/completions"))
+		|| (path == QStringLiteral("/chat/completions"))) {
+		result.apiType = OpenAiApiType::ChatCompletions;
+	} else {
+		return std::nullopt;
 	}
 	url.setPath(path);
-	return url;
+	result.url = url;
+	return result;
 }
 
 struct StreamingResponseData {
@@ -155,15 +173,9 @@ std::optional<StreamingResponseData> ParseStreamingResponse(const QByteArray &bo
 	return result;
 }
 
-std::optional<std::vector<QString>> ParseTranslationsObject(
-		const QJsonObject &object,
+std::optional<std::vector<QString>> ParseTranslationsArray(
+		const QJsonArray &translationsArray,
 		int expectedCount) {
-	const auto translationsValue = object.value("translations");
-	if (!translationsValue.isArray()) {
-		return std::nullopt;
-	}
-
-	const auto translationsArray = translationsValue.toArray();
 	if (translationsArray.size() != expectedCount) {
 		return std::nullopt;
 	}
@@ -183,24 +195,47 @@ std::optional<std::vector<QString>> ParseTranslationsObject(
 	return result;
 }
 
+std::optional<std::vector<QString>> ParseTranslationsObject(
+		const QJsonObject &object,
+		int expectedCount) {
+	const auto translationsValue = object.value("translations");
+	if (!translationsValue.isArray()) {
+		return std::nullopt;
+	}
+	return ParseTranslationsArray(translationsValue.toArray(), expectedCount);
+}
+
 std::optional<std::vector<QString>> ParseTranslationsValue(
 		const QJsonValue &value,
 		int expectedCount) {
 	if (value.isObject()) {
 		return ParseTranslationsObject(value.toObject(), expectedCount);
 	}
+	if (value.isArray()) {
+		return ParseTranslationsArray(value.toArray(), expectedCount);
+	}
 	if (!value.isString()) {
 		return std::nullopt;
 	}
 
 	QJsonParseError parseError;
+	const auto text = value.toString();
 	const auto doc = QJsonDocument::fromJson(
-		value.toString().toUtf8(),
+		text.toUtf8(),
 		&parseError);
-	if ((parseError.error != QJsonParseError::NoError) || !doc.isObject()) {
+	if (parseError.error != QJsonParseError::NoError) {
+		if (expectedCount == 1 && !text.trimmed().isEmpty()) {
+			return std::vector<QString>{ text };
+		}
 		return std::nullopt;
 	}
-	return ParseTranslationsObject(doc.object(), expectedCount);
+	if (doc.isObject()) {
+		return ParseTranslationsObject(doc.object(), expectedCount);
+	}
+	if (doc.isArray()) {
+		return ParseTranslationsArray(doc.array(), expectedCount);
+	}
+	return std::nullopt;
 }
 
 std::optional<std::vector<QString>> ParseResponseTranslations(
@@ -251,7 +286,34 @@ std::optional<std::vector<QString>> ParseResponseTranslations(
 	return std::nullopt;
 }
 
-bool HasResponseError(const QJsonObject &root) {
+std::optional<std::vector<QString>> ParseChatCompletionsTranslations(
+		const QJsonObject &root,
+		int expectedCount) {
+	const auto choicesValue = root.value("choices");
+	if (!choicesValue.isArray()) {
+		return std::nullopt;
+	}
+
+	const auto choices = choicesValue.toArray();
+	if (choices.isEmpty() || !choices[0].isObject()) {
+		return std::nullopt;
+	}
+
+	const auto messageValue = choices[0].toObject().value("message");
+	if (!messageValue.isObject()) {
+		return std::nullopt;
+	}
+
+	const auto message = messageValue.toObject();
+	const auto refusal = message.value("refusal");
+	if (refusal.isString() && !refusal.toString().trimmed().isEmpty()) {
+		return std::nullopt;
+	}
+	const auto contentValue = message.value("content");
+	return ParseTranslationsValue(contentValue, expectedCount);
+}
+
+bool HasApiError(const QJsonObject &root) {
 	const auto errorValue = root.value("error");
 	return !errorValue.isUndefined() && !errorValue.isNull();
 }
@@ -263,6 +325,159 @@ QString BuildMessagesJson(const std::vector<TextWithEntities> &texts) {
 	}
 	return QString::fromUtf8(
 		QJsonDocument(messages).toJson(QJsonDocument::Indented));
+}
+
+QJsonObject BuildTranslationSchema(int expectedCount) {
+	return QJsonObject{
+		{"type", "object"},
+		{"properties", QJsonObject{
+			{"translations", QJsonObject{
+				{"type", "array"},
+				{"items", QJsonObject{
+					{"type", "string"}
+				}},
+				{"minItems", expectedCount},
+				{"maxItems", expectedCount}
+			}}
+		}},
+		{"required", QJsonArray{
+			QStringLiteral("translations")
+		}},
+		{"additionalProperties", false}
+	};
+}
+
+QByteArray BuildRequestBody(
+		OpenAiApiType apiType,
+		const QString &model,
+		const QString &instructions,
+		const QString &prompt,
+		const QJsonObject &schema) {
+	switch (apiType) {
+	case OpenAiApiType::Responses: {
+		const auto input = QJsonArray{
+			QJsonObject{
+				{"type", "message"},
+				{"role", "user"},
+				{"content", QJsonArray{
+					QJsonObject{
+						{"type", "input_text"},
+						{"text", prompt}
+					}
+				}}
+			}
+		};
+		auto bodyObject = QJsonObject{
+			{"model", model},
+			{"stream", false},
+			{"input", input},
+			{"text", QJsonObject{
+				{"format", QJsonObject{
+					{"type", "json_schema"},
+					{"name", "translation_result"},
+					{"strict", true},
+					{"schema", schema}
+				}}
+			}}
+		};
+		if (!instructions.trimmed().isEmpty()) {
+			bodyObject.insert("instructions", instructions);
+		}
+		return QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+	}
+	case OpenAiApiType::ChatCompletions: {
+		auto messages = QJsonArray();
+		if (!instructions.trimmed().isEmpty()) {
+			messages.push_back(QJsonObject{
+				{"role", "developer"},
+				{"content", instructions}
+			});
+		}
+		messages.push_back(QJsonObject{
+			{"role", "user"},
+			{"content", prompt}
+		});
+		const auto bodyObject = QJsonObject{
+			{"model", model},
+			{"stream", false},
+			{"messages", messages},
+			{"response_format", QJsonObject{
+				{"type", "json_schema"},
+				{"json_schema", QJsonObject{
+					{"name", "translation_result"},
+					{"strict", true},
+					{"schema", schema}
+				}}
+			}}
+		};
+		return QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
+	}
+	}
+	return QByteArray();
+}
+
+std::optional<QJsonObject> ParseRootObject(const QByteArray &body) {
+	QJsonParseError parseError;
+	const auto doc = QJsonDocument::fromJson(body, &parseError);
+	if ((parseError.error != QJsonParseError::NoError) || !doc.isObject()) {
+		return std::nullopt;
+	}
+	return doc.object();
+}
+
+std::optional<std::vector<QString>> ParseResponsesResponseBody(
+		const QByteArray &body,
+		int expectedCount) {
+	if (const auto streamed = ParseStreamingResponse(body)) {
+		if (streamed->failed) {
+			return std::nullopt;
+		}
+		if (streamed->outputText) {
+			if (const auto translations = ParseTranslationsValue(
+					QJsonValue(*streamed->outputText),
+					expectedCount)) {
+				return translations;
+			}
+		}
+		if (streamed->completedResponse) {
+			if (HasApiError(*streamed->completedResponse)) {
+				return std::nullopt;
+			}
+			return ParseResponseTranslations(
+				*streamed->completedResponse,
+				expectedCount);
+		}
+		return std::nullopt;
+	}
+
+	const auto root = ParseRootObject(body);
+	if (!root || HasApiError(*root)) {
+		return std::nullopt;
+	}
+	return ParseResponseTranslations(*root, expectedCount);
+}
+
+std::optional<std::vector<QString>> ParseChatCompletionsResponseBody(
+		const QByteArray &body,
+		int expectedCount) {
+	const auto root = ParseRootObject(body);
+	if (!root || HasApiError(*root)) {
+		return std::nullopt;
+	}
+	return ParseChatCompletionsTranslations(*root, expectedCount);
+}
+
+std::optional<std::vector<QString>> ParseTranslationResponse(
+		OpenAiApiType apiType,
+		const QByteArray &body,
+		int expectedCount) {
+	switch (apiType) {
+	case OpenAiApiType::Responses:
+		return ParseResponsesResponseBody(body, expectedCount);
+	case OpenAiApiType::ChatCompletions:
+		return ParseChatCompletionsResponseBody(body, expectedCount);
+	}
+	return std::nullopt;
 }
 
 } // namespace
@@ -295,7 +510,7 @@ void OpenAITranslator::startTranslation(const StartTranslationArgs &args) {
 		: settings.apiBaseOrEndpoint().trimmed();
 	const auto endpoint = NormalizeEndpoint(endpointText);
 	const auto apiKey = settings.apiKey().trimmed();
-	if (!endpoint.isValid() || apiKey.isEmpty()) {
+	if (!endpoint || !endpoint->url.isValid() || apiKey.isEmpty()) {
 		if (onFail) onFail();
 		return;
 	}
@@ -317,55 +532,15 @@ void OpenAITranslator::startTranslation(const StartTranslationArgs &args) {
 		to,
 		static_cast<int>(texts.size()),
 		messagesJson);
+	const auto schema = BuildTranslationSchema(static_cast<int>(texts.size()));
+	const auto body = BuildRequestBody(
+		endpoint->apiType,
+		model,
+		instructions,
+		prompt,
+		schema);
 
-	const auto schema = QJsonObject{
-		{"type", "object"},
-		{"properties", QJsonObject{
-			{"translations", QJsonObject{
-				{"type", "array"},
-				{"items", QJsonObject{
-					{"type", "string"}
-				}},
-				{"minItems", static_cast<int>(texts.size())},
-				{"maxItems", static_cast<int>(texts.size())}
-			}}
-		}},
-		{"required", QJsonArray{
-			QStringLiteral("translations")
-		}},
-		{"additionalProperties", false}
-	};
-	const auto input = QJsonArray{
-		QJsonObject{
-			{"type", "message"},
-			{"role", "user"},
-			{"content", QJsonArray{
-				QJsonObject{
-					{"type", "input_text"},
-					{"text", prompt}
-				}
-			}}
-		}
-	};
-	auto bodyObject = QJsonObject{
-		{"model", model},
-		{"stream", false},
-		{"input", input},
-		{"text", QJsonObject{
-			{"format", QJsonObject{
-				{"type", "json_schema"},
-				{"name", "translation_result"},
-				{"strict", true},
-				{"schema", schema}
-			}}
-		}}
-	};
-	if (!instructions.trimmed().isEmpty()) {
-		bodyObject.insert("instructions", instructions);
-	}
-	const auto body = QJsonDocument(bodyObject).toJson(QJsonDocument::Compact);
-
-	QNetworkRequest request(endpoint);
+	QNetworkRequest request(endpoint->url);
 	request.setHeader(QNetworkRequest::UserAgentHeader, randomDesktopUserAgent());
 	request.setHeader(
 		QNetworkRequest::ContentTypeHeader,
@@ -398,7 +573,12 @@ void OpenAITranslator::startTranslation(const StartTranslationArgs &args) {
 		reply,
 		&QNetworkReply::finished,
 		reply,
-		[reply, onSuccess = onSuccess, onFail = onFail, timer, expectedCount = static_cast<int>(texts.size())] {
+		[reply,
+			onSuccess = onSuccess,
+			onFail = onFail,
+			timer,
+			apiType = endpoint->apiType,
+			expectedCount = static_cast<int>(texts.size())] {
 			if (!reply) {
 				return;
 			}
@@ -425,51 +605,10 @@ void OpenAITranslator::startTranslation(const StartTranslationArgs &args) {
 				}
 			};
 
-			if (const auto streamed = ParseStreamingResponse(responseBody)) {
-				if (streamed->failed) {
-					if (onFail) onFail();
-					return;
-				}
-				if (streamed->outputText) {
-					const auto translations = ParseTranslationsValue(
-						QJsonValue(*streamed->outputText),
-						expectedCount);
-					if (translations) {
-						produceSuccess(*translations);
-						return;
-					}
-				}
-				if (streamed->completedResponse) {
-					if (HasResponseError(*streamed->completedResponse)) {
-						if (onFail) onFail();
-						return;
-					}
-					const auto translations = ParseResponseTranslations(
-						*streamed->completedResponse,
-						expectedCount);
-					if (translations) {
-						produceSuccess(*translations);
-						return;
-					}
-				}
-				if (onFail) onFail();
-				return;
-			}
-
-			QJsonParseError parseError;
-			const auto doc = QJsonDocument::fromJson(responseBody, &parseError);
-			if ((parseError.error != QJsonParseError::NoError) || !doc.isObject()) {
-				if (onFail) onFail();
-				return;
-			}
-
-			const auto root = doc.object();
-			if (HasResponseError(root)) {
-				if (onFail) onFail();
-				return;
-			}
-
-			const auto translations = ParseResponseTranslations(root, expectedCount);
+			const auto translations = ParseTranslationResponse(
+				apiType,
+				responseBody,
+				expectedCount);
 			if (!translations) {
 				if (onFail) onFail();
 				return;

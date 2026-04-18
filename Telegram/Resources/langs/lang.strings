@@ -8004,7 +8004,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_OpenAiTranslationSettings" = "OpenAI Settings";
 "ayu_OpenAiTranslationModel" = "Model";
 "ayu_OpenAiTranslationApiUrl" = "API URL";
-"ayu_OpenAiTranslationApiUrlAbout" = "Only Responses API is supported. You can enter a base URL or a full /v1/responses endpoint.";
+"ayu_OpenAiTranslationApiUrlAbout" = "Base URLs default to the Responses API. You can enter a base URL, a full /v1/responses endpoint, or a full /v1/chat/completions endpoint.";
 "ayu_OpenAiTranslationApiKey" = "API Key";
 "ayu_OpenAiTranslationSystemPrompt" = "System Prompt";
 "ayu_OpenAiTranslationPrompt" = "Prompt";
