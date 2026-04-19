@@ -183,12 +183,12 @@ style::colorizer ColorizerFrom(
 }
 
 std::optional<QColor> SystemAccentColor() {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
-	constexpr auto kAccentRole = QPalette::ColorRole::Accent;
-#else
-	constexpr auto kAccentRole = QPalette::ColorRole::Highlight;
-#endif
-	const auto accent = QGuiApplication::palette().color(kAccentRole);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	if (Platform::IsWindows() && !Platform::IsWindows8OrGreater()) {
+		return std::nullopt;
+	}
+#endif // Qt < 6.0.0
+	const auto accent = QPalette().color(QPalette::Highlight);
 	return accent.isValid() ? std::make_optional(accent) : std::nullopt;
 }
 
