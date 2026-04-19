@@ -45,24 +45,47 @@ void PeerSearch::request(
 		finish(PeerSearchResult{});
 		return;
 	}
+	const auto &settings = AyuSettings::getInstance();
+	const auto adsMode = settings.adsMode();
 	auto &cache = _cache[_query];
-	if (cache.peersReady && cache.sponsoredReady) {
-		finish(cache.result);
+	const auto needsSponsoredRefresh = (cache.peersReady
+		&& cache.sponsoredReady
+		&& (_query.size() >= kMinSponsoredQueryLength)
+		&& (_type == Type::WithSponsored)
+		&& ((adsMode == AdsMode::Show && cache.sponsoredMode != AdsMode::Show)
+			|| (adsMode == AdsMode::Camouflage
+				&& cache.sponsoredMode == AdsMode::Strict)));
+	if (cache.peersReady && cache.sponsoredReady && !needsSponsoredRefresh) {
+		auto result = cache.result;
+		if (adsMode != AdsMode::Show) {
+			result.sponsored.clear();
+		}
+		finish(std::move(result));
 		return;
 	} else if (type == RequestType::CacheOnly) {
 		_callback = nullptr;
 		return;
-	} else if (cache.requested) {
+	} else if (cache.requested && !needsSponsoredRefresh) {
 		return;
 	}
+	const auto requestedBefore = cache.requested;
 	cache.requested = true;
 	cache.result.query = _query;
 	if (_query.size() < kMinSponsoredQueryLength) {
 		cache.sponsoredReady = true;
+		cache.sponsoredMode = adsMode;
 	} else if (_type == Type::WithSponsored) {
-		requestSponsored();
+		if (settings.disableAdsStrictly()) {
+			cache.sponsoredReady = true;
+			cache.sponsoredMode = AdsMode::Strict;
+			cache.result.sponsored.clear();
+		} else if (!cache.sponsoredReady || needsSponsoredRefresh) {
+			requestSponsored();
+		}
 	}
-	requestPeers();
+	if (!cache.peersReady && !requestedBefore) {
+		requestPeers();
+	}
 }
 
 void PeerSearch::requestPeers() {
@@ -140,7 +163,11 @@ void PeerSearch::finishPeers(
 	cache.result.my = std::move(result.my);
 	cache.result.peers = std::move(result.peers);
 	if (cache.sponsoredReady && _query == *query) {
-		finish(cache.result);
+		auto complete = cache.result;
+		if (AyuSettings::getInstance().disableAds()) {
+			complete.sponsored.clear();
+		}
+		finish(std::move(complete));
 	}
 }
 
@@ -152,9 +179,14 @@ void PeerSearch::finishSponsored(
 
 	auto &cache = _cache[*query];
 	cache.sponsoredReady = true;
+	cache.sponsoredMode = AyuSettings::getInstance().adsMode();
 	cache.result.sponsored = std::move(result.sponsored);
 	if (cache.peersReady && _query == *query) {
-		finish(cache.result);
+		auto complete = cache.result;
+		if (AyuSettings::getInstance().disableAds()) {
+			complete.sponsored.clear();
+		}
+		finish(std::move(complete));
 	}
 }
 

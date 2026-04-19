@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "ayu/ayu_settings.h"
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -52,6 +54,7 @@ private:
         bool requested = false;
         bool peersReady = false;
         bool sponsoredReady = false;
+        AdsMode sponsoredMode = AdsMode::Show;
     };
 
     void requestPeers();
