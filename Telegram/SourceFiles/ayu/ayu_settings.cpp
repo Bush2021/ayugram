@@ -640,6 +640,7 @@ void AyuSettings::validate() {
 	validateEnum(_showMessageDetailsInContextMenu, defaults._showMessageDetailsInContextMenu);
 	validateEnum(_showRepeatMessageInContextMenu, defaults._showRepeatMessageInContextMenu);
 	validateEnum(_showAddFilterInContextMenu, defaults._showAddFilterInContextMenu);
+	validateEnum(_adsMode, defaults._adsMode, 2);
 
 	validateEnum(_translationProvider, defaults._translationProvider, 4);
 	if ((_translationProvider.current() == TranslationProvider::Native)
@@ -717,10 +718,14 @@ void AyuSettings::setSemiTransparentDeletedMessages(bool val) {
 	save();
 }
 
-void AyuSettings::setDisableAds(bool val) {
-	if (_disableAds.current() == val) return;
-	_disableAds = val;
+void AyuSettings::setAdsMode(AdsMode val) {
+	if (_adsMode.current() == val) return;
+	_adsMode = val;
 	save();
+}
+
+void AyuSettings::setDisableAds(bool val) {
+	setAdsMode(val ? AdsMode::Strict : AdsMode::Show);
 }
 
 void AyuSettings::setDisableStories(bool val) {
@@ -1208,7 +1213,8 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"filtersEnabledInChats", s._filtersEnabledInChats.current()},
 		{"hideFromBlocked", s._hideFromBlocked.current()},
 		{"semiTransparentDeletedMessages", s._semiTransparentDeletedMessages.current()},
-		{"disableAds", s._disableAds.current()},
+		{"adsMode", s._adsMode.current()},
+		{"disableAds", s.disableAds()},
 		{"disableStories", s._disableStories.current()},
 		{"disableCustomBackgrounds", s._disableCustomBackgrounds.current()},
 		{"showOnlyAddedEmojisAndStickers", s._showOnlyAddedEmojisAndStickers.current()},
@@ -1309,7 +1315,13 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._filtersEnabledInChats = j.value("filtersEnabledInChats", defaults._filtersEnabledInChats.current());
 	s._hideFromBlocked = j.value("hideFromBlocked", defaults._hideFromBlocked.current());
 	s._semiTransparentDeletedMessages = j.value("semiTransparentDeletedMessages", defaults._semiTransparentDeletedMessages.current());
-	s._disableAds = j.value("disableAds", defaults._disableAds.current());
+	if (j.contains("adsMode")) {
+		s._adsMode = j.value("adsMode", defaults._adsMode.current());
+	} else {
+		s._adsMode = j.value("disableAds", defaults.disableAds())
+			? AdsMode::Strict
+			: AdsMode::Show;
+	}
 	s._disableStories = j.value("disableStories", defaults._disableStories.current());
 	s._disableCustomBackgrounds = j.value("disableCustomBackgrounds", defaults._disableCustomBackgrounds.current());
 	s._showOnlyAddedEmojisAndStickers = j.value("showOnlyAddedEmojisAndStickers", defaults._showOnlyAddedEmojisAndStickers.current());

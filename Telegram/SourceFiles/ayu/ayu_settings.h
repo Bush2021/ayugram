@@ -52,6 +52,12 @@ enum class SendWithoutSoundOption {
 	Always = 2,
 };
 
+enum class AdsMode {
+	Show = 0,
+	Camouflage = 1,
+	Strict = 2,
+};
+
 NLOHMANN_JSON_SERIALIZE_ENUM(PeerIdDisplay, {
 	{PeerIdDisplay::Hidden, 0},
 	{PeerIdDisplay::TelegramApi, 1},
@@ -82,6 +88,12 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SendWithoutSoundOption, {
 	{SendWithoutSoundOption::Never, 0},
 	{SendWithoutSoundOption::InGhostMode, 1},
 	{SendWithoutSoundOption::Always, 2},
+})
+
+NLOHMANN_JSON_SERIALIZE_ENUM(AdsMode, {
+	{AdsMode::Show, "show"},
+	{AdsMode::Camouflage, "camouflage"},
+	{AdsMode::Strict, "strict"},
 })
 
 class GhostModeAccountSettings {
@@ -326,7 +338,9 @@ public:
 	[[nodiscard]] bool filtersEnabledInChats() const { return _filtersEnabledInChats.current(); }
 	[[nodiscard]] bool hideFromBlocked() const { return _hideFromBlocked.current(); }
 	[[nodiscard]] bool semiTransparentDeletedMessages() const { return _semiTransparentDeletedMessages.current(); }
-	[[nodiscard]] bool disableAds() const { return _disableAds.current(); }
+	[[nodiscard]] AdsMode adsMode() const { return _adsMode.current(); }
+	[[nodiscard]] bool disableAds() const { return adsMode() != AdsMode::Show; }
+	[[nodiscard]] bool disableAdsStrictly() const { return adsMode() == AdsMode::Strict; }
 	[[nodiscard]] bool disableStories() const { return _disableStories.current(); }
 	[[nodiscard]] bool disableCustomBackgrounds() const { return _disableCustomBackgrounds.current(); }
 	[[nodiscard]] bool hidePremiumStatuses() const { return _hidePremiumStatuses.current(); }
@@ -410,6 +424,7 @@ public:
 	void setFiltersEnabledInChats(bool val);
 	void setHideFromBlocked(bool val);
 	void setSemiTransparentDeletedMessages(bool val);
+	void setAdsMode(AdsMode val);
 	void setDisableAds(bool val);
 	void setDisableStories(bool val);
 	void setDisableCustomBackgrounds(bool val);
@@ -503,8 +518,8 @@ public:
 	[[nodiscard]] rpl::producer<bool> hideFromBlockedChanges() const { return _hideFromBlocked.changes(); }
 	[[nodiscard]] rpl::producer<bool> semiTransparentDeletedMessagesValue() const { return _semiTransparentDeletedMessages.value(); }
 	[[nodiscard]] rpl::producer<bool> semiTransparentDeletedMessagesChanges() const { return _semiTransparentDeletedMessages.changes(); }
-	[[nodiscard]] rpl::producer<bool> disableAdsValue() const { return _disableAds.value(); }
-	[[nodiscard]] rpl::producer<bool> disableAdsChanges() const { return _disableAds.changes(); }
+	[[nodiscard]] rpl::producer<AdsMode> adsModeValue() const { return _adsMode.value(); }
+	[[nodiscard]] rpl::producer<AdsMode> adsModeChanges() const { return _adsMode.changes(); }
 	[[nodiscard]] rpl::producer<bool> disableStoriesValue() const { return _disableStories.value(); }
 	[[nodiscard]] rpl::producer<bool> disableStoriesChanges() const { return _disableStories.changes(); }
 	[[nodiscard]] rpl::producer<bool> disableCustomBackgroundsValue() const { return _disableCustomBackgrounds.value(); }
@@ -672,7 +687,7 @@ private:
 	rpl::variable<bool> _filtersEnabledInChats = false;
 	rpl::variable<bool> _hideFromBlocked = false;
 	rpl::variable<bool> _semiTransparentDeletedMessages = false;
-	rpl::variable<bool> _disableAds = true;
+	rpl::variable<AdsMode> _adsMode = AdsMode::Strict;
 	rpl::variable<bool> _disableStories = false;
 	rpl::variable<bool> _disableCustomBackgrounds = false;
 	rpl::variable<bool> _showOnlyAddedEmojisAndStickers = false;

@@ -662,6 +662,8 @@ void BuildSpyEssentials(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 }
 
 void BuildOther(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	auto *settings = &AyuSettings::getInstance();
+
 	builder.addSubsectionTitle(tr::ayu_MessageSavingOtherHeader());
 
 	ayu.addSettingToggle({
@@ -670,11 +672,20 @@ void BuildOther(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::localPremium,
 		.setter = &AyuSettings::setLocalPremium,
 	});
-	ayu.addSettingToggle({
-		.id = u"ayu/disableAds"_q,
-		.title = tr::ayu_DisableAds(),
-		.getter = &AyuSettings::disableAds,
-		.setter = &AyuSettings::setDisableAds,
+	ayu.addChooseButton({
+		.id = u"ayu/adsMode"_q,
+		.altIds = { u"ayu/disableAds"_q },
+		.title = tr::ayu_AdsModeTitle(),
+		.boxTitle = tr::ayu_AdsModeTitle(),
+		.initialSelection = static_cast<int>(settings->adsMode()),
+		.options = {
+			tr::ayu_AdsModeShow(tr::now),
+			tr::ayu_AdsModeCamouflage(tr::now),
+			tr::ayu_AdsModeStrict(tr::now),
+		},
+		.setter = [](int index) {
+			AyuSettings::getInstance().setAdsMode(static_cast<AdsMode>(index));
+		},
 	});
 }
 
