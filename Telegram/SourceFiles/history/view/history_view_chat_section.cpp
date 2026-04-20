@@ -1202,10 +1202,16 @@ bool ChatWidget::confirmSendingFiles(
 		Api::SendType::Normal,
 		sendMenuDetails(),
 		[=](const TextWithTags &text) { _composeControls->setText(text); });
+	box->setReplyTo(_composeControls->replyingToMessage());
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,
-			Api::SendOptions options) {
+			Api::SendOptions options,
+			FullReplyTo currentReplyTo) {
+		if (!currentReplyTo.messageId
+				&& _composeControls->replyingToMessage().messageId) {
+			_composeControls->cancelReplyMessage();
+		}
 		sendingFilesConfirmed(std::move(bundle), options);
 	}));
 	box->setCancelledCallback(_composeControls->restoreTextCallback(
