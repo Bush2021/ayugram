@@ -5239,7 +5239,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 	}
 	if (!mediaDisplayed && bubble && hasVisibleText()) {
 		const auto probeTextWidth = bubbleTextWidth(contentWidth);
-		[[maybe_unused]] const auto probeHeight = textHeightFor(probeTextWidth);
+		[[maybe_unused]] const auto probe = textHeightFor(probeTextWidth);
 		if (!Get<TextAppearing>()) {
 			const auto use = textRealWidth();
 			if (use > 0) {
@@ -5527,7 +5527,7 @@ bool Message::textAppearCheckLine(not_null<TextAppearing*> appearing) {
 			if (appearing->heightAnimation.animating()
 				|| !appearing->widthAnimation.animating()
 				|| left <= duration) {
-				textAppearStartHeightAnimation(appearing);
+				textAppearStartHeightAnimation(appearing, targetHeight);
 			}
 		}
 	}
@@ -5565,13 +5565,12 @@ void Message::textAppearStartWidthAnimation(
 }
 
 void Message::textAppearStartHeightAnimation(
-		not_null<TextAppearing*> appearing) {
+		not_null<TextAppearing*> appearing,
+		int targetHeight) {
 	Expects(appearing->use);
 
 	const auto from = appearing->shownHeight;
-	const auto to
-		= appearing->targetHeight
-		= textAppearTargetHeight(appearing);
+	const auto to = appearing->targetHeight = targetHeight;
 	const auto duration = appearing->finalizing
 		? kLineHeightAppearFinalDuration
 		: kLineHeightAppearDuration;
@@ -5584,7 +5583,7 @@ int Message::textAppearTargetHeight(
 		not_null<TextAppearing*> appearing) const {
 	const auto next = appearing->shownLine + 1;
 	const auto lines = int(appearing->lines.size());
-	if (next >= lines) {
+	if (next + 1 >= lines) {
 		return appearing->lines.back().bottom;
 	}
 	const auto &line = appearing->lines[next];
