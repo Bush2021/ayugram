@@ -2,6 +2,21 @@ name: Windows
 
 on:
   workflow_dispatch:
+    inputs:
+      generator:
+        description: CMake generator to use for the Windows build.
+        type: choice
+        default: Visual Studio
+        options:
+          - Visual Studio
+          - Ninja Multi-Config
+      toolchain:
+        description: Compiler toolchain to use for the Windows build.
+        type: choice
+        default: MSVC
+        options:
+          - MSVC
+          - ClangCL
 
 jobs:
 
@@ -12,7 +27,7 @@ jobs:
     strategy:
       matrix:
         arch: [x64]
-        generator: [""]
+        generator: ${{ fromJSON(inputs.generator == 'Ninja Multi-Config' && '["Ninja Multi-Config"]' || '[""]') }}
 
     env:
       UPLOAD_ARTIFACT: "true"
@@ -118,6 +133,18 @@ jobs:
           [ -n "$GENERATOR" ] && ARCH=""
           echo "TDESKTOP_BUILD_ARCH=$ARCH" >> $GITHUB_ENV
 
+          TOOLCHAIN=""
+          if [ "${{ inputs.toolchain }}" = "ClangCL" ]; then
+            if [ -n "$GENERATOR" ]; then
+              TOOLCHAIN="-D CMAKE_C_COMPILER=clang-cl -D CMAKE_CXX_COMPILER=clang-cl"
+            else
+              TOOLCHAIN="-T ClangCL"
+            fi
+            echo "Toolchain from input: $TOOLCHAIN"
+            ARTIFACT_NAME="${ARTIFACT_NAME} ClangCL"
+          fi
+          echo "TDESKTOP_BUILD_TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
+
           DEFINE=""
           if [ -n "${{ matrix.defines }}" ]; then
             DEFINE="-D ${{ matrix.defines }}=ON"
@@ -139,6 +166,7 @@ jobs:
 
           call configure.bat ^
           %TDESKTOP_BUILD_GENERATOR% ^
+          %TDESKTOP_BUILD_TOOLCHAIN% ^
           %TDESKTOP_BUILD_ARCH% ^
           -D TDESKTOP_API_ID=2040 ^
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
