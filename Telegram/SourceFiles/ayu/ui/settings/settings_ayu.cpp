@@ -276,6 +276,7 @@ void BuildGhostEssentials(SectionBuilder &builder) {
 				dst.setMarkReadAfterAction(src.markReadAfterAction());
 				dst.setUseScheduledMessages(src.useScheduledMessages());
 				dst.setSendWithoutSound(src.sendWithoutSound());
+				dst.setSuggestGhostModeBeforeViewingStory(src.suggestGhostModeBeforeViewingStory());
 				dst.setSendReadMessagesLocked(src.sendReadMessagesLocked());
 				dst.setSendReadStoriesLocked(src.sendReadStoriesLocked());
 				dst.setSendOnlinePacketsLocked(src.sendOnlinePacketsLocked());
@@ -472,6 +473,34 @@ void BuildGhostEssentials(SectionBuilder &builder) {
 			AddSkip(container);
 			AddDividerText(container, tr::ayu_SendWithoutSoundByDefaultDescription());
 
+			AddSkip(container);
+			const auto suggestGhostModeButton = AddButtonWithIcon(
+				container,
+				tr::ayu_SuggestGhostModeBeforeViewingStory(),
+				st::settingsButtonNoIcon);
+			if (wctx.highlights) {
+				wctx.highlights->push_back(std::make_pair(
+					u"ayu/suggestGhostModeBeforeViewingStory"_q,
+					HighlightEntry{ suggestGhostModeButton.get(), {} }));
+			}
+			suggestGhostModeButton->toggleOn(
+				state->selectedUserId.value()
+				| rpl::map([](uint64 id) {
+					return AyuSettings::ghost(id).suggestGhostModeBeforeViewingStoryValue();
+				}) | rpl::flatten_latest()
+			)->toggledValue(
+			) | rpl::filter(
+				[=](bool enabled) {
+					return enabled != AyuSettings::ghost(state->selectedUserId.current()).suggestGhostModeBeforeViewingStory();
+				}
+			) | on_next(
+				[=](bool enabled) {
+					AyuSettings::ghost(state->selectedUserId.current()).setSuggestGhostModeBeforeViewingStory(enabled);
+				},
+				container->lifetime());
+			AddSkip(container);
+			AddDividerText(container, tr::ayu_SuggestGhostModeBeforeViewingStoryDescription());
+
 			auto showMenu = [=] {
 				state->menu = base::make_unique_q<Ui::PopupMenu>(
 					pickerButton,
@@ -523,6 +552,11 @@ void BuildGhostEssentials(SectionBuilder &builder) {
 			sctx.entries->push_back({
 				.id = u"ayu/sendWithoutSound"_q,
 				.title = tr::ayu_SendWithoutSoundByDefault(tr::now),
+				.section = sctx.sectionId,
+			});
+			sctx.entries->push_back({
+				.id = u"ayu/suggestGhostModeBeforeViewingStory"_q,
+				.title = tr::ayu_SuggestGhostModeBeforeViewingStory(tr::now),
 				.section = sctx.sectionId,
 			});
 		});

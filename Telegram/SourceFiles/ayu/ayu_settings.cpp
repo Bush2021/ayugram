@@ -115,6 +115,12 @@ void GhostModeAccountSettings::setSendWithoutSound(bool val) {
 	AyuSettings::save();
 }
 
+void GhostModeAccountSettings::setSuggestGhostModeBeforeViewingStory(bool val) {
+	if (_suggestGhostModeBeforeViewingStory.current() == val) return;
+	_suggestGhostModeBeforeViewingStory = val;
+	AyuSettings::save();
+}
+
 void GhostModeAccountSettings::setGhostModeEnabled(bool val) {
 	if (!_sendReadMessagesLocked.current()) _sendReadMessages = !val;
 	if (!_sendReadStoriesLocked.current()) _sendReadStories = !val;
@@ -172,6 +178,7 @@ void to_json(nlohmann::json &j, const GhostModeAccountSettings &s) {
 		{"markReadAfterAction", s._markReadAfterAction.current()},
 		{"useScheduledMessages", s._useScheduledMessages.current()},
 		{"sendWithoutSound", s._sendWithoutSound.current()},
+		{"suggestGhostModeBeforeViewingStory", s._suggestGhostModeBeforeViewingStory.current()},
 		{"sendReadMessagesLocked", s._sendReadMessagesLocked.current()},
 		{"sendReadStoriesLocked", s._sendReadStoriesLocked.current()},
 		{"sendOnlinePacketsLocked", s._sendOnlinePacketsLocked.current()},
@@ -189,6 +196,7 @@ void from_json(const nlohmann::json &j, GhostModeAccountSettings &s) {
 	s._markReadAfterAction = j.value("markReadAfterAction", true);
 	s._useScheduledMessages = j.value("useScheduledMessages", false);
 	s._sendWithoutSound = j.value("sendWithoutSound", false);
+	s._suggestGhostModeBeforeViewingStory = j.value("suggestGhostModeBeforeViewingStory", true);
 	s._sendReadMessagesLocked = j.value("sendReadMessagesLocked", false);
 	s._sendReadStoriesLocked = j.value("sendReadStoriesLocked", false);
 	s._sendOnlinePacketsLocked = j.value("sendOnlinePacketsLocked", false);

@@ -82,6 +82,7 @@ public:
 	[[nodiscard]] bool markReadAfterAction() const { return _markReadAfterAction.current(); }
 	[[nodiscard]] bool useScheduledMessages() const { return _useScheduledMessages.current(); }
 	[[nodiscard]] bool sendWithoutSound() const { return _sendWithoutSound.current(); }
+	[[nodiscard]] bool suggestGhostModeBeforeViewingStory() const { return _suggestGhostModeBeforeViewingStory.current(); }
 	[[nodiscard]] bool isGhostModeActive() const { return _ghostModeActive.current(); }
 	[[nodiscard]] bool isUseScheduledMessages() const { return isGhostModeActive() && useScheduledMessages(); }
 
@@ -99,6 +100,7 @@ public:
 	void setMarkReadAfterAction(bool val);
 	void setUseScheduledMessages(bool val);
 	void setSendWithoutSound(bool val);
+	void setSuggestGhostModeBeforeViewingStory(bool val);
 	void setGhostModeEnabled(bool val);
 
 	void setSendReadMessagesLocked(bool val);
@@ -123,6 +125,8 @@ public:
 	[[nodiscard]] rpl::producer<bool> useScheduledMessagesChanges() const { return _useScheduledMessages.changes(); }
 	[[nodiscard]] rpl::producer<bool> sendWithoutSoundValue() const { return _sendWithoutSound.value(); }
 	[[nodiscard]] rpl::producer<bool> sendWithoutSoundChanges() const { return _sendWithoutSound.changes(); }
+	[[nodiscard]] rpl::producer<bool> suggestGhostModeBeforeViewingStoryValue() const { return _suggestGhostModeBeforeViewingStory.value(); }
+	[[nodiscard]] rpl::producer<bool> suggestGhostModeBeforeViewingStoryChanges() const { return _suggestGhostModeBeforeViewingStory.changes(); }
 	[[nodiscard]] rpl::producer<bool> ghostModeActiveValue() const { return _ghostModeActive.value(); }
 	[[nodiscard]] rpl::producer<bool> ghostModeActiveChanges() const { return _ghostModeActive.changes(); }
 
@@ -151,6 +155,7 @@ private:
 	rpl::variable<bool> _markReadAfterAction = true;
 	rpl::variable<bool> _useScheduledMessages = false;
 	rpl::variable<bool> _sendWithoutSound = false;
+	rpl::variable<bool> _suggestGhostModeBeforeViewingStory = true;
 	rpl::variable<bool> _ghostModeActive = false;
 
 	rpl::variable<bool> _sendReadMessagesLocked = false;
