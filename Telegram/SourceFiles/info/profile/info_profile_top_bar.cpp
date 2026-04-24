@@ -1815,6 +1815,7 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		const auto size = st::infoProfileTopBarPhotoSize;
 		const auto frame = _videoUserpicPlayer->frame(Size(size), _peer);
 		if (!frame.isNull()) {
+			auto hq = PainterHighQualityEnabler(p);
 			p.drawImage(geometry, frame);
 			update();
 			return;
@@ -1859,7 +1860,10 @@ void TopBar::paintUserpic(QPainter &p, const QRect &geometry) {
 		_cachedUserpic = std::move(image);
 		_cachedUserpic.setDevicePixelRatio(style::DevicePixelRatio());
 	}
-	p.drawImage(geometry, _cachedUserpic);
+	{
+		auto hq = PainterHighQualityEnabler(p);
+		p.drawImage(geometry, _cachedUserpic);
+	}
 	if (_uploadOverlay && _uploadOverlay->shown()) {
 		_uploadOverlay->paint(p, geometry, {
 			.lineWidth = st::defaultUserpicButton.uploadProgressLine,

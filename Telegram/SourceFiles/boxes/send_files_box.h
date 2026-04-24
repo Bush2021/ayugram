@@ -272,7 +272,7 @@ private:
 	void checkCharsLimitation();
 	void refreshMessagesCount();
 
-	void requestToTakeTextWithTags() const;
+	void requestToTakeTextWithTags();
 	bool validateLength(const QString &text) const;
 
 	[[nodiscard]] Fn<MenuDetails()> prepareSendMenuDetails(
@@ -306,6 +306,7 @@ private:
 	std::unique_ptr<Ui::RpWidget> _priceTag;
 	QImage _priceTagBg;
 	bool _confirmed = false;
+	bool _textTaken = false;
 	bool _invertCaption = false;
 
 	const object_ptr<Ui::InputField> _caption;

@@ -3266,7 +3266,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 								showStickerPackInfo(document);
 							}, &st::menuIconStickers);
 						} else {
-							Api::AddAddToStickerSetAction(
+							Api::AddAddToOwnedSetAction(
 								Ui::Menu::CreateAddActionCallback(_menu),
 								_controller->uiShow(),
 								document);
