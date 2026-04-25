@@ -1992,7 +1992,6 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				}
 				return false;
 			});
-			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
 	}
 	wrap->toggleOn(tracker.atLeastOneShownValue());
