@@ -2735,7 +2735,15 @@ BottomRippleMask Message::bottomRippleMask(int buttonHeight) const {
 	const auto buttonWidth = g.width();
 	const auto &large = CachedCornersMasks(Radius::BubbleLarge);
 	const auto &small = CachedCornersMasks(Radius::BubbleSmall);
-	const auto rounding = countBubbleRounding();
+	auto rounding = countBubbleRounding();
+	if (AyuSettings::getInstance().removeMessageTail()) {
+		if (rounding.bottomLeft == Corner::Tail) {
+			rounding.bottomLeft = Corner::Large;
+		}
+		if (rounding.bottomRight == Corner::Tail) {
+			rounding.bottomRight = Corner::Large;
+		}
+	}
 	const auto icon = (rounding.bottomLeft == Corner::Tail)
 		? &st::historyBubbleTailInLeft
 		: (rounding.bottomRight == Corner::Tail)
