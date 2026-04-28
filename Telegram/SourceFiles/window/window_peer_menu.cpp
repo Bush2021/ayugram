@@ -4127,13 +4127,19 @@ void AddSenderUserpicModerateAction(
 		&& CanCreateModerateMessagesBox(
 			HistoryItemsList{ not_null<HistoryItem*>(moderateItem) });
 	if (canDeleteAndBan) {
+		const auto itemId = moderateItem->fullId();
 		addAction({ .isSeparator = true });
 		addAction({
 			.text = tr::lng_context_delete_and_ban(tr::now),
 			.handler = [=] {
+				const auto item = controller->session().data().message(
+					itemId);
+				if (!item) {
+					return;
+				}
 				controller->show(Box(
 					CreateModerateMessagesBox,
-					HistoryItemsList{ not_null<HistoryItem*>(moderateItem) },
+					HistoryItemsList{ not_null<HistoryItem*>(item) },
 					nullptr,
 					ModerateMessagesBoxOptions{
 						.reportSpam = true,

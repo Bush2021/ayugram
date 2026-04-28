@@ -123,6 +123,23 @@ EmojiPan {
 	tabs: SettingsSlider;
 	search: TabbedSearch;
 	searchMargin: margins;
+	searchPacksTop: pixels;
+	searchPackWidth: pixels;
+	searchPackHeight: pixels;
+	searchPackSkip: pixels;
+	searchPackIconSize: pixels;
+	searchPackIconTop: pixels;
+	searchPackTextTop: pixels;
+	searchPackTextPadding: pixels;
+	searchPacksBottom: pixels;
+	searchResultsHeight: pixels;
+	searchResultsTextTop: pixels;
+	searchSwapDuration: int;
+	searchBackHeight: pixels;
+	searchBackIconLeft: pixels;
+	searchBackIconTop: pixels;
+	searchBackTextLeft: pixels;
+	searchBackTextTop: pixels;
 	colorAll: IconButton;
 	colorAllLabel: FlatLabel;
 	removeSet: IconButton;
@@ -607,6 +624,7 @@ stickerPanRemoveSet: IconButton(hashtagClose) {
 stickerIconMove: 400;
 stickerPreviewDuration: 150;
 stickerPreviewMin: 0.1;
+stickerPanFirstAfterShortcutsSkip: 4px;
 mediaPreviewPhotoSkip: 48px;
 
 emojiPanColorAll: IconButton(stickerPanRemoveSet) {
@@ -771,6 +789,23 @@ defaultEmojiPan: EmojiPan {
 	tabs: emojiTabs;
 	search: defaultTabbedSearch;
 	searchMargin: margins(1px, 11px, 2px, 5px);
+	searchPacksTop: 0px;
+	searchPackWidth: 70px;
+	searchPackHeight: 78px;
+	searchPackSkip: 6px;
+	searchPackIconSize: 42px;
+	searchPackIconTop: 8px;
+	searchPackTextTop: 55px;
+	searchPackTextPadding: 5px;
+	searchPacksBottom: 0px;
+	searchResultsHeight: 20px;
+	searchResultsTextTop: 3px;
+	searchSwapDuration: 100;
+	searchBackHeight: 36px;
+	searchBackIconLeft: 5px;
+	searchBackIconTop: 6px;
+	searchBackTextLeft: 40px;
+	searchBackTextTop: 10px;
 	colorAll: emojiPanColorAll;
 	colorAllLabel: emojiPanColorAllLabel;
 	removeSet: stickerPanRemoveSet;

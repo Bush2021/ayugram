@@ -554,7 +554,8 @@ bool ResolveUsernameOrPhone(
 			UrlAuthBox::ActivateUrl(
 				controller->uiShow(),
 				&controller->session(),
-				u"tg://resolve?domain=oauth&startapp="_q + token,
+				u"tg://resolve?domain=oauth&startapp="_q
+					+ qthelp::url_encode(token),
 				context);
 			return true;
 		}
@@ -1633,7 +1634,7 @@ bool ResolveOAuth(
 	UrlAuthBox::ActivateUrl(
 		controller->uiShow(),
 		&controller->session(),
-		u"tg://oauth?token="_q + token,
+		u"tg://oauth?token="_q + qthelp::url_encode(token),
 		context);
 	return true;
 }

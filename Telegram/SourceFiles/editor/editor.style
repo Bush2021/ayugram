@@ -154,9 +154,9 @@ photoEditorBlurSizeMultiplier: 3.0;
 photoEditorBlurPreviewOpacity: 0.25;
 photoEditorBlurRadius: 20;
 
-photoEditorBrushSizeControlLeftSkip: 0px;
+photoEditorBrushSizeControlLeftSkip: -3px;
 photoEditorBrushSizeControlHeight: 280px;
-photoEditorBrushSizeControlCollapsedWidth: 2px;
+photoEditorBrushSizeControlCollapsedWidth: 6px;
 photoEditorBrushSizeControlExpandedTopWidth: 25px;
 photoEditorBrushSizeControlExpandedBottomWidth: 4px;
 photoEditorBrushSizeControlExpandShift: 14px;
