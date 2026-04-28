@@ -93,6 +93,11 @@ using SendFilesCheck = Fn<bool(
 [[nodiscard]] SendFilesCheck DefaultCheckForPeer(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<PeerData*> peer);
+void RenameFileBox(
+	not_null<Ui::GenericBox*> box,
+	const QString &currentName,
+	bool allowExtensionEdit,
+	Fn<void(QString)> apply);
 
 using SendFilesConfirmed = Fn<void(
 	std::shared_ptr<Ui::PreparedBundle>,
@@ -180,6 +185,7 @@ private:
 		[[nodiscard]] rpl::producer<int> itemDeleteRequest() const;
 		[[nodiscard]] rpl::producer<int> itemReplaceRequest() const;
 		[[nodiscard]] rpl::producer<int> itemModifyRequest() const;
+		[[nodiscard]] rpl::producer<int> itemRenameRequest() const;
 		[[nodiscard]] rpl::producer<> orderUpdated() const;
 
 		void setSendWay(Ui::SendFilesWay way);
