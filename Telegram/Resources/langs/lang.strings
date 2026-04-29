@@ -8465,6 +8465,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_HideReactionsInGroups" = "Groups";
 "ayu_HideReactionsInPrivateChats" = "Private Chats";
 "ayu_QuickAdminShortcuts" = "Quick Admin Shortcuts";
+"ayu_DisableGreetingSticker" = "Disable Greeting Sticker";
 "ayu_TranslationProvider" = "Translation Provider";
 "ayu_OpenAiTranslationSettings" = "OpenAI Settings";
 "ayu_OpenAiTranslationModel" = "Model";

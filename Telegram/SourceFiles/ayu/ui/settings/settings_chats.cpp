@@ -118,6 +118,12 @@ void BuildGroupsAndChannels(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setQuickAdminShortcuts,
 	});
 	ayu.addSettingToggle({
+		.id = u"ayu/disableGreetingSticker"_q,
+		.title = tr::ayu_DisableGreetingSticker(),
+		.getter = &AyuSettings::disableGreetingSticker,
+		.setter = &AyuSettings::setDisableGreetingSticker,
+	});
+	ayu.addSettingToggle({
 		.id = u"ayu/showMessageShot"_q,
 		.title = tr::ayu_SettingsShowMessageShot(),
 		.getter = &AyuSettings::showMessageShot,
