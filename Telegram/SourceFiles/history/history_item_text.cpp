@@ -25,6 +25,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_entity.h"
 #include "ui/text/text_options.h"
 
+// AyuGram includes
+#include "api/api_transcribes.h"
+
 namespace {
 
 constexpr auto kSelectedCopyReplyPreviewLimit = 64;
@@ -363,6 +366,10 @@ TextForMimeData HistorySelectedItemPlainWrappedText(
 } // namespace
 
 TextForMimeData HistoryItemText(not_null<HistoryItem*> item) {
+	const auto &summary = item->summaryEntry();
+	if (!summary.result.empty() && summary.shown) {
+		return TextForMimeData::WithExpandedLinks(summary.result);
+	}
 	return AppendExtraCopyText(item, HistoryItemMainText(item));
 }
 
