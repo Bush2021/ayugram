@@ -296,6 +296,10 @@ AbstractSection::AbstractSection(
 : _controller(controller) {
 }
 
+bool AbstractSection::processChosenSticker(ChatHelpers::FileChosen &&) {
+	return false;
+}
+
 void AbstractSection::build(
 		not_null<Ui::VerticalLayout*> container,
 		SectionBuildMethod method) {

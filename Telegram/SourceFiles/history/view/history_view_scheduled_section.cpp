@@ -949,6 +949,11 @@ SendMenu::Details ScheduledWidget::sendMenuDetails() const {
 	return { .type = type, .effectAllowed = effectAllowed };
 }
 
+bool ScheduledWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	_composeControls->processChosenSticker(std::move(chosen));
+	return true;
+}
+
 void ScheduledWidget::cornerButtonsShowAtPosition(
 		Data::MessagePosition position) {
 	showAtPosition(position);

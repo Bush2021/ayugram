@@ -1136,7 +1136,15 @@ void MainWidget::exportTopBarHeightUpdated() {
 }
 
 SendMenu::Details MainWidget::sendMenuDetails() const {
-	return _history->sendMenuDetails();
+	return _mainSection
+		? _mainSection->sendMenuDetails()
+		: _history->sendMenuDetails();
+}
+
+bool MainWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	return _mainSection
+		? _mainSection->processChosenSticker(std::move(chosen))
+		: _history->processChosenSticker(std::move(chosen));
 }
 
 void MainWidget::dialogsCancelled() {

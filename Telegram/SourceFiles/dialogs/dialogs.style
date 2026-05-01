@@ -577,6 +577,11 @@ dialogsMiniReplyStory: DialogsMiniIcon {
 	skipMedia: 5px;
 }
 
+historyReplyStoryIcon: IconEmoji {
+	icon: icon {{ "mini_reply_story", dialogsTextFg, point(0px, 1px) }};
+	padding: margins(0px, 0px, 4px, 0px);
+}
+
 dialogsUnreadMention: ThreeStateIcon {
 	icon: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsMentionIconFg }};
 	over: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsMentionIconFg }};
