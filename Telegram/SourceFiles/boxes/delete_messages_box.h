@@ -27,8 +27,7 @@ class DeleteMessagesBox final : public Ui::BoxContent {
 public:
 	DeleteMessagesBox(
 		QWidget*,
-		not_null<HistoryItem*> item,
-		bool suggestModerateActions);
+		not_null<HistoryItem*> item);
 	DeleteMessagesBox(
 		QWidget*,
 		not_null<Main::Session*> session,
