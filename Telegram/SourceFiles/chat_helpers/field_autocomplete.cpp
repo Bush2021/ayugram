@@ -533,7 +533,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 
 		bool listAllSuggestions = _filter.isEmpty();
 		if (_addInlineBots) {
-			for (const auto user : _session->recentInlineBots().list()) {
+			for (const auto &user : _session->recentInlineBots().list()) {
 				if (user->isInaccessible()
 					|| (!listAllSuggestions
 						&& filterNotPassedByUsername(user))) {
@@ -541,7 +541,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 				}
 				pushMentionRow(user, MentionRow::Source::InlineRecent);
 			}
-			for (const auto peer : guestChatBots) {
+			for (const auto &peer : guestChatBots) {
 				const auto user = peer->asUser();
 				if (!user
 					|| user->isInaccessible()
