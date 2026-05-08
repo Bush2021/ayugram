@@ -3220,7 +3220,10 @@ bool HistoryItem::canReact() const {
 			return (_flags & MessageFlag::ReactionsAllowed);
 		}
 	}
-	return Data::CanSend(history()->peer, ChatRestriction::SendReactions, false);
+	const auto peer = history()->peer;
+	return (peer->isChat() || peer->isMegagroup())
+	    ? Data::CanSend(peer, ChatRestriction::SendReactions, false)
+		: true;
 }
 
 void HistoryItem::addPaidReaction(

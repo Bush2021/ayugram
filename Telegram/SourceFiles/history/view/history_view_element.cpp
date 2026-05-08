@@ -2142,7 +2142,9 @@ bool Element::computeIsAttachToPrevious(not_null<Element*> previous) {
 			}
 			const auto rank = [&](not_null<HistoryItem*> item) {
 			    const auto msgsigned = item->Get<HistoryMessageSigned>();
-				return msgsigned->isAnonymousRank ? msgsigned->author : QString();
+				return (msgsigned && msgsigned->isAnonymousRank)
+					? msgsigned->author
+					: QString();
 			};
 			return rank(item) == rank(prev);
 		}
