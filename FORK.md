@@ -24,13 +24,24 @@ telegramdesktop/tdesktop (tg remote)
 ## Sync workflows
 
 ### tg/dev (tdesktop) into local dev — `merge`
-Run `/sync-tg`. Conflicts: keep ayu side; for forked-submodule SHA conflicts, keep local SHA. Verify ayu surface intact before pushing.
+Run `/sync-tg`. Conflict resolution is judgment-based — the rule of thumb is **keep both features**: preserve ayu functionality while taking upstream's new behavior. When upstream changes an API that ayu code calls, update the ayu code to match the new API rather than reverting upstream's change. For SHA conflicts, decide per submodule (see _Forked submodules_ below).
+
+If during `/sync-tg` a forked submodule has new commits on its desktop-app upstream, advance the fork inline: cd into the submodule, rebase its branch onto upstream, force-push to our fork, then continue the main-repo merge with the new fork SHA staged. Verify the ayu surface is intact before pushing.
 
 ### ayu/dev (AyuGramDesktop) into local dev — `rebase`
 Run `/sync-ayu`. Rewrites local commits onto `ayu/dev`. Requires `git push --force-with-lease origin dev` afterward — coordinate first.
 
-### Forked submodules — independent sync
-Run `/submodule-sync`. Advance each forked submodule against its own desktop-app upstream, then register the new SHA as a separate main-repo commit. **Never** run `git submodule update --remote` in the main repo.
+### vs2026 branch — rebase onto dev after every dev change
+The `vs2026` branch carries VS 2026 build adjustments on top of `dev` (currently one commit). After any work that advances `dev` (a sync, a feature commit, anything), refresh `vs2026`:
+
+```bash
+git checkout vs2026
+git rebase dev
+git push --force-with-lease origin vs2026
+git checkout dev
+```
+
+Resolve any rebase conflicts the same way as a normal dev edit. The vs2026 commit should stay a thin shim on top — if it grows, fold the non-VS-specific parts back into dev.
 
 ### Pre-sync checklist (any sync)
 - Working tree clean (`git status --porcelain` empty).
@@ -39,7 +50,7 @@ Run `/submodule-sync`. Advance each forked submodule against its own desktop-app
 
 ## Forked submodules
 
-These five submodules are our (or AyuGram's) forks. Their SHAs must NOT regress to desktop-app upstream during a tg merge.
+These five submodules are our (or AyuGram's) forks.
 
 | Path                  | Direct fork                       | Ultimate upstream                    |
 | --------------------- | --------------------------------- | ------------------------------------ |
@@ -48,6 +59,8 @@ These five submodules are our (or AyuGram's) forks. Their SHAs must NOT regress 
 | `Telegram/codegen`    | github.com/Bush2021/codegen       | github.com/desktop-app/codegen       |
 | `cmake`               | github.com/Bush2021/cmake_helpers | github.com/desktop-app/cmake_helpers |
 | `Telegram/lib_icu`    | github.com/AyuGram/lib_icu        | github.com/desktop-app/lib_icu       |
+
+When `/sync-tg` reports an SHA conflict on one of these, decide per submodule: either keep the local fork SHA (if the fork is ahead of its desktop-app upstream and upstream has no new commits to fold in), or advance the fork first — rebase onto its desktop-app upstream, force-push to our fork, then continue the main-repo merge with the new fork SHA. **Never** run `git submodule update --remote` in the main repo — it overwrites hand-picked SHAs with whatever the tracking branch tip happens to be.
 
 All other (~23) submodules point straight at desktop-app or third-party upstreams; let them flow with normal SHA bumps.
 
@@ -73,8 +86,12 @@ Editing these in this repo causes recurring merge conflicts. Put fork-specific r
 
 | Skill              | Purpose                                                              |
 | ------------------ | -------------------------------------------------------------------- |
-| `/sync-tg`         | Merge `tg/dev` into `dev` with ayu safety checks                     |
+| `/sync-tg`         | Merge `tg/dev` into `dev` with ayu safety checks; advance forked submodules inline when their upstreams have new commits |
 | `/sync-ayu`        | Rebase local commits onto `ayu/dev` (rewrites history)               |
-| `/submodule-sync`  | Advance each forked submodule against its own upstream, one at a time |
 
 Each skill lives at `.claude/commands/`. Invoke via Claude Code's slash menu.
+
+## Git & Submodules
+- Never use `--ours` or `--theirs` blindly during merge conflict resolution involving submodules; inspect each submodule SHA and confirm which side is canonical before committing.
+- Distinguish forked submodules from upstream-tracked ones before amending SHAs. Ask if unclear.
+- After any merge involving submodules, verify all submodule pointers and run a build before declaring success.

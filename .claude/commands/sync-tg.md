@@ -46,15 +46,39 @@ If merge succeeds with no conflicts, jump to step 5.
 
 Inspect `git status` and group conflicts:
 
-**Forked submodule SHA conflicts** (paths from `FORK.md` forked-submodule list — `Telegram/lib_ui`, `lib_tl`, `codegen`, `lib_icu`, `cmake`): always keep our side.
+**Forked submodule SHA conflicts** (paths from `FORK.md` forked-submodule list — `Telegram/lib_ui`, `lib_tl`, `codegen`, `lib_icu`, `cmake`): judgment call per submodule. First check whether the fork's own desktop-app upstream has new commits:
 ```bash
+cd <submodule-path>
+git remote -v                        # confirm an upstream remote exists; add it if missing
+git fetch upstream
+git log --oneline HEAD..upstream/<branch>
+```
+
+If upstream has new commits, **advance the fork inline** before resolving the SHA conflict in the main repo:
+```bash
+git rebase upstream/<branch>         # resolve any fork-internal conflicts
+git push --force-with-lease origin <branch>
+cd <main-repo-root>
+git add <submodule-path>             # stages the newly-advanced fork SHA
+```
+
+If upstream has no new commits (fork is already ahead), keep the local fork SHA:
+```bash
+cd <main-repo-root>
 git checkout --ours <submodule-path>
 git add <submodule-path>
 ```
 
-**Ayu file conflicts** (paths under `Telegram/SourceFiles/ayu/`, `*ayu*` resource dirs, `lib_ui/ayu/`): default to keeping our side; only manually merge when the ayu code references upstream APIs that just changed.
+**Non-forked submodule SHA conflicts** (every submodule path NOT in the forked list above — `lib_base`, `lib_webview`, `ThirdParty/dispatch`, etc.): take upstream's bumped SHA. Never blanket-apply the `--ours` rule here.
+```bash
+git checkout --theirs <submodule-path>
+git add <submodule-path>
+```
+If unsure, `cd` into the submodule and check `git log` on both candidate SHAs to confirm upstream's is the newer commit before staging.
 
-**Other files**: standard 3-way merge resolution.
+**Ayu file conflicts** (paths under `Telegram/SourceFiles/ayu/`, `*ayu*` resource dirs, `lib_ui/ayu/`): **keep both features**. Take upstream's structural/API changes and update the ayu side to match the new API — don't blanket-revert upstream just to preserve the old ayu code. Manually merge each file with both intents in mind.
+
+**Other files**: standard 3-way merge resolution; same _keep both features_ principle when upstream and ayu both touched the same hunk.
 
 After all conflicts resolved: `git merge --continue`.
 
@@ -76,6 +100,13 @@ Any line of diff = something in the ayu surface changed during the merge. Show t
 ### 6. Submodule SHA sanity check
 
 Run `git submodule status`. For each forked submodule, confirm its SHA is not a desktop-app upstream commit. If unsure, `cd` into the submodule and run `git log -1 --format='%H %s' <sha>` to see whose commit it is.
+
+Then sync non-forked submodule working trees to the freshly-merged superproject pointers:
+```bash
+git submodule update --init <non-forked-paths-that-moved>
+git submodule status   # confirm no '+' or '-' prefix on any line
+```
+A `+` prefix after a merge means the working tree submodule HEAD differs from what the superproject records — usually a stale checkout that needs `git submodule update`, not a real change to commit. Do **not** `git add` these without first checking that the working-tree SHA is the one you actually want.
 
 ### 7. Stop short of push
 
