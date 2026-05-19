@@ -1596,6 +1596,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_preview_loading" = "Getting Link Info...";
 "lng_preview_cant" = "Could not generate preview for this link.";
+"lng_markdown_preview_cant" = "Can't preview this Markdown file";
+"lng_markdown_preview_open_file" = "Open file";
 
 "lng_profile_settings_section" = "Settings";
 "lng_profile_bot_settings" = "Bot Settings";
@@ -4901,6 +4903,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_bot_sure_add_text_group" = "Are you sure you want to add this bot as an admin in the group {group}? It will have access to the list of anonymous admins.";
 "lng_bot_sure_add_text_channel" = "Are you sure you want to add this bot as an admin in the channel {group}? It will have access to lists of channel admins and subscribers.";
 "lng_bot_no_webview" = "Unfortunately, you can't open this menu with your current system configuration.";
+"lng_bot_webview_failed" = "Could not initialize WebView.";
+"lng_bot_webview_crashed" = "Webview crashed.";
 "lng_bot_remove_from_menu" = "Remove from menu";
 "lng_bot_remove_from_menu_sure" = "Remove {bot} from the attachment menu?";
 "lng_bot_remove_from_menu_done" = "Bot removed from the menu.";
@@ -5483,8 +5487,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_share_wrong_user" = "This game was opened from a different user.";
 "lng_share_game_link_copied" = "Game link copied to clipboard.";
 "lng_share_done" = "Done!";
-"lng_share_message_to_saved_messages" = "Message forwarded to **Saved Messages**.";
-"lng_share_messages_to_saved_messages" = "Messages forwarded to **Saved Messages**.";
+"lng_share_message_to_saved" = "Message forwarded to **{chat}**.";
+"lng_share_messages_to_saved" = "Messages forwarded to **{chat}**.";
 "lng_share_message_to_chat" = "Message forwarded to **{chat}**.";
 "lng_share_messages_to_chat" = "Messages forwarded to **{chat}**.";
 "lng_share_message_to_two_chats" = "Message forwarded to **{user}** and **{chat}**.";
@@ -7884,6 +7888,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_contact_send_message" = "Message";
 
 "lng_iv_open_in_browser" = "Open in Browser";
+"lng_iv_click_to_view" = "Click to View";
 "lng_iv_share" = "Share";
 "lng_iv_join_channel" = "Join";
 "lng_iv_window_title" = "Instant View";

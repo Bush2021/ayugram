@@ -41,7 +41,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Dialogs {
 namespace {
 
-constexpr auto kLinesForPhoto = 3;
+[[nodiscard]] int PillRadius() {
+	const auto padding = st::msgReplyPadding.top();
+	return (padding
+		+ st::semiboldTextStyle.font->height
+		+ st::dialogsTopBarSuggestionAboutStyle.font->height
+		+ padding) / 2;
+}
 
 void PaintTopFade(QPainter &p, int outerWidth, int fadeHeight) {
 	if (fadeHeight <= 0) {
@@ -134,8 +140,15 @@ not_null<UnconfirmedAuthWrap*> CreateUnconfirmedAuthContent(
 	content->paintOn([=](QPainter &p) {
 		const auto outer = content->rect();
 		const auto pill = outer - margins;
-		const auto radius = st::dialogsTopBarSuggestionRadius;
 		PaintTopFade(p, outer.width(), margins.top() + pill.height() / 2);
+		if (pill.isEmpty()) {
+			return;
+		}
+		const auto radius = std::min({
+			PillRadius(),
+			pill.width() / 2,
+			pill.height() / 2,
+		});
 		wrap->shadow().paint(p, pill, radius);
 		auto hq = PainterHighQualityEnabler(p);
 		p.setBrush(st::dialogsBg);
@@ -273,9 +286,15 @@ void TopBarSuggestionContent::setRightIcon(RightIcon icon) {
 		const auto rightHide = _rightHide.get();
 		sizeValue() | rpl::filter_size(
 		) | rpl::on_next([=](const QSize &s) {
+			const auto &button = st::dialogsCancelSearchInPeer;
+			const auto padding = PillRadius()
+				- button.rippleAreaSize / 2;
+			const auto pillHeight = s.height() - rect::m::sum::v(margins);
 			rightHide->moveToRight(
-				margins.right() + st::buttonRadius,
-				margins.top() + st::lineWidth);
+				margins.right() + padding - button.rippleAreaPosition.x(),
+				margins.top()
+					+ (pillHeight - button.rippleAreaSize) / 2
+					- button.rippleAreaPosition.y());
 		}, rightHide->lifetime());
 		rightHide->show();
 	} else if (icon == RightIcon::Arrow) {
@@ -340,9 +359,17 @@ void TopBarSuggestionContent::draw(QPainter &p) {
 	const auto outer = Ui::RpWidget::rect();
 	const auto &margins = st::dialogsTopBarSuggestionMargins;
 	const auto pill = outer - margins;
-	const auto radius = st::dialogsTopBarSuggestionRadius;
 
 	PaintTopFade(p, outer.width(), margins.top() + pill.height() / 2);
+
+	if (pill.isEmpty()) {
+		return;
+	}
+	const auto radius = std::min({
+		PillRadius(),
+		pill.width() / 2,
+		pill.height() / 2,
+	});
 
 	_shadow.paint(p, pill, radius);
 
@@ -401,18 +428,13 @@ void TopBarSuggestionContent::draw(QPainter &p) {
 				- line * lineHeight;
 			if (diff < 3 * lineHeight) {
 				return {
-					.width = availableWidthNoPhoto,
+					.width = availableWidth,
 					.elided = true,
 				};
 			} else if (diff < 2 * lineHeight) {
 				return {};
 			}
-			line += (hasSecondLineTitle ? 2 : 1) + 1;
-			return {
-				.width = (line > kLinesForPhoto)
-					? availableWidthNoPhoto
-					: availableWidth,
-			};
+			return { .width = availableWidth };
 		};
 		p.setPen(_descriptionColorOverride.value_or(st::windowSubTextFg->c));
 		_contentText.draw(p, {
@@ -520,18 +542,13 @@ int TopBarSuggestionContent::resizeGetHeight(int newWidth) {
 			- line * lineHeight;
 		if (diff < 3 * lineHeight) {
 			return {
-				.width = availableWidthNoPhoto,
+				.width = availableWidth,
 				.elided = true,
 			};
 		} else if (diff < 2 * lineHeight) {
 			return {};
 		}
-		line += (hasSecondLineTitle ? 2 : 1) + 1;
-		return {
-			.width = (line > kLinesForPhoto)
-				? availableWidthNoPhoto
-				: availableWidth,
-		};
+		return { .width = availableWidth };
 	};
 	const auto dims = _contentText.countDimensions(
 		Ui::Text::GeometryDescriptor{ .layout = std::move(lineLayout) });

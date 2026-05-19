@@ -717,9 +717,8 @@ void HistoryInner::setupSwipeReplyAndBack() {
 	};
 
 	auto init = [=, show = _controller->uiShow()](
-			int cursorTop,
-			Qt::LayoutDirection direction) {
-		if (direction == Qt::RightToLeft) {
+			Ui::Controls::SwipeHandlerInitData data) {
+		if (data.direction == Qt::RightToLeft) {
 			auto good = true;
 			enumerateItems<EnumItemsDirection::BottomToTop>([&](
 					not_null<Element*> view,
@@ -748,14 +747,16 @@ void HistoryInner::setupSwipeReplyAndBack() {
 				not_null<Element*> view,
 				int itemtop,
 				int itembottom) {
-			if ((cursorTop < itemtop)
-				|| (cursorTop > itembottom)
+			if ((data.cursorPosition.y() < itemtop)
+				|| (data.cursorPosition.y() > itembottom)
 				|| !view->data()->isRegular()
 				|| view->data()->showSimilarChannels()
 				|| view->data()->isService()) {
 				return true;
 			}
-			const auto item = view->data();
+			const auto item = lookupItemByPoint(
+				data.cursorPosition,
+				view);
 			const auto canSendReply = CanSendReply(item);
 			const auto canReply = canSendReply || item->allowsForward();
 			if (!canReply) {
@@ -764,15 +765,22 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			if (_overlayHost) {
 				_overlayHost->hide();
 			}
-			result.msgBareId = item->fullId().msg.bare;
-			result.callback = [=, itemId = item->fullId()] {
-				const auto still = show->session().data().message(itemId);
-				const auto selected = selectedQuote(still);
-				const auto replyToItemId = (selected.item
+			const auto viewItemId = view->data()->fullId();
+			const auto itemId = item->fullId();
+			result.msgBareId = viewItemId.msg.bare;
+			result.callback = [=] {
+				const auto still = show->session().data().message(viewItemId);
+				const auto selected = still
+					? selectedQuote(still)
+					: HistoryView::SelectedQuote();
+				const auto exact = selected.item
 					? selected.item
-					: still)->fullId();
+					: show->session().data().message(itemId);
+				if (!exact) {
+					return;
+				}
 				_widget->replyToMessage({
-					.messageId = replyToItemId,
+					.messageId = exact->fullId(),
 					.quote = selected.highlight.quote,
 					.quoteOffset = selected.highlight.quoteOffset,
 				});
@@ -2018,6 +2026,13 @@ QPoint HistoryInner::mapPointToItem(
 		return mapPointToItem(p, view);
 	}
 	return QPoint();
+}
+
+not_null<HistoryItem*> HistoryInner::lookupItemByPoint(
+		QPoint point,
+		not_null<Element*> view) const {
+	point -= QPoint(SelectionViewOffset(this, view), 0);
+	return HistoryView::LookupItemByPoint(view, mapPointToItem(point, view));
 }
 
 void HistoryInner::mousePressEvent(QMouseEvent *e) {

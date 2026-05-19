@@ -370,7 +370,10 @@ void ShareBox::prepare() {
 				_inner->applyChatFilter(id);
 				scrollToY(0);
 			},
-			Window::GifPauseReason::Layer);
+			Window::GifPauseReason::Layer,
+			nullptr,
+			false,
+			true);
 		chatsFilters->lower();
 		chatsFilters->heightValue() | rpl::on_next([this](int h) {
 			updateScrollSkips();
@@ -1891,7 +1894,12 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 							ChatHelpers::ForwardedMessagePhrase(
 								donePhraseArgs)).current();
 						if (!phrase.empty()) {
-							show->showToast(std::move(phrase));
+							show->showToast({
+								.text = std::move(phrase),
+								.filter = ChatHelpers
+									::ForwardedToSavedMessagesFilter(
+										&history->session()),
+							});
 						}
 						show->hideLayer();
 					}
@@ -1943,7 +1951,12 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 					ChatHelpers::ForwardedMessagePhrase(
 						donePhraseArgs)).current();
 				if (!phrase.empty()) {
-					show->showToast(std::move(phrase));
+					show->showToast({
+						.text = std::move(phrase),
+						.filter = ChatHelpers
+							::ForwardedToSavedMessagesFilter(
+								&history->session()),
+					});
 				}
 				show->hideLayer();
 			}
@@ -2086,7 +2099,11 @@ void FastShareMessageToSelf(
 				ChatHelpers::ForwardedMessagePhrase(
 					donePhraseArgs)).current();
 			if (!phrase.empty()) {
-				show->showToast(std::move(phrase));
+				show->showToast({
+					.text = std::move(phrase),
+					.filter = ChatHelpers::ForwardedToSavedMessagesFilter(
+						&show->session()),
+				});
 			}
 		});
 }

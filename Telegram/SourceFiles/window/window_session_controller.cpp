@@ -1905,7 +1905,8 @@ void SessionController::setupShortcuts() {
 		return !window().locked()
 			&& (_chatSwitchProcess
 				|| (request.started
-					&& (Core::App().activeWindow() == &window())));
+					&& (Core::App().activeWindow() == &window())
+					&& !isLayerShown()));
 	}) | rpl::on_next([=](const ChatSwitchRequest &request) {
 		if (!_chatSwitchProcess) {
 			_chatSwitchProcess = std::make_unique<ChatSwitchProcess>(
