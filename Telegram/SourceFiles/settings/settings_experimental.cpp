@@ -186,8 +186,8 @@ void AddOption(
 	const auto referrer = OptionReferrer(option);
 	Button *button = nullptr;
 	if (!referrer.isEmpty()) {
-		button = container->add(object_ptr<Button>(
-			container,
+		button = inner->add(object_ptr<Button>(
+			inner,
 			rpl::single(name),
 			st::settingsButtonNoIcon));
 		button->addClickHandler([=] {
