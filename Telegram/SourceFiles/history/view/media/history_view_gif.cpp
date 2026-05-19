@@ -75,6 +75,7 @@ namespace {
 constexpr auto kMaxGifForwardedBarLines = 4;
 constexpr auto kUseNonBlurredThreshold = 240;
 constexpr auto kMaxInlineArea = 1920 * 1080;
+constexpr auto kMaxInstantViewInlineArea = 1920 * 1920;
 constexpr auto kSeekAnimationDuration = crl::time(200);
 constexpr auto kSeekTrackOpacity = 0.2;
 
@@ -202,7 +203,7 @@ Gif::Gif(
 			if (!_data->createMediaView()->canBePlayed()
 				|| !_data->isAnimation()
 				|| _data->isVideoMessage()
-				|| !CanPlayInline(_data)) {
+				|| !canPlayInline()) {
 				return false;
 			}
 			playAnimation(false);
@@ -257,6 +258,16 @@ Gif::~Gif() {
 
 bool Gif::CanPlayInline(not_null<DocumentData*> document) {
 	return ValidFrameSize(document->dimensions, kMaxInlineArea);
+}
+
+int Gif::maxInlineArea() const {
+	return IsHostedInstantViewMedia(_parent)
+		? kMaxInstantViewInlineArea
+		: kMaxInlineArea;
+}
+
+bool Gif::canPlayInline() const {
+	return ValidFrameSize(_data->dimensions, maxInlineArea());
 }
 
 QSize Gif::sizeForAspectRatio() const {
@@ -479,7 +490,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 	const auto canBePlayed = _dataMedia->canBePlayed();
 	const auto autoplay = autoplayEnabled()
 		&& canBePlayed
-		&& CanPlayInline(_data);
+		&& canPlayInline();
 	const auto activeRoundPlaying = activeRoundStreamed();
 
 	auto paintx = 0, painty = 0, paintw = width(), painth = height();
@@ -1593,7 +1604,7 @@ void Gif::drawGrouped(
 	const auto autoplay = !_smallGroupPart
 		&& autoplayEnabled()
 		&& canBePlayed
-		&& CanPlayInline(_data);
+		&& canPlayInline();
 	const auto canStartPlay = autoplay
 		&& !_streamed
 		&& !fullHiddenBySpoiler;
@@ -2334,7 +2345,7 @@ void Gif::repaintStreamedContent() {
 }
 
 void Gif::streamingReady(::Media::Streaming::Information &&info) {
-	if (!ValidFrameSize(info.video.size, kMaxInlineArea)) {
+	if (!ValidFrameSize(info.video.size, maxInlineArea())) {
 		if (!info.video.size.isEmpty()) {
 			_data->dimensions = info.video.size;
 		}
