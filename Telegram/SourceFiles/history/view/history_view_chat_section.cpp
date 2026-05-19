@@ -3453,6 +3453,10 @@ base::unique_qptr<Ui::PopupMenu> ChatWidget::listFillSenderUserpicMenu(
 	return menu->empty() ? nullptr : std::move(menu);
 }
 
+Ui::ScrollArea *ChatWidget::listScrollArea() const {
+	return _scroll.get();
+}
+
 void ChatWidget::setupEmptyPainter() {
 	Expects(_topic != nullptr);
 

@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_widget.h"
 #include "dialogs/ui/dialogs_layout.h"
 #include "history/history_item_components.h"
+#include "history/view/history_view_message.h"
 #include "info/profile/info_profile_actions.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
@@ -286,6 +287,7 @@ void SetupExperimental(
 	addToggle(Dialogs::Ui::kOptionDialogsMuteIcon);
 	addToggle(Core::kOptionFractionalScalingEnabled);
 	addToggle(Core::kOptionHighDpiDownscale);
+	addToggle(Core::kOptionUseQtRhi);
 	addToggle(Window::kOptionViewProfileInChatsListContextMenu);
 	addToggle(Info::Profile::kOptionShowPeerIdBelowAbout);
 	addToggle(Info::Profile::kOptionShowChannelJoinedBelowAbout);
@@ -312,6 +314,7 @@ void SetupExperimental(
 	addToggle(kForceComposeSearchOneColumn);
 	addToggle(ChatHelpers::kOptionUnlimitedRecentStickers);
 	addToggle(Ui::kOptionHideAiButton);
+	addToggle(HistoryView::kOptionUnlimitedMessageWidth);
 }
 
 } // namespace

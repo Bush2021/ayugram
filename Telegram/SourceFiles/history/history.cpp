@@ -4410,6 +4410,7 @@ int HistoryBlock::resizeGetHeight(int newWidth, ResizeRequest request) {
 void HistoryBlock::remove(not_null<Element*> view) {
 	Expects(view->block() == this);
 
+	_history->owner().notifyViewAboutToBeRemoved(view);
 	_history->mainViewRemoved(this, view);
 
 	const auto blockIndex = indexInHistory();
