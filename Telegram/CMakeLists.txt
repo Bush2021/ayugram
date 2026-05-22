@@ -2170,7 +2170,9 @@ PRIVATE
     numbers.txt
 )
 
-include(cmake/qrhi_shaders.cmake)
+if (QT_VERSION GREATER_EQUAL 6)
+    include(cmake/qrhi_shaders.cmake)
+endif()
 
 if (APPLE AND NOT build_macstore)
     nice_target_sources(Telegram ${res_loc}
