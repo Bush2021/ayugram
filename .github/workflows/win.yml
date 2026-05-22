@@ -134,7 +134,7 @@ jobs:
 
       - name: Configure pagefile.
         if: env.ONLY_CACHE == 'false'
-        uses: al-cheb/configure-pagefile-action@v1.4
+        uses: al-cheb/configure-pagefile-action@v1.5
         with:
           minimum-size: 16GB
           maximum-size: 32GB
