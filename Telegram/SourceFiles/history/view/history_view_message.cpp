@@ -1931,9 +1931,12 @@ void Message::paintFromName(
 	const auto statusWidth = _fromNameStatus && !hidePremiumStatuses
 		? st::dialogsPremiumIcon.icon.width()
 		: 0;
+	const auto nameAvailableWidth = (statusWidth && availableWidth > statusWidth)
+		? (availableWidth - statusWidth)
+		: availableWidth;
 	if (statusWidth && availableWidth > statusWidth) {
 		const auto x = availableLeft
-			+ std::min(availableWidth - statusWidth, nameText->maxWidth());
+			+ std::min(nameAvailableWidth, nameText->maxWidth());
 		const auto y = trect.top();
 		auto color = nameFg;
 		color.setAlpha(115);
@@ -1973,7 +1976,7 @@ void Message::paintFromName(
 	const auto nameLinkHandler = fromLink();
 	const auto nameWidth = std::min(
 		nameText->maxWidth(),
-		availableWidth);
+		nameAvailableWidth);
 	paintLinkRipple(
 		p,
 		nameLinkHandler,
@@ -1981,7 +1984,7 @@ void Message::paintFromName(
 		trect.topLeft());
 	nameText->draw(p, {
 		.position = { availableLeft, trect.top() },
-		.availableWidth = availableWidth,
+		.availableWidth = nameAvailableWidth,
 		.elisionLines = 1,
 	});
 	const auto skipWidth = nameText->maxWidth()
