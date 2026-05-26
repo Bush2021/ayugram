@@ -1,6 +1,6 @@
 Read `FORK.md` for this project's fork-management rules (remotes, forked-submodule registry, ayu code surface, sync workflows).
 
-For fork-management tasks use the project skills under `.claude/commands/`: `/sync-tg`, `/sync-ayu`, `/submodule-sync`.
+For fork-management tasks use the project skills under `.claude/commands/`: `/sync-tg`, `/sync-ayu`.
 
 Avoid building the project.
 
