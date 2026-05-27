@@ -539,6 +539,7 @@ private:
 	void updateAiButtonVisibility();
 	void updateAiButtonGeometry();
 	void showAiComposeBox();
+	void triggerAiApplyInPlace();
 	void initSendAsFileButton();
 	void sendTextAsFile(
 		const QString &fileText,
