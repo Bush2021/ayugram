@@ -66,6 +66,10 @@ PromoSuggestions::PromoSuggestions(
 PromoSuggestions::~PromoSuggestions() = default;
 
 void PromoSuggestions::refreshTopPromotion() {
+	if (_contactBirthdaysLastDayRequest != -1
+		&& _contactBirthdaysLastDayRequest != QDate::currentDate().day()) {
+		_refreshed.fire({});
+	}
 	if (AyuSettings::getInstance().disableAdsStrictly()) {
 		if (_topPromotionRequestId) {
 			_session->api().request(_topPromotionRequestId).cancel();
