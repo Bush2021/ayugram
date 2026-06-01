@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/color_contrast.h"
 #include "ui/painter.h"
 #include "ui/effects/premium_graphics.h"
+#include "ui/effects/premium_star.h"
+#include "ui/effects/premium_star_particles.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/rect.h"
@@ -25,6 +27,10 @@ namespace {
 constexpr auto kBodyAnimationPart = 0.90;
 constexpr auto kTitleAdditionalScale = 0.15;
 constexpr auto kMinAcceptableContrast = 4.5; // 1.14;
+
+constexpr auto kStar3dScale = 2.;
+
+constexpr auto kStarParticlesFieldScale = 2.2;
 
 [[nodiscard]] QImage ScaleTo(QImage image) {
 	using namespace style;
@@ -118,6 +124,26 @@ TopBar::TopBar(
 		(_logo == u"diamond"_q)
 			? MiniStarsType::DiamondStars
 			: MiniStarsType::BiStars) {
+	if (descriptor.use3dStar && Star::Supported()) {
+		_star3d = CreateChild<Star>(this);
+		_starParticles3d = std::make_unique<StarParticles>([=](
+				const QRect &area) {
+			update(area);
+		});
+		_star3d->flungStrength() | rpl::on_next([=](float64 strength) {
+			_starParticles3d->fling(strength);
+		}, lifetime());
+		if (descriptor.showFinished) {
+			std::move(
+				descriptor.showFinished
+			) | rpl::on_next([=] {
+				if (_star3d) {
+					_star3d->startEnter();
+				}
+			}, lifetime());
+		}
+	}
+
 	std::move(
 		descriptor.title
 	) | rpl::on_next([=](QString text) {
@@ -171,6 +197,21 @@ TopBar::TopBar(
 				: Ui::Premium::ButtonGradientStops()));
 			_ministars.setColorOverride(descriptor.gradientStops);
 		}
+		if (_star3d) {
+			if (!_light && !TopBarAbstract::isDark()) {
+				_star3d->setColors(
+					QColor(255, 255, 255),
+					QColor(0xE3, 0xEC, 0xFA));
+				_starParticles3d->setColor(QColor(255, 255, 255));
+			} else {
+				const auto stops = descriptor.gradientStops
+					? (*descriptor.gradientStops)
+					: Ui::Premium::ButtonGradientStops();
+				const auto middle = stops[stops.size() / 2].second;
+				_star3d->setColors(stops.front().second, middle);
+				_starParticles3d->setColor(middle);
+			}
+		}
 		auto event = QResizeEvent(size(), size());
 		resizeEvent(&event);
 	}, lifetime());
@@ -194,6 +235,12 @@ TopBar::~TopBar() = default;
 
 void TopBar::setPaused(bool paused) {
 	_ministars.setPaused(paused);
+	if (_star3d) {
+		_star3d->setPaused(paused);
+	}
+	if (_starParticles3d) {
+		_starParticles3d->setPaused(paused);
+	}
 }
 
 void TopBar::setTextPosition(int x, int y) {
@@ -223,10 +270,16 @@ void TopBar::resizeEvent(QResizeEvent *e) {
 
 	_starRect = starRect(_progress.top, _progress.body);
 
+	if (_star3d) {
+		auto enlarged = Rect(_starRect.size() * kStar3dScale);
+		enlarged.moveCenter(rect::center(_starRect));
+		_star3d->setGeometry(enlarged.toRect());
+		_star3d->setShownProgress(_progress.body);
+	}
+
 	const auto &padding = st::boxRowPadding;
 	const auto availableWidth = width() - padding.left() - padding.right();
-	const auto titleTop = _starRect.top()
-		+ _starRect.height()
+	const auto titleTop = rect::bottom(_starRect)
 		+ _titlePadding.top();
 	const auto titlePathRect = _titlePath.boundingRect();
 	const auto aboutTop = titleTop
@@ -259,34 +312,46 @@ void TopBar::paintEvent(QPaintEvent *e) {
 		TopBarAbstract::paintEdges(p);
 	}
 
-	p.setOpacity(_progress.body);
-	p.translate(_starRect.center());
-	p.scale(_progress.body, _progress.body);
-	p.translate(-_starRect.center());
-	if (_progress.top) {
-		_ministars.paint(p);
-	}
-	if (_lottie) {
-		_lottie->paint(
-			p,
-			_starRect.left()
-				+ (_starRect.width() - _lottie->width()) / 2
-				- st::lineWidth * 6,
-			_starRect.top());
-		if (!_lottie->animating() && _lottie->frameIndex() > 0) {
-			_lottie->animate(
-				[=] { update(_starRect.toRect() + Margins(st::lineWidth)); },
-				0,
-				_lottie->framesCount() - 1);
+	if (_starParticles3d) {
+		if (_progress.top) {
+			auto field = Rect(_starRect.size() * kStarParticlesFieldScale);
+			field.moveCenter(rect::center(_starRect));
+			p.setOpacity(_progress.body);
+			_starParticles3d->paint(p, field);
+			p.setOpacity(1.);
 		}
+	} else {
+		p.setOpacity(_progress.body);
+		p.translate(rect::center(_starRect));
+		p.scale(_progress.body, _progress.body);
+		p.translate(-rect::center(_starRect));
+		if (_progress.top) {
+			_ministars.paint(p);
+		}
+		if (_lottie) {
+			_lottie->paint(
+				p,
+				_starRect.left()
+					+ (_starRect.width() - _lottie->width()) / 2
+					- st::lineWidth * 6,
+				_starRect.top());
+			if (!_lottie->animating() && _lottie->frameIndex() > 0) {
+				_lottie->animate(
+					[=] {
+						update(_starRect.toRect() + Margins(st::lineWidth));
+					},
+					0,
+					_lottie->framesCount() - 1);
+			}
+		}
+		p.resetTransform();
 	}
-	p.resetTransform();
 
 
 	if (!_dollar.isNull()) {
 		auto hq = PainterHighQualityEnabler(p);
 		p.drawImage(_starRect, _dollar);
-	} else {
+	} else if (!_star3d) {
 		_star.render(&p, _starRect);
 	}
 
@@ -310,9 +375,9 @@ void TopBar::paintEvent(QPaintEvent *e) {
 			_progress.title),
 		anim::interpolate(fullTitleTop, _titlePosition.y(), _progress.title));
 
-	p.translate(titlePathRect.center());
+	p.translate(rect::center(titlePathRect));
 	p.scale(_progress.scaleTitle, _progress.scaleTitle);
-	p.translate(-titlePathRect.center());
+	p.translate(-rect::center(titlePathRect));
 	p.fillPath(_titlePath, color);
 }
 

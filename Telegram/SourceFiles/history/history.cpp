@@ -535,7 +535,7 @@ not_null<HistoryItem*> History::createItem(
 	owner().fillMessagePeers(peer->id, message);
 	if (const auto result = owner().message(peer, id)) {
 		if (detachExistingItem) {
-			result->removeMainView();
+			result->removeMainView(Data::ViewRemovalReason::Detached);
 		}
 		if (result->needsUpdateForVideoQualities(message)) {
 			owner().updateEditedMessage(message);
@@ -4433,10 +4433,12 @@ int HistoryBlock::resizeGetHeight(int newWidth, ResizeRequest request) {
 	return _height;
 }
 
-void HistoryBlock::remove(not_null<Element*> view) {
+void HistoryBlock::remove(
+		not_null<Element*> view,
+		Data::ViewRemovalReason reason) {
 	Expects(view->block() == this);
 
-	_history->owner().notifyViewAboutToBeRemoved(view);
+	_history->owner().notifyViewAboutToBeRemoved(view, reason);
 	_history->mainViewRemoved(this, view);
 
 	const auto blockIndex = indexInHistory();

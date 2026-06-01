@@ -29,6 +29,9 @@ class Icon;
 
 namespace Ui::Premium {
 
+class Star;
+class StarParticles;
+
 class TopBarAbstract : public RpWidget {
 public:
 	TopBarAbstract(
@@ -71,7 +74,9 @@ struct TopBarDescriptor {
 	rpl::producer<TextWithEntities> about;
 	bool light = false;
 	bool optimizeMinistars = true;
+	bool use3dStar = false;
 	std::optional<QGradientStops> gradientStops;
+	rpl::producer<> showFinished;
 };
 
 class TopBar final : public TopBarAbstract {
@@ -102,6 +107,8 @@ private:
 	QSvgRenderer _star;
 	QImage _dollar;
 	std::unique_ptr<Lottie::Icon> _lottie;
+	Star *_star3d = nullptr;
+	std::unique_ptr<StarParticles> _starParticles3d;
 
 	struct {
 		float64 top = 0.;

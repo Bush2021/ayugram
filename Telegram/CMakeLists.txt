@@ -1338,6 +1338,8 @@ PRIVATE
     info/profile/info_profile_badge_tooltip.h
     info/profile/info_profile_badge.cpp
     info/profile/info_profile_badge.h
+    info/profile/info_profile_birthday_effect.cpp
+    info/profile/info_profile_birthday_effect.h
     info/profile/info_profile_cover.cpp
     info/profile/info_profile_cover.h
     info/profile/info_profile_emoji_status_panel.cpp
@@ -2173,6 +2175,7 @@ PRIVATE
 )
 
 include(cmake/qrhi_shaders.cmake)
+include(cmake/generate_models.cmake)
 
 if (APPLE AND NOT build_macstore)
     nice_target_sources(Telegram ${res_loc}

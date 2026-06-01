@@ -67,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_style.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
 #include "lang/lang_keys.h"
 #include "boxes/delete_messages_box.h"
@@ -2969,7 +2970,7 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 	}
 
 	const auto count = accessibilityChildCount();
-	if (count > 0) {
+	if (count > 0 && Ui::ScreenReaderModeActive()) {
 		if (_accessibilityFocusedItem
 			&& _accessibilityFocusedIndex >= 0) {
 			const auto elements = accessibleElements();
@@ -4537,13 +4538,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 				pressedHandler->property(
 					kPhotoLinkMediaProperty).toULongLong());
 			if (lnkPhoto) {
-				photoData = PreparePhotoDragData(
-					lnkPhoto,
-					exactItem ? exactItem->date() : TimeId(0));
-				if (!photoData.tempPath.isEmpty()) {
-					urls.push_back(
-						QUrl::fromLocalFile(photoData.tempPath));
-				}
+				photoData = PreparePhotoDragData(lnkPhoto);
 			}
 		}
 
@@ -4553,8 +4548,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 			return nullptr;
 		}
 
-		auto result = std::make_unique<DragMimeData>(
-			std::move(photoData.tempPath));
+		auto result = std::make_unique<QMimeData>();
 		if (!forwardIds.empty()) {
 			session().data().setMimeForwardIds(std::move(forwardIds));
 			result->setData(u"application/x-td-forward"_q, "1");
@@ -4562,9 +4556,7 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 		if (!urls.isEmpty()) {
 			result->setUrls(urls);
 		}
-		if (!photoData.image.isNull()) {
-			result->setImageData(std::move(photoData.image));
-		}
+		FillDragMimeWithPhoto(result.get(), std::move(photoData));
 		return result;
 	}
 	return nullptr;

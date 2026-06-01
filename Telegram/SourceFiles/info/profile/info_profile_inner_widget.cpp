@@ -77,14 +77,14 @@ void AddSavedMusic(
 		anim::type::instant);
 }
 
-[[nodiscard]] Section MakeSecurityRiskWarningSection(
-		not_null<QWidget*> parent,
+void AddUnofficialSecurityRiskWarning(
+		not_null<Ui::VerticalLayout*> layout,
 		not_null<UserData*> user) {
-	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-		parent,
-		object_ptr<Ui::VerticalLayout>(parent));
-	const auto raw = wrap.data();
-	const auto content = raw->entity();
+	const auto wrap = layout->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			layout,
+			object_ptr<Ui::VerticalLayout>(layout)));
+	const auto content = wrap->entity();
 	user->session().changes().peerFlagsValue(
 		user,
 		Data::PeerUpdate::Flag::FullInfo
@@ -136,63 +136,14 @@ void AddSavedMusic(
 				std::move(label),
 				st::defaultBoxDividerLabelPadding,
 				st::defaultDividerLabel.bar,
-				RectPart::Top | RectPart::Bottom));
+				RectParts()));
 		}
 		content->resizeToWidth(content->width());
 	}, content->lifetime());
 	using namespace rpl::mappers;
-	raw->toggleOn(
+	wrap->toggleOn(
 		content->heightValue() | rpl::map(_1 > 0),
 		anim::type::instant);
-	return Section{
-		.widget = std::move(wrap),
-		.shown = raw->toggledValue(),
-		.trailing = SectionSeparator::None(),
-		.embedsLeadingSeparator = true,
-	};
-}
-
-[[nodiscard]] Section MakeBotVerificationFooterSection(
-		not_null<QWidget*> parent,
-		not_null<PeerData*> peer) {
-	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-		parent,
-		object_ptr<Ui::VerticalLayout>(parent));
-	const auto raw = wrap.data();
-	const auto inner = raw->entity();
-	peer->session().changes().peerFlagsValue(
-		peer,
-		Data::PeerUpdate::Flag::VerifyInfo
-	) | rpl::on_next([=] {
-		while (inner->count()) {
-			delete inner->widgetAt(0);
-		}
-		const auto info = peer->botVerifyDetails();
-		if (!info || info->description.empty()) {
-			inner->resizeToWidth(inner->width());
-			return;
-		}
-		auto hasMainApp = false;
-		if (const auto user = peer->asUser()) {
-			if (user->botInfo) {
-				hasMainApp = user->botInfo->hasMainApp;
-			}
-		}
-		if (!hasMainApp) {
-			Ui::AddDividerText(inner, rpl::single(info->description));
-		}
-		inner->resizeToWidth(inner->width());
-	}, inner->lifetime());
-	using namespace rpl::mappers;
-	raw->toggleOn(
-		inner->heightValue() | rpl::map(_1 > 0),
-		anim::type::instant);
-	return Section{
-		.widget = std::move(wrap),
-		.shown = raw->toggledValue(),
-		.trailing = SectionSeparator::None(),
-		.embedsLeadingSeparator = true,
-	};
 }
 
 } // namespace
@@ -249,11 +200,11 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 		_controller,
 		musicPeer,
 		_topBarColor.value());
+	if (const auto user = _peer->asUser()) {
+		AddUnofficialSecurityRiskWarning(result.data(), user);
+	}
 
 	auto stack = SectionStack(result.data());
-	if (const auto user = _peer->asUser()) {
-		stack.add(MakeSecurityRiskWarningSection(result.data(), user));
-	}
 	if (_topic && _topic->creating()) {
 		stack.finalize();
 		return result;
@@ -298,7 +249,6 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			.trailing = SectionSeparator::None(),
 		});
 	}
-	stack.add(MakeBotVerificationFooterSection(result.data(), _peer));
 	if (auto actions = SetupActions(_controller, result.data(), _peer)) {
 		stack.addPlainSeparator();
 		stack.add(Section{
