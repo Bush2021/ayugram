@@ -86,4 +86,15 @@ Any output → show the user and get explicit confirmation each change is intent
 
 ## 7. Stop short of push
 
-Tell the user the merge is local; they run `git push origin dev` themselves.
+Tell the user the merge is local; ask if they want Claude to run `git push origin dev` or by themselves.
+
+## 8. vs2026 branch
+
+Checkout vs2026 branch, rebase onto dev; ask if the user allows force push.
+
+## 9. Run CI
+
+Ask the user first, if they agree: Use `gh` CLI to trigger three workflows:
+- mac.yml, running on dev branch.
+- win.yml, running on dev branch.
+- win.yml, running on vs2026 branch.
