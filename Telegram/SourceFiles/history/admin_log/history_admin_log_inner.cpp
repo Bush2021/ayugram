@@ -816,6 +816,12 @@ void InnerWidget::elementOpenDocument(
 	_controller->openDocument(document, showInMediaView, { context });
 }
 
+bool InnerWidget::elementScrollToLocalY(
+		not_null<const Element*> view,
+		int localTop) {
+	return false;
+}
+
 void InnerWidget::elementCancelUpload(const FullMsgId &context) {
 	if (const auto item = session().data().message(context)) {
 		_controller->cancelUploadLayer(item);
@@ -1645,7 +1651,7 @@ void InnerWidget::clearDisplayPointers(DisplayPointerScope pointerScope) {
 	}
 	if (clearMember(_selectedItem)) {
 		_selectedItem = nullptr;
-		_selectedText = TextSelection();
+		_selectedTextSelection = MessageSelection();
 	}
 	if (displayPointerMatches(Element::Hovered(), pointerScope)) {
 		Element::Hovered(nullptr);
@@ -1908,8 +1914,13 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 				const auto view = i->view;
 				context.outbg = view->hasOutLayout();
 				context.selection = (view == _selectedItem)
-					? _selectedText
+					? _selectedTextSelection.flatSelection()
 					: TextSelection();
+				context.fullMessageSelected = false;
+				context.messageSelection = ((view == _selectedItem)
+					&& !_selectedTextSelection.empty())
+					? &_selectedTextSelection
+					: nullptr;
 				context.highlight = _highlighter.state(view->data());
 				view->draw(p, context);
 
@@ -2029,7 +2040,7 @@ void InnerWidget::paintEmpty(Painter &p, not_null<const Ui::ChatStyle*> st) {
 
 TextForMimeData InnerWidget::getSelectedText() const {
 	return _selectedItem
-		? _selectedItem->selectedText(_selectedText)
+		? _selectedItem->selectedText(_selectedTextSelection)
 		: TextForMimeData();
 }
 
@@ -2054,13 +2065,15 @@ void InnerWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 		request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
 		auto dragState = _mouseActionItem->textState(_dragStartPosition, request);
 		if (dragState.cursor == CursorState::Text) {
-			_mouseTextSymbol = dragState.symbol;
+			_mouseTextAnchor = dragState;
 			_mouseSelectType = TextSelectType::Words;
 			if (_mouseAction == MouseAction::None) {
 				_mouseAction = MouseAction::Selecting;
-				auto selection = TextSelection { dragState.symbol, dragState.symbol };
 				repaintItem(std::exchange(_selectedItem, _mouseActionItem));
-				_selectedText = selection;
+				_selectedTextSelection = _mouseActionItem->selectionFromStates(
+					_mouseTextAnchor,
+					dragState,
+					_mouseSelectType);
 			}
 			mouseMoveEvent(e);
 
@@ -2084,10 +2097,7 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	auto hasSelected = 0;
 	if (_selectedItem) {
 		isUponSelected = -1;
-
-		auto selFrom = _selectedText.from;
-		auto selTo = _selectedText.to;
-		hasSelected = (selTo > selFrom) ? 1 : 0;
+		hasSelected = _selectedTextSelection.empty() ? 0 : 1;
 		if (Element::Moused() && Element::Moused() == Element::Hovered()) {
 			auto mousePos = mapPointToItem(
 				mapFromGlobal(_mousePosition),
@@ -2095,8 +2105,9 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			StateRequest request;
 			request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
 			auto dragState = Element::Moused()->textState(mousePos, request);
-			if (dragState.cursor == CursorState::Text
-				&& base::in_range(dragState.symbol, selFrom, selTo)) {
+			if (Element::Moused()->selectionContains(
+					_selectedTextSelection,
+					dragState)) {
 				isUponSelected = 1;
 			}
 		}
@@ -2215,6 +2226,9 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}
 			}
 			suggestRestrictParticipant(participant, realId);
+			if (_overSenderUserpic) {
+				_menu->setForcedOrigin(Ui::PanelAnimation::Origin::BottomLeft);
+			}
 		}
 	} else { // maybe cursor on some text history item?
 		const auto item = view ? view->data().get() : nullptr;
@@ -2608,10 +2622,12 @@ void InnerWidget::mouseActionStart(const QPoint &screenPos, Qt::MouseButton butt
 			request.flags = Ui::Text::StateRequest::Flag::LookupSymbol;
 			dragState = _mouseActionItem->textState(_dragStartPosition, request);
 			if (dragState.cursor == CursorState::Text) {
-				auto selection = TextSelection { dragState.symbol, dragState.symbol };
 				repaintItem(std::exchange(_selectedItem, _mouseActionItem));
-				_selectedText = selection;
-				_mouseTextSymbol = dragState.symbol;
+				_selectedTextSelection = _mouseActionItem->selectionFromStates(
+					dragState,
+					dragState,
+					TextSelectType::Paragraphs);
+				_mouseTextAnchor = dragState;
 				_mouseAction = MouseAction::Selecting;
 				_mouseSelectType = TextSelectType::Paragraphs;
 				mouseActionUpdate(_mousePosition);
@@ -2624,22 +2640,20 @@ void InnerWidget::mouseActionStart(const QPoint &screenPos, Qt::MouseButton butt
 		}
 		if (_mouseSelectType != TextSelectType::Paragraphs) {
 			if (Element::Pressed()) {
-				_mouseTextSymbol = dragState.symbol;
-				auto uponSelected = (dragState.cursor == CursorState::Text);
-				if (uponSelected) {
-					if (!_selectedItem || _selectedItem != _mouseActionItem) {
-						uponSelected = false;
-					} else if (_mouseTextSymbol < _selectedText.from || _mouseTextSymbol >= _selectedText.to) {
-						uponSelected = false;
-					}
-				}
+				auto uponSelected = _mouseActionItem
+					&& (_selectedItem == _mouseActionItem)
+					&& _mouseActionItem->selectionContains(
+						_selectedTextSelection,
+						dragState);
 				if (uponSelected) {
 					_mouseAction = MouseAction::PrepareDrag; // start text drag
 				} else if (!_pressWasInactive) {
-					if (dragState.afterSymbol) ++_mouseTextSymbol;
-					auto selection = TextSelection { _mouseTextSymbol, _mouseTextSymbol };
 					repaintItem(std::exchange(_selectedItem, _mouseActionItem));
-					_selectedText = selection;
+					_mouseTextAnchor = dragState;
+					_selectedTextSelection = _mouseActionItem->selectionFromStates(
+						_mouseTextAnchor,
+						dragState,
+						_mouseSelectType);
 					_mouseAction = MouseAction::Selecting;
 					repaintItem(_mouseActionItem);
 				}
@@ -2662,6 +2676,7 @@ void InnerWidget::mouseActionUpdate(const QPoint &screenPos) {
 void InnerWidget::mouseActionCancel() {
 	_mouseActionItem = nullptr;
 	_mouseAction = MouseAction::None;
+	_mouseTextAnchor = TextState();
 	_dragStartPosition = QPoint(0, 0);
 	_wasSelectedText = false;
 	//_widget->noSelectingScroll(); // TODO
@@ -2732,7 +2747,7 @@ void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton but
 		repaintItem(base::take(_selectedItem));
 	} else if (_mouseAction == MouseAction::Selecting) {
 		if (_selectedItem && !_pressWasInactive) {
-			if (_selectedText.from == _selectedText.to) {
+			if (_selectedTextSelection.empty()) {
 				_selectedItem = nullptr;
 				_controller->widget()->setInnerFocus();
 			}
@@ -2741,13 +2756,14 @@ void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton but
 	_mouseAction = MouseAction::None;
 	_mouseActionItem = nullptr;
 	_mouseSelectType = TextSelectType::Letters;
+	_mouseTextAnchor = TextState();
 	//_widget->noSelectingScroll(); // TODO
 
 	if (QGuiApplication::clipboard()->supportsSelection()
 		&& _selectedItem
-		&& _selectedText.from != _selectedText.to) {
+		&& !_selectedTextSelection.empty()) {
 		TextUtilities::SetClipboardText(
-			_selectedItem->selectedText(_selectedText),
+			_selectedItem->selectedText(_selectedTextSelection),
 			QClipboard::Selection);
 	}
 }
@@ -2784,6 +2800,7 @@ void InnerWidget::updateSelected() {
 
 	TextState dragState;
 	ClickHandlerHost *lnkhost = nullptr;
+	auto dragStateUserpic = false;
 	auto selectingText = _selectedItem
 		&& (view == _mouseActionItem)
 		&& (view == Element::Hovered());
@@ -2819,6 +2836,7 @@ void InnerWidget::updateSelected() {
 					// stop enumeration if we've found a userpic under the cursor
 					if (point.y() >= userpicTop && point.y() < userpicTop + st::msgPhotoSize) {
 						dragState.link = view->data()->from()->openLink();
+						dragStateUserpic = true;
 						lnkhost = view;
 						return false;
 					}
@@ -2827,6 +2845,7 @@ void InnerWidget::updateSelected() {
 			}
 		}
 	}
+	_overSenderUserpic = dragStateUserpic;
 	auto lnkChanged = ClickHandler::setActive(dragState.link, lnkhost);
 	if (lnkChanged || dragState.cursor != _mouseCursorState) {
 		Ui::Tooltip::Hide();
@@ -2851,21 +2870,12 @@ void InnerWidget::updateSelected() {
 	} else if (item) {
 		if (_mouseAction == MouseAction::Selecting) {
 			if (selectingText) {
-				auto second = dragState.symbol;
-				if (dragState.afterSymbol && _mouseSelectType == TextSelectType::Letters) {
-					++second;
-				}
-				auto selection = TextSelection { qMin(second, _mouseTextSymbol), qMax(second, _mouseTextSymbol) };
-				if (_mouseSelectType != TextSelectType::Letters) {
-					selection = _mouseActionItem->adjustSelection(
-						selection,
-						_mouseSelectType);
-				}
-				if (_selectedText != selection) {
-					_selectedText = selection;
-					repaintItem(_mouseActionItem);
-				}
-				if (!_wasSelectedText && (selection.from != selection.to)) {
+				_selectedTextSelection = _mouseActionItem->selectionFromStates(
+					_mouseTextAnchor,
+					dragState,
+					_mouseSelectType);
+				repaintItem(_mouseActionItem);
+				if (!_wasSelectedText && !_selectedTextSelection.empty()) {
 					_wasSelectedText = true;
 					setFocus();
 				}

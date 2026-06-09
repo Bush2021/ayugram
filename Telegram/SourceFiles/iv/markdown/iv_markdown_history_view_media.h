@@ -35,18 +35,28 @@ class Session;
 
 namespace Iv::Markdown {
 
+class MediaBlockHost;
+
 class IvHistoryViewMediaHost final {
 public:
 	IvHistoryViewMediaHost(
 		not_null<Window::SessionController*> controller,
 		not_null<History*> history,
 		QString pageUrl);
+	IvHistoryViewMediaHost(
+		not_null<Window::SessionController*> controller,
+		not_null<HistoryItem*> item);
+	explicit IvHistoryViewMediaHost(
+		not_null<HistoryView::Element*> view);
 	~IvHistoryViewMediaHost();
 
 	[[nodiscard]] not_null<::Data::Session*> session() const;
 	[[nodiscard]] not_null<HistoryItem*> item() const;
-	[[nodiscard]] not_null<HistoryView::Message*> view() const;
+	[[nodiscard]] not_null<HistoryView::Element*> view() const;
 	[[nodiscard]] const QString &pageUrl() const;
+	[[nodiscard]] bool needsViewRequestBridge() const;
+	void registerViewRequestBridge(MediaBlockHost *host);
+	void unregisterViewRequestBridge(MediaBlockHost *host);
 
 	void registerPhoto(not_null<PhotoData*> photo) const;
 	void registerDocument(not_null<DocumentData*> document) const;
@@ -134,7 +144,6 @@ std::shared_ptr<MediaBlock> IvHistoryViewMediaBlockFactory::create(
 }
 
 [[nodiscard]] std::shared_ptr<MediaBlock> CreateIvHistoryViewMediaBlock(
-	Window::SessionController *controller,
 	IvHistoryViewMediaDescriptor descriptor);
 
 } // namespace Iv::Markdown

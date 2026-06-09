@@ -13,11 +13,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/swipe_handler_data.h"
 #include "ui/style/style_core_palette.h"
 #include "layout/layout_selection.h"
+#include "styles/style_iv.h"
 #include "styles/style_basic.h"
 
 #include <vector>
 
 enum class ImageRoundRadius;
+
+namespace HistoryView {
+struct MessageSelection;
+} // namespace HistoryView
 
 namespace style {
 struct TwoIconButton;
@@ -67,6 +72,7 @@ struct MessageStyle {
 
 	style::icon channelBadgeIcon = { Qt::Uninitialized };
 
+	style::Markdown richPageStyle;
 	style::icon tailLeft = { Qt::Uninitialized };
 	style::icon tailRight = { Qt::Uninitialized };
 	style::icon historyRepliesIcon = { Qt::Uninitialized };
@@ -200,6 +206,8 @@ struct ChatPaintContext {
 	QRect area;
 	QRect clip;
 	TextSelection selection;
+	bool fullMessageSelected = false;
+	const HistoryView::MessageSelection *messageSelection = nullptr;
 	ChatPaintHighlight highlight;
 	QPainterPath *highlightPathCache = nullptr;
 	mutable QRect highlightInterpolateTo;
@@ -217,7 +225,7 @@ struct ChatPaintContext {
 	}
 
 	[[nodiscard]] bool selected() const {
-		return (selection == FullSelection);
+		return fullMessageSelected;
 	}
 	[[nodiscard]] not_null<const MessageStyle*> messageStyle() const;
 	[[nodiscard]] not_null<const MessageImageStyle*> imageStyle() const;
@@ -235,8 +243,19 @@ struct ChatPaintContext {
 	}
 	[[nodiscard]] ChatPaintContext withSelection(
 			TextSelection selection) const {
+		return withSelectionState(
+			selection,
+			(selection == FullSelection),
+			nullptr);
+	}
+	[[nodiscard]] ChatPaintContext withSelectionState(
+			TextSelection selection,
+			bool fullMessageSelected,
+			const HistoryView::MessageSelection *messageSelection) const {
 		auto result = *this;
 		result.selection = selection;
+		result.fullMessageSelected = fullMessageSelected;
+		result.messageSelection = messageSelection;
 		return result;
 	}
 	[[nodiscard]] auto computeHighlightCache() const
@@ -331,6 +350,9 @@ public:
 
 	[[nodiscard]] rpl::producer<> paletteChanged() const {
 		return _paletteChanged.events();
+	}
+	[[nodiscard]] int paletteVersion() const {
+		return _paletteVersion;
 	}
 
 	template <typename Type>
@@ -542,6 +564,47 @@ private:
 		style::TextPalette &my,
 		const style::TextPalette &original) const;
 	void make(
+		style::QuoteStyle &my,
+		const style::QuoteStyle &original) const;
+	void make(
+		style::TextStyle &my,
+		const style::TextStyle &original) const;
+	void make(
+		style::FlatLabel &my,
+		const style::FlatLabel &original) const;
+	void make(style::Check &my, const style::Check &original) const;
+	void make(
+		style::MarkdownList &my,
+		const style::MarkdownList &original) const;
+	void make(
+		style::MarkdownQuotePaintColors &my,
+		const style::MarkdownQuotePaintColors &original) const;
+	void make(
+		style::MarkdownRule &my,
+		const style::MarkdownRule &original) const;
+	void make(
+		style::MarkdownDisplayMath &my,
+		const style::MarkdownDisplayMath &original) const;
+	void make(
+		style::MarkdownTable &my,
+		const style::MarkdownTable &original) const;
+	void make(
+		style::MarkdownDetails &my,
+		const style::MarkdownDetails &original) const;
+	void make(
+		style::MarkdownPhoto &my,
+		const style::MarkdownPhoto &original) const;
+	void make(
+		style::MarkdownAudio &my,
+		const style::MarkdownAudio &original) const;
+	void make(
+		style::MarkdownGroupedMedia &my,
+		const style::MarkdownGroupedMedia &original) const;
+	void make(
+		style::MarkdownFailure &my,
+		const style::MarkdownFailure &original) const;
+	void make(style::Markdown &my, const style::Markdown &original) const;
+	void make(
 		style::TwoIconButton &my,
 		const style::TwoIconButton &original) const;
 	void make(
@@ -642,6 +705,7 @@ private:
 	ColorIndicesCompressed _colorIndices;
 
 	bool _dark = false;
+	int _paletteVersion = 0;
 
 	rpl::event_stream<> _paletteChanged;
 

@@ -1120,6 +1120,10 @@ void Updates::handleSendActionUpdate(
 		const auto &data = action.c_sendMessageTextDraftAction();
 		history->streamedDrafts().apply(rootId, fromId, when, data);
 		return;
+	} else if (action.type() == mtpc_sendMessageRichMessageDraftAction) {
+		const auto &data = action.c_sendMessageRichMessageDraftAction();
+		history->streamedDrafts().apply(rootId, fromId, when, data);
+		return;
 	}
 	session().data().sendActionManager().registerFor(
 		history,
@@ -1242,7 +1246,8 @@ void Updates::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 				MTPlong(), // paid_message_stars
 				MTPSuggestedPost(),
 				MTPint(), // schedule_repeat_period
-				MTPstring()), // summary_from_language
+				MTPstring(), // summary_from_language
+				MTPRichMessage()),
 			MessageFlags(),
 			NewMessageType::Unread);
 	} break;
@@ -1286,7 +1291,8 @@ void Updates::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 				MTPlong(), // paid_message_stars
 				MTPSuggestedPost(),
 				MTPint(), // schedule_repeat_period
-				MTPstring()), // summary_from_language
+				MTPstring(), // summary_from_language
+				MTPRichMessage()),
 			MessageFlags(),
 			NewMessageType::Unread);
 	} break;
@@ -2240,6 +2246,15 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 	case mtpc_updateWebViewResultSent: {
 		const auto &d = update.c_updateWebViewResultSent();
 		session().data().webViewResultSent({ .queryId = d.vquery_id().v });
+	} break;
+
+	case mtpc_updateJoinChatWebViewDecision: {
+		const auto &d = update.c_updateJoinChatWebViewDecision();
+		session().data().joinChatWebViewDecision({
+			.peerId = peerFromMTP(d.vpeer()),
+			.queryId = uint64(d.vquery_id().v),
+			.result = d.vresult(),
+		});
 	} break;
 
 	case mtpc_updateBotMenuButton: {

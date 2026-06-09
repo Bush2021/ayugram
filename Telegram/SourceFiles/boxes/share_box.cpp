@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
+#include "history/view/controls/history_view_forward_panel.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_context_menu.h" // CopyPostLink.
 #include "settings/sections/settings_premium.h"
@@ -428,6 +429,7 @@ bool ShareBox::searchByUsername(bool searchCache) {
 			_peopleQuery = query;
 			_peopleFull = false;
 			_peopleRequest = _api.request(MTPcontacts_Search(
+				MTP_flags(0),
 				MTP_string(_peopleQuery),
 				MTP_int(SearchPeopleLimit)
 			)).done([=](const MTPcontacts_Found &result, mtpRequestId requestId) {
@@ -749,8 +751,10 @@ void ShareBox::submit(Api::SendOptions options) {
 		return true;
 	};
 	if (const auto onstack = _descriptor.submitCallback) {
-		const auto forwardOptions = (_forwardOptions.captionsCount
-			&& _forwardOptions.dropCaptions)
+		const auto forwardOptions = !_descriptor.forwardOptions.show
+			? Data::ForwardOptions::PreserveInfo
+			: (_forwardOptions.captionsCount
+				&& _forwardOptions.dropCaptions)
 			? Data::ForwardOptions::NoNamesAndCaptions
 			: _forwardOptions.dropNames
 			? Data::ForwardOptions::NoSenderNames
@@ -1708,6 +1712,12 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		if (existingIds.empty() || result.empty()) {
 			return;
 		}
+		if (HistoryView::Controls::HasRichPage(items)) {
+			forwardOptions = HistoryView::Controls::NormalizeForwardOptions(
+				&history->session(),
+				items,
+				forwardOptions);
+		}
 
 		const auto error = GetErrorForSending(
 			result,
@@ -2016,6 +2026,9 @@ void FastShareMessage(
 		: ranges::all_of(items, [](auto item) {
 			return item->media() && item->media()->forceForwardedInfo();
 		});
+	const auto canShowRichForwardOptions
+		= !HistoryView::Controls::HasRichPage(items)
+		|| HistoryView::Controls::CanHideForwardAuthor(session, items);
 
 	auto copyCallback = [=] {
 		const auto item = owner->message(msgIds[0]);
@@ -2071,7 +2084,8 @@ void FastShareMessage(
 		.forwardOptions = {
 			.sendersCount = ItemsForwardSendersCount(items),
 			.captionsCount = ItemsForwardCaptionsCount(items),
-			.show = !hasOnlyForcedForwardedInfo,
+			.show = !hasOnlyForcedForwardedInfo
+				&& canShowRichForwardOptions,
 		},
 		.moneyRestrictionError = ShareMessageMoneyRestrictionError(),
 	}), Ui::LayerOption::CloseOther);

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_history_view_media.h"
 
+#include "iv/markdown/iv_markdown_article.h"
 #include "base/unixtime.h"
 #include "iv/markdown/iv_markdown_media_block.h"
 
@@ -33,8 +34,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_message.h"
 #include "history/view/media/history_view_media.h"
 #include "ui/basic_click_handlers.h"
-#include "ui/chat/chat_style.h"
-#include "ui/chat/chat_theme.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
 
@@ -166,9 +165,7 @@ struct IvHistoryViewHit {
 
 class IvHistoryViewBlock final : public MediaBlock {
 public:
-	IvHistoryViewBlock(
-		not_null<Window::SessionController*> controller,
-		IvHistoryViewMediaDescriptor descriptor);
+	explicit IvHistoryViewBlock(IvHistoryViewMediaDescriptor descriptor);
 
 	[[nodiscard]] uint64 stableId() const override;
 
@@ -183,15 +180,18 @@ public:
 	[[nodiscard]] int firstLineBaseline() const override;
 
 	void paint(
-			Painter &p,
-			QRect clip,
-			const MarkdownArticlePaintCaches &caches) const override;
+		Painter &p,
+		const MarkdownArticlePaintContext &context) const override;
 
 	[[nodiscard]] ClickHandlerPtr linkAt(QPoint point) const override;
 
 	[[nodiscard]] MediaActivation activationAt(QPoint point) const override;
 
 	[[nodiscard]] MediaBlockSelectionData selectionData() const override;
+
+	[[nodiscard]] bool hasHeavyPart() const override;
+
+	void unloadHeavyPart() override;
 
 private:
 	[[nodiscard]] IvHistoryViewHit resolveHit(QPoint point) const;
@@ -208,11 +208,7 @@ private:
 
 	[[nodiscard]] bool supportsHitClassification();
 
-	void handleViewRepaint(QRect rect);
-
-	void handleItemRepaint();
-
-	void handleViewResize();
+	void hostUpdated() override;
 
 	const uint64 _stableId = 0;
 	const IvHistoryViewMediaKind _kind = IvHistoryViewMediaKind::Map;
@@ -222,18 +218,14 @@ private:
 	const std::shared_ptr<DocumentRuntime> _documentRuntime;
 	const std::shared_ptr<IvHistoryViewMediaHost> _host;
 	const std::vector<std::shared_ptr<void>> _keepAlive;
-	const not_null<::Data::Session*> _session;
-	const not_null<Ui::ChatTheme*> _theme;
-	const not_null<const Ui::ChatStyle*> _style;
 	std::unique_ptr<HistoryView::Media> _media;
-	rpl::lifetime _lifetime;
 	QRect _geometry;
 	int _requestedWidth = 0;
 	bool _supported = false;
+	MediaBlockHost *_registeredBridgeHost = nullptr;
 };
 
 IvHistoryViewBlock::IvHistoryViewBlock(
-	not_null<Window::SessionController*> controller,
 	IvHistoryViewMediaDescriptor descriptor)
 : _stableId(descriptor.stableId)
 , _kind(descriptor.kind)
@@ -242,10 +234,7 @@ IvHistoryViewBlock::IvHistoryViewBlock(
 , _photoRuntime(std::move(descriptor.photo))
 , _documentRuntime(std::move(descriptor.document))
 , _host(std::move(descriptor.host))
-, _keepAlive(std::move(descriptor.keepAlive))
-, _session(_host->session())
-, _theme(controller->currentChatTheme())
-, _style(controller->chatStyle()) {
+, _keepAlive(std::move(descriptor.keepAlive)) {
 	if (descriptor.mediaFactory) {
 		_media = descriptor.mediaFactory(_host->view());
 	}
@@ -253,30 +242,6 @@ IvHistoryViewBlock::IvHistoryViewBlock(
 		_media->initDimensions();
 	}
 	_supported = _media && probeSupport();
-	_session->itemRepaintRequest(
-	) | rpl::filter([=](not_null<const HistoryItem*> item) {
-		return (item == _host->item());
-	}) | rpl::on_next([=](not_null<const HistoryItem*>) {
-		handleItemRepaint();
-	}, _lifetime);
-	_session->itemResizeRequest(
-	) | rpl::filter([=](not_null<const HistoryItem*> item) {
-		return (item == _host->item());
-	}) | rpl::on_next([=](not_null<const HistoryItem*>) {
-		handleViewResize();
-	}, _lifetime);
-	_session->viewRepaintRequest(
-	) | rpl::filter([=](::Data::RequestViewRepaint data) {
-		return (data.view == _host->view());
-	}) | rpl::on_next([=](::Data::RequestViewRepaint data) {
-		handleViewRepaint(data.rect);
-	}, _lifetime);
-	_session->viewResizeRequest(
-	) | rpl::filter([=](not_null<HistoryView::Element*> view) {
-		return (view == _host->view());
-	}) | rpl::on_next([=](not_null<HistoryView::Element*>) {
-		handleViewResize();
-	}, _lifetime);
 }
 
 uint64 IvHistoryViewBlock::stableId() const {
@@ -318,28 +283,19 @@ int IvHistoryViewBlock::firstLineBaseline() const {
 
 void IvHistoryViewBlock::paint(
 		Painter &p,
-		QRect clip,
-		const MarkdownArticlePaintCaches &caches) const {
-	Q_UNUSED(caches);
+		const MarkdownArticlePaintContext &context) const {
 	if (!_media || _geometry.isEmpty()) {
 		return;
 	}
-	const auto visible = clip.intersected(_geometry);
+	const auto visible = context.clip.intersected(_geometry);
 	if (visible.isEmpty()) {
 		return;
 	}
 	p.save();
 	p.translate(_geometry.topLeft());
-	const auto localClip = visible.translated(-_geometry.topLeft());
-	const auto rect = QRect(QPoint(), _media->currentSize());
-	auto context = _theme->preparePaintContext(
-		_style,
-		rect,
-		rect,
-		localClip,
-		!QApplication::activeWindow());
-	context.outbg = _host->view()->hasOutLayout();
-	_media->draw(p, context);
+	auto local = context.translated(-_geometry.topLeft());
+	local.clip = visible.translated(-_geometry.topLeft());
+	_media->draw(p, local);
 	p.restore();
 }
 
@@ -355,6 +311,20 @@ MediaBlockSelectionData IvHistoryViewBlock::selectionData() const {
 	return {
 		.copyText = _copyText,
 	};
+}
+
+bool IvHistoryViewBlock::hasHeavyPart() const {
+	return _media && _media->hasHeavyPart();
+}
+
+void IvHistoryViewBlock::unloadHeavyPart() {
+	const auto had = hasHeavyPart();
+	if (_media) {
+		_media->unloadHeavyPart();
+	}
+	if (had) {
+		_host->view()->checkHeavyPart();
+	}
 }
 
 IvHistoryViewHit IvHistoryViewBlock::resolveHit(QPoint point) const {
@@ -411,6 +381,11 @@ IvHistoryViewHit IvHistoryViewBlock::classifyHandler(
 		|| std::dynamic_pointer_cast<DocumentSaveClickHandler>(handler)
 		|| std::dynamic_pointer_cast<DocumentCancelClickHandler>(handler)
 		|| std::dynamic_pointer_cast<DocumentOpenWithClickHandler>(handler)) {
+		result.link = handler;
+		return result;
+	}
+	if (_kind == IvHistoryViewMediaKind::Audio
+		&& std::dynamic_pointer_cast<DocumentOpenClickHandler>(handler)) {
 		result.link = handler;
 		return result;
 	}
@@ -479,30 +454,17 @@ bool IvHistoryViewBlock::supportsHitClassification() {
 	return true;
 }
 
-void IvHistoryViewBlock::handleViewRepaint(QRect rect) {
-	Q_UNUSED(rect);
-	requestRepaint(QRect());
-}
-
-void IvHistoryViewBlock::handleItemRepaint() {
-	requestRepaint(QRect());
-}
-
-void IvHistoryViewBlock::handleViewResize() {
-	if (!_media) {
+void IvHistoryViewBlock::hostUpdated() {
+	const auto current = host();
+	if (_registeredBridgeHost == current) {
 		return;
 	}
-	const auto previous = _media->currentSize();
-	if (_requestedWidth > 0) {
-		_media->resizeGetHeight(_requestedWidth);
+	if (_registeredBridgeHost) {
+		_host->unregisterViewRequestBridge(_registeredBridgeHost);
 	}
-	if (_geometry.isEmpty()) {
-		return;
-	}
-	if (_media->currentSize() != previous) {
-		requestRelayout(_geometry);
-	} else {
-		requestRepaint(QRect());
+	_registeredBridgeHost = current;
+	if (_registeredBridgeHost) {
+		_host->registerViewRequestBridge(_registeredBridgeHost);
 	}
 }
 
@@ -513,13 +475,22 @@ struct IvHistoryViewMediaHost::State {
 		not_null<Window::SessionController*> controller,
 		not_null<History*> history,
 		QString pageUrl);
+	State(
+		not_null<Window::SessionController*> controller,
+		not_null<HistoryItem*> item);
+	explicit State(not_null<HistoryView::Element*> view);
 
 	const not_null<::Data::Session*> session;
 	const QString pageUrl;
 	const std::unique_ptr<IvHistoryViewDelegate> delegate;
 	const not_null<HistoryItem*> item;
 	AdminLog::OwnedItem owned;
-	HistoryView::Message *view = nullptr;
+	std::unique_ptr<HistoryView::Element> realView;
+	HistoryView::Element *view = nullptr;
+	bool needsViewRequestBridge = true;
+	MediaBlockHost *bridgeHost = nullptr;
+	int bridgeHostReferences = 0;
+	rpl::lifetime bridgeLifetime;
 };
 
 IvHistoryViewMediaHost::State::State(
@@ -539,7 +510,35 @@ IvHistoryViewMediaHost::State::State(
 , item(CreateIvHostMessage(history, this->pageUrl))
 , owned(delegate.get(), item)
 , view(static_cast<HistoryView::Message*>(owned.get())) {
-	view->setInstantViewMediaRuntime(this->pageUrl);
+	static_cast<HistoryView::Message*>(view)->setInstantViewMediaRuntime(
+		this->pageUrl);
+}
+
+IvHistoryViewMediaHost::State::State(
+	not_null<Window::SessionController*> controller,
+	not_null<HistoryItem*> item)
+: session(&item->history()->owner())
+, delegate(std::make_unique<IvHistoryViewDelegate>(
+	controller,
+	session,
+	[=] {
+		if (view) {
+			view->repaint();
+		}
+	}))
+, item(item)
+, realView(this->item->createView(delegate.get()))
+, view(static_cast<HistoryView::Message*>(realView.get())) {
+	static_cast<HistoryView::Message*>(view)->setInstantViewMediaRuntime(
+		this->pageUrl);
+}
+
+IvHistoryViewMediaHost::State::State(
+	not_null<HistoryView::Element*> view)
+: session(&view->history()->owner())
+, item(view->data())
+, view(view.get())
+, needsViewRequestBridge(false) {
 }
 
 IvHistoryViewMediaHost::IvHistoryViewMediaHost(
@@ -552,6 +551,17 @@ IvHistoryViewMediaHost::IvHistoryViewMediaHost(
 	std::move(pageUrl))) {
 }
 
+IvHistoryViewMediaHost::IvHistoryViewMediaHost(
+	not_null<Window::SessionController*> controller,
+	not_null<HistoryItem*> item)
+: _state(std::make_unique<State>(controller, item)) {
+}
+
+IvHistoryViewMediaHost::IvHistoryViewMediaHost(
+	not_null<HistoryView::Element*> view)
+: _state(std::make_unique<State>(view)) {
+}
+
 IvHistoryViewMediaHost::~IvHistoryViewMediaHost() = default;
 
 not_null<::Data::Session*> IvHistoryViewMediaHost::session() const {
@@ -562,12 +572,60 @@ not_null<HistoryItem*> IvHistoryViewMediaHost::item() const {
 	return _state->item;
 }
 
-not_null<HistoryView::Message*> IvHistoryViewMediaHost::view() const {
-	return not_null<HistoryView::Message*>{ _state->view };
+not_null<HistoryView::Element*> IvHistoryViewMediaHost::view() const {
+	return not_null<HistoryView::Element*>{ _state->view };
 }
 
 const QString &IvHistoryViewMediaHost::pageUrl() const {
 	return _state->pageUrl;
+}
+
+bool IvHistoryViewMediaHost::needsViewRequestBridge() const {
+	return _state->needsViewRequestBridge;
+}
+
+void IvHistoryViewMediaHost::registerViewRequestBridge(MediaBlockHost *host) {
+	if (!host || !_state->needsViewRequestBridge) {
+		return;
+	}
+	if (_state->bridgeHost == host) {
+		++_state->bridgeHostReferences;
+		return;
+	}
+	_state->bridgeLifetime.destroy();
+	_state->bridgeHost = host;
+	_state->bridgeHostReferences = 1;
+	_state->session->viewRepaintRequest(
+	) | rpl::filter([=](::Data::RequestViewRepaint data) {
+		return (data.view == _state->view);
+	}) | rpl::on_next([=](::Data::RequestViewRepaint) {
+		if (_state->bridgeHost) {
+			_state->bridgeHost->requestRepaint(QRect());
+		}
+	}, _state->bridgeLifetime);
+	_state->session->viewResizeRequest(
+	) | rpl::filter([=](not_null<HistoryView::Element*> view) {
+		return (view == _state->view);
+	}) | rpl::on_next([=](not_null<HistoryView::Element*>) {
+		if (_state->bridgeHost) {
+			_state->bridgeHost->requestRelayout(QRect());
+		}
+	}, _state->bridgeLifetime);
+}
+
+void IvHistoryViewMediaHost::unregisterViewRequestBridge(MediaBlockHost *host) {
+	if (!host
+		|| !_state->needsViewRequestBridge
+		|| _state->bridgeHost != host) {
+		return;
+	}
+	--_state->bridgeHostReferences;
+	if (_state->bridgeHostReferences > 0) {
+		return;
+	}
+	_state->bridgeHostReferences = 0;
+	_state->bridgeHost = nullptr;
+	_state->bridgeLifetime.destroy();
 }
 
 void IvHistoryViewMediaHost::registerPhoto(not_null<PhotoData*> photo) const {
@@ -613,16 +671,14 @@ std::shared_ptr<MediaBlock> IvHistoryViewMediaBlockFactory::createMap(
 }
 
 std::shared_ptr<MediaBlock> CreateIvHistoryViewMediaBlock(
-		Window::SessionController *controller,
 		IvHistoryViewMediaDescriptor descriptor) {
-	if (!controller || !descriptor.host) {
+	if (!descriptor.host) {
 		return nullptr;
 	}
 	if (!descriptor.mediaFactory) {
 		return nullptr;
 	}
 	const auto block = std::make_shared<IvHistoryViewBlock>(
-		controller,
 		std::move(descriptor));
 	return block->supported() ? block : nullptr;
 }

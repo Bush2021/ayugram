@@ -28,6 +28,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "data/data_channel.h"
+#include "data/data_session.h"
+#include "iv/iv_cached_media.h"
 #include "base/unixtime.h"
 #include "boxes/premium_preview_box.h"
 #include "core/application.h"
@@ -36,10 +39,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
+#include "spellcheck/spellcheck_highlight_syntax.h"
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "payments/payments_reaction_process.h" // TryAddingPaidReaction.
-#include "window/section_widget.h"
 #include "window/window_session_controller.h"
+#include "window/section_widget.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/glare.h"
 #include "ui/effects/path_shift_gradient.h"
@@ -54,7 +58,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_groups.h"
 #include "data/data_saved_sublist.h"
-#include "data/data_session.h"
 #include "data/data_todo_list.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
@@ -63,6 +66,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
+#include "styles/style_iv.h"
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -73,6 +77,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace HistoryView {
 namespace {
+
+[[nodiscard]] auto FlatSelectionEndpointFromState(const TextState &state)
+-> MessageSelectionFlatEndpoint {
+	if (state.selectionCursor.isFlat()) {
+		return state.selectionCursor.flat;
+	}
+	return {
+		.symbol = state.symbol,
+		.afterSymbol = state.afterSymbol,
+	};
+}
+
+[[nodiscard]] auto FlatSelectionEndpointFromOffset(uint16 offset)
+-> MessageSelectionFlatEndpoint {
+	return {
+		.symbol = offset,
+		.afterSymbol = false,
+	};
+}
 
 // A new message from the same sender is attached to previous within 15 minutes.
 constexpr int kAttachMessageToPreviousSecondsDelta = 900;
@@ -532,6 +555,12 @@ void DefaultElementDelegate::elementOpenDocument(
 	not_null<DocumentData*> document,
 	FullMsgId context,
 	bool showInMediaView) {
+}
+
+bool DefaultElementDelegate::elementScrollToLocalY(
+		not_null<const Element*> view,
+		int localTop) {
+	return false;
 }
 
 void DefaultElementDelegate::elementCancelUpload(const FullMsgId &context) {
@@ -1745,6 +1774,14 @@ const Ui::Text::String &Element::text() const {
 	return _text;
 }
 
+HistoryMessageRichPage *Element::richpage() {
+	return Get<HistoryMessageRichPage>();
+}
+
+const HistoryMessageRichPage *Element::richpage() const {
+	return const_cast<Element*>(this)->richpage();
+}
+
 OnlyEmojiAndSpaces Element::isOnlyEmojiAndSpaces() const {
 	if (data()->Has<HistoryMessageTranslation>()) {
 		return OnlyEmojiAndSpaces::No;
@@ -1759,6 +1796,10 @@ OnlyEmojiAndSpaces Element::isOnlyEmojiAndSpaces() const {
 	}
 }
 
+int Element::richPageWidthFor(int textWidth) const {
+    return textWidth + st::msgPadding.left() + st::msgPadding.right();
+}
+
 int Element::textHeightFor(int textWidth) const {
 	constexpr auto kMaxWidth = (1 << 16) - 1;
 	if (textWidth <= 0 || textWidth > kMaxWidth) {
@@ -1767,9 +1808,20 @@ int Element::textHeightFor(int textWidth) const {
 	const_cast<Element*>(this)->validateText();
 	if (_textWidth != textWidth) {
 		_textWidth = textWidth;
-		const auto result = _text.countSize(textWidth);
-		_textRealWidth = std::clamp(result.width(), 0, kMaxWidth);
-		_textHeight = result.height();
+		if (const auto rich = const_cast<Element*>(this)->richpage()) {
+			const auto articleHeight = rich->article.resizeGetHeight(
+				richPageWidthFor(textWidth));
+			_textHeight = articleHeight + skipBlockHeight();
+			rich->article.setVisibleTopBottom(0, articleHeight);
+			_textRealWidth = std::clamp(
+				rich->article.lastLayoutWidth(),
+				0,
+				kMaxWidth);
+		} else {
+			const auto result = _text.countSize(textWidth);
+			_textRealWidth = std::clamp(result.width(), 0, kMaxWidth);
+			_textHeight = result.height();
+		}
 	}
 	return _textHeight;
 }
@@ -1794,9 +1846,10 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 		return {};
 	}
 	const auto from = item->from();
-	const auto topicUrl = u"internal:url:https://t.me/c/%1/%2"_q
-		.arg(peerToChannel(peerId).bare)
-		.arg(topicRootId.bare);
+	const auto topicUrl = UrlClickHandler::EncodeInternalWrappedUrl(
+		u"https://t.me/c/%1/%2"_q
+			.arg(peerToChannel(peerId).bare)
+			.arg(topicRootId.bare));
 	const auto fromLink = [&](int index) {
 		return tr::link(from->name(), index);
 	};
@@ -1922,6 +1975,90 @@ auto Element::contextDependentServiceText() -> TextWithLinks {
 }
 
 void Element::validateText() {
+	const auto clearRichPage = [&] {
+		if (Has<HistoryMessageRichPage>()) {
+			RemoveComponents(0
+				| HistoryMessageRichPage::Bit()
+				| InstantViewMediaRuntime::Bit());
+			invalidateTextSizeCache();
+		}
+	};
+	const auto ensureRichPage = [&](
+			std::shared_ptr<const Iv::RichPage> page) {
+		const auto message = dynamic_cast<Message*>(this);
+		if (!message || !page) {
+			clearRichPage();
+			return;
+		}
+		if (!Has<HistoryMessageRichPage>()) {
+			AddComponents(0
+				| HistoryMessageRichPage::Bit()
+				| InstantViewMediaRuntime::Bit());
+		}
+		const auto runtime = Get<HistoryMessageRichPage>();
+		const auto needsBinding = (runtime->article.mediaBlockHost()
+			!= &runtime->host);
+		const auto needsHighlightSubscription = !runtime->highlightReadyLifetime;
+		if (needsBinding || needsHighlightSubscription) {
+			const auto weak = base::make_weak(message);
+			runtime->host.owner = weak;
+			if (needsBinding) {
+				runtime->article.setMediaBlockHost(&runtime->host);
+				runtime->article.setTextRepaintCallbacks(
+					[weak] {
+						if (const auto owner = weak.get()) {
+							owner->requestRichPageRepaint(QRect());
+						}
+					},
+					[weak](QRect articleRect) {
+						if (const auto owner = weak.get()) {
+							owner->requestRichPageRepaint(articleRect);
+						}
+					});
+			}
+		}
+		if (needsHighlightSubscription) {
+			Spellchecker::HighlightReady(
+			) | rpl::on_next([weak = runtime->host.owner](
+					Spellchecker::HighlightProcessId processId) {
+				if (const auto owner = weak.get()) {
+					if (const auto rich = owner->richpage()) {
+						if (rich->article.highlightProcessDone(processId)) {
+							owner->requestRichPageRepaint(QRect());
+						}
+					}
+				}
+			}, runtime->highlightReadyLifetime);
+		}
+		if (runtime->page == page && runtime->mediaRuntime) {
+			return;
+		}
+		const auto &layoutSt = st::messageMarkdown;
+		const auto session = &history()->session();
+		runtime->page = std::move(page);
+		runtime->mediaRuntime = Iv::CreateMessageMediaRuntime(
+			session,
+			not_null<Element*>{ this },
+			[](QString) {}, // openChannel
+			[](QString) {}); // joinChannel
+		auto prepared = Iv::Markdown::TryPrepareNativeInstantView({
+			.richPage = runtime->page,
+			.mediaRuntime = runtime->mediaRuntime,
+			.dimensionsOverride = Iv::Markdown::CaptureMarkdownPrepareDimensions(
+				layoutSt),
+		});
+		if (!prepared.supported()) {
+			clearRichPage();
+			return;
+		}
+		runtime->article.setContent(std::move(prepared.content));
+		runtime->handler = nullptr;
+		runtime->handlerPreparedLink = std::nullopt;
+		runtime->handlerMediaActivation = {};
+		runtime->handlerPlaceholderId = {};
+		runtime->handlerPlaceholderPoint = QPoint();
+		invalidateTextSizeCache();
+	};
 	const auto item = data();
 	const auto media = item->media();
 	const auto storyMention = media && media->storyMention();
@@ -1930,6 +2067,7 @@ void Element::validateText() {
 	if (storyExpired || storyUnsupported) {
 		_media = nullptr;
 		_textItem = item;
+		clearRichPage();
 		if (!storyMention) {
 			if (_text.isEmpty()) {
 				setTextWithLinks(tr::italic(storyUnsupported
@@ -1953,6 +2091,7 @@ void Element::validateText() {
 		if (summaryShownChanged) {
 			setTextWithLinks(summary.result);
 		}
+		clearRichPage();
 		return;
 	} else {
 		_flags &= ~Flag::SummaryShown;
@@ -1962,9 +2101,11 @@ void Element::validateText() {
 		if (!_text.isEmpty()) {
 			setTextWithLinks({});
 		}
+		clearRichPage();
 		return;
 	}
 	const auto &text = _textItem->_text;
+	auto richPage = std::shared_ptr<const Iv::RichPage>();
 	if (!summaryShownChanged && _text.isEmpty() == text.empty()) {
 	} else if (_flags & Flag::ServiceMessage) {
 		const auto contextDependentText = contextDependentServiceText();
@@ -2000,8 +2141,15 @@ void Element::validateText() {
 			setTextWithLinks(tr::italic(unavailable));
 		} else {
 			setTextWithLinks(_textItem->translatedTextWithLocalEntities());
+			richPage = _textItem->richPage();
 		}
 	}
+	if (!richPage
+		&& !(_flags & Flag::ServiceMessage)
+		&& item->computeUnavailableReason().isEmpty()) {
+		richPage = _textItem->richPage();
+	}
+	ensureRichPage(std::move(richPage));
 }
 
 void Element::setTextWithLinks(
@@ -2534,7 +2682,7 @@ bool Element::allowTextSelectionByHandler(
 }
 
 bool Element::usesBubblePattern(const PaintContext &context) const {
-	return (context.selection != FullSelection)
+	return !context.selected()
 		&& hasOutLayout()
 		&& context.bubblesPattern
 		&& !context.viewport.isEmpty()
@@ -2546,6 +2694,9 @@ bool Element::hasVisibleText() const {
 }
 
 int Element::textualMaxWidth() const {
+	if (const auto rich = richpage()) {
+		return rich->article.maxWidth();
+	}
 	return st::msgPadding.left()
 		+ (hasVisibleText() ? text().maxWidth() : 0)
 		+ st::msgPadding.right();
@@ -2559,8 +2710,10 @@ auto Element::verticalRepaintRange() const -> VerticalRepaintRange {
 }
 
 bool Element::hasHeavyPart() const {
+	const auto rich = richpage();
 	return (_flags & Flag::HeavyCustomEmoji)
-		|| (_media && _media->hasHeavyPart());
+		|| (_media && _media->hasHeavyPart())
+		|| (rich && rich->article.hasHeavyPart());
 }
 
 void Element::checkHeavyPart() {
@@ -2731,6 +2884,9 @@ void Element::unloadHeavyPart() {
 	if (_media) {
 		_media->unloadHeavyPart();
 	}
+	if (const auto rich = richpage()) {
+		rich->article.unloadHeavyPart();
+	}
 	if (_flags & Flag::HeavyCustomEmoji) {
 		_flags &= ~Flag::HeavyCustomEmoji;
 		_text.unloadPersistentAnimation();
@@ -2845,10 +3001,78 @@ TextState Element::bottomInfoTextState(
 	return TextState();
 }
 
+MessageSelection Element::selectionFromStates(
+		const TextState &anchor,
+		const TextState &current,
+		TextSelectType type) const {
+	if (anchor.selectionCursor.isRichPage()
+		|| current.selectionCursor.isRichPage()) {
+		return {};
+	}
+	return adjustSelection(
+		MessageSelection::Flat(
+			FlatSelectionEndpointFromState(anchor),
+			FlatSelectionEndpointFromState(current)),
+		type);
+}
+
+TextForMimeData Element::selectedText(
+		const MessageSelection &selection) const {
+	if (const auto flat = selection.flatSelection(); !flat.empty()) {
+		return selectedText(flat);
+	}
+	return {};
+}
+
+SelectedQuote Element::selectedQuote(
+		const MessageSelection &selection) const {
+	if (const auto flat = selection.flatSelection(); !flat.empty()) {
+		return selectedQuote(flat);
+	}
+	return {};
+}
+
 TextSelection Element::adjustSelection(
 		TextSelection selection,
 		TextSelectType type) const {
 	return selection;
+}
+
+MessageSelection Element::adjustSelection(
+		const MessageSelection &selection,
+		TextSelectType type) const {
+	if (!selection.isFlat()) {
+		return {};
+	}
+	const auto adjusted = adjustSelection(selection.flatSelection(), type);
+	if (adjusted.empty() || (adjusted == FullSelection)) {
+		return {};
+	}
+	const auto anchorOffset = selection.anchor.isFlat()
+		? selection.anchor.flat.offset()
+		: adjusted.from;
+	const auto focusOffset = selection.focus.isFlat()
+		? selection.focus.flat.offset()
+		: adjusted.to;
+	return MessageSelection::Flat(
+		(anchorOffset <= focusOffset)
+			? FlatSelectionEndpointFromOffset(adjusted.from)
+			: FlatSelectionEndpointFromOffset(adjusted.to),
+		(anchorOffset <= focusOffset)
+			? FlatSelectionEndpointFromOffset(adjusted.to)
+			: FlatSelectionEndpointFromOffset(adjusted.from));
+}
+
+TextSelection Element::selectionForEdit(
+		const MessageSelection &selection) const {
+	return selection.flatRangeForEdit();
+}
+
+bool Element::selectionContains(
+		const MessageSelection &selection,
+		const TextState &state) const {
+	return (state.cursor == CursorState::Text)
+		&& selection.contains(state.selectionCursor);
 }
 
 SelectedQuote Element::FindSelectedQuote(
@@ -3087,6 +3311,10 @@ Element::~Element() {
 	if (_flags & Flag::HeavyCustomEmoji) {
 		_flags &= ~Flag::HeavyCustomEmoji;
 		_text.unloadPersistentAnimation();
+		checkHeavyPart();
+	}
+	if (const auto rich = richpage(); rich && rich->article.hasHeavyPart()) {
+		rich->article.clearBeforeDestroy();
 		checkHeavyPart();
 	}
 	if (_data->mainView() == this) {
