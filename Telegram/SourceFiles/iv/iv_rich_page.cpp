@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flat_map.h"
 #include "base/qthelp_url.h"
 #include "base/unixtime.h"
+#include "base/variant.h"
 #include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
@@ -1440,9 +1441,44 @@ void AppendBlocks(
 	}
 }
 
+void ExpandInlineTextObjects(TextWithEntities *text) {
+	auto &entities = text->entities;
+	for (auto i = entities.begin(); i != entities.end();) {
+		if (i->type() != EntityType::CustomEmoji) {
+			++i;
+			continue;
+		}
+		const auto object = Markdown::ParseInlineTextObjectEntity(
+			i->data());
+		if (!object) {
+			++i;
+			continue;
+		}
+		const auto replacement = v::match(object->data, [](
+				const Markdown::InlineTextObjectFormulaData &data) {
+			return data.trimmedTex;
+		}, [](const Markdown::InlineTextObjectIvImageData &data) {
+			return data.replacementText;
+		});
+		const auto offset = i->offset();
+		const auto length = i->length();
+		const auto delta = int(replacement.size()) - length;
+		text->text.replace(offset, length, replacement);
+		i = entities.erase(i);
+		for (auto &entity : entities) {
+			if (entity.offset() > offset) {
+				entity.shiftRight(delta);
+			} else if (entity.offset() + entity.length() > offset) {
+				entity.shrinkFromRight(-delta);
+			}
+		}
+	}
+}
+
 void AppendSummaryLine(
 		TextWithEntities *result,
 		TextWithEntities &&line) {
+	ExpandInlineTextObjects(&line);
 	TextUtilities::Trim(line);
 	if (line.empty()) {
 		return;
@@ -1470,6 +1506,35 @@ void AppendSummaryLine(
 		const RichText &line,
 		const QString &prefix = QString()) {
 	AppendSummaryLine(result, line.text, prefix);
+}
+
+[[nodiscard]] QString MediaSummaryFallback(const Block &block) {
+	if (block.kind == BlockKind::Photo) {
+		return tr::lng_in_dlg_photo(tr::now);
+	} else if (block.kind == BlockKind::Video) {
+		return tr::lng_in_dlg_video(tr::now);
+	} else if (block.kind == BlockKind::Audio) {
+		return tr::lng_in_dlg_audio_file(tr::now);
+	} else if (block.kind == BlockKind::Map) {
+		return tr::lng_maps_point(tr::now);
+	} else if (block.kind == BlockKind::GroupedMedia) {
+		auto photos = false;
+		auto videos = false;
+		for (const auto &item : block.mediaItems) {
+			if (item.kind == BlockKind::Video) {
+				videos = true;
+			} else {
+				photos = true;
+			}
+		}
+		if (videos && !photos) {
+			return tr::lng_in_dlg_video(tr::now);
+		} else if (photos && !videos) {
+			return tr::lng_in_dlg_photo(tr::now);
+		}
+		return tr::lng_in_dlg_album(tr::now);
+	}
+	return QString();
 }
 
 [[nodiscard]] QString FooterText(const RelatedArticle &article) {
@@ -1559,7 +1624,13 @@ void AppendSummaryBlock(TextWithEntities *result, const Block &block) {
 	case BlockKind::Audio:
 	case BlockKind::GroupedMedia:
 	case BlockKind::Map:
-		AppendSummaryLine(result, block.caption);
+		if (!block.caption.text.empty()) {
+			AppendSummaryLine(result, block.caption);
+		} else {
+			AppendSummaryLine(
+				result,
+				TextWithEntities::Simple(MediaSummaryFallback(block)));
+		}
 		return;
 	case BlockKind::Embed:
 		if (!block.caption.text.empty()) {
@@ -1787,6 +1858,9 @@ std::shared_ptr<const RichPage> ParseRichPage(
 TextWithEntities FlattenRichPageSummary(const RichPage &page) {
 	auto result = FlattenSummaryBlocks(page.blocks);
 	TextUtilities::Trim(result);
+	if (result.empty()) {
+		result = TextWithEntities::Simple(tr::lng_message_empty(tr::now));
+	}
 	return result;
 }
 

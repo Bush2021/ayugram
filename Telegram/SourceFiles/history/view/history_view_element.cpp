@@ -1814,7 +1814,8 @@ int Element::textHeightFor(int textWidth) const {
 		if (const auto rich = const_cast<Element*>(this)->richpage()) {
 			const auto articleHeight = rich->article.resizeGetHeight(
 				richPageWidthFor(textWidth));
-			_textHeight = articleHeight + skipBlockHeight();
+			_textHeight = articleHeight
+				+ (_text.hasSkipBlock() ? skipBlockHeight() : 0);
 			rich->article.setVisibleTopBottom(0, articleHeight);
 			_textRealWidth = std::clamp(
 				rich->article.lastLayoutWidth(),
