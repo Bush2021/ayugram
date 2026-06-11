@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
+#include "base/options.h"
 #include "base/platform/base_platform_info.h"
 #include "base/qt_signal_producer.h"
 #include "base/random.h"
@@ -147,6 +148,15 @@ constexpr auto kCommonModifiers = 0
 	| Qt::MetaModifier
 	| Qt::ControlModifier;
 
+base::options::toggle MacCmdReplyImmediately({
+	.id = Controls::kOptionMacCmdReplyImmediately,
+	.name = "Mac: instant reply on Cmd + Up/Down",
+	.description = "Reply to the previous or next message right away on "
+		"Cmd + Up/Down, instead of first moving the text cursor to the start "
+		"or end of the input field. Hold Shift to move the cursor as before.",
+	.scope = base::options::macos,
+});
+
 using FileChosen = ComposeControls::FileChosen;
 using PhotoChosen = ComposeControls::PhotoChosen;
 using MessageToEdit = ComposeControls::MessageToEdit;
@@ -164,6 +174,10 @@ using ForwardPanel = Controls::ForwardPanel;
 	}
 
 } // namespace
+
+namespace Controls {
+const char kOptionMacCmdReplyImmediately[] = "mac-cmd-reply-immediately";
+} // namespace Controls
 
 const ChatHelpers::PauseReason kDefaultPanelsLevel
 	= ChatHelpers::PauseReason::TabbedPanel;
@@ -2409,7 +2423,7 @@ void ComposeControls::initKeyHandler() {
 			const auto isUp = (k->key() == Qt::Key_Up);
 			const auto isDown = (k->key() == Qt::Key_Down);
 			if (isUp || isDown) {
-				if (Platform::IsMac()) {
+				if (Platform::IsMac() && !MacCmdReplyImmediately.value()) {
 					// Cmd + Up is used instead of Home.
 					if ((isUp && (!_field->textCursor().atStart()))
 						// Cmd + Down is used instead of End.
