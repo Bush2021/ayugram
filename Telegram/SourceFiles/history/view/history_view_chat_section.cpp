@@ -1107,6 +1107,7 @@ void ChatWidget::setupSwipeReplyAndBack() {
 			if (!exact) {
 				return;
 			}
+			Window::ActivateWindow(controller());
 			_inner->replyToMessageRequestNotify({
 				.messageId = exact->fullId(),
 				.quote = selected.highlight.quote,
