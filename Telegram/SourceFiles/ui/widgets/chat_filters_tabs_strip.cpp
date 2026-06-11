@@ -440,7 +440,10 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			reassignUnreadValue();
 		}
 		[&] {
-			const auto lookingId = state->lastFilterId.value_or(list[0].id());
+			const auto lookingId = state->lastFilterId.value_or(
+				trackActiveFilterAndUnreadAndReorder
+					? controller->activeChatsFilterCurrent()
+					: list[0].id());
 			for (auto i = 0; i < list.size(); i++) {
 				const auto &filter = list[i];
 				if (filter.id() == lookingId) {
@@ -450,7 +453,9 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 					scrollToIndex(
 						i,
 						wasLast ? anim::type::normal : anim::type::instant);
-					applyFilter(filter);
+					if (wasLast || !trackActiveFilterAndUnreadAndReorder) {
+						applyFilter(filter);
+					}
 					return;
 				}
 			}

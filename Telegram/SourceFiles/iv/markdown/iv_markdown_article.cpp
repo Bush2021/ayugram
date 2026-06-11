@@ -2765,7 +2765,7 @@ private:
 		const MarkdownArticleScrollOwnerIdentity &identity,
 		int left);
 
-	void finalizeRelayout(int width, int heightBottom);
+	void finalizeRelayout(int heightBottom);
 	void relayout(int width);
 	void relayoutRetained(int width);
 	void retainBlocks();
@@ -2782,6 +2782,8 @@ private:
 	int _width = -1;
 	int _laidOutWidth = 0;
 	int _height = 0;
+	int _layoutGeneration = 0;
+	MarkdownArticleRevealLineCountsCache _revealLineCounts;
 	CachedTextLeafPool _cachedTextLeafs;
 	std::vector<LaidOutBlock> _blocks;
 	std::vector<LaidOutBlock> _retainedBlocks;
@@ -3100,6 +3102,15 @@ void MarkdownArticle::Impl::paint(
 	auto markBg = MarkBgColorForStyle(paintSt);
 	const auto ownedMarkBg = style::internal::OwnedColor(markBg);
 	textPalette.markBg = ownedMarkBg.color();
+	if (local.reveal) {
+		if (_revealLineCounts.layoutGeneration != _layoutGeneration) {
+			_revealLineCounts.layoutGeneration = _layoutGeneration;
+			_revealLineCounts.counts.clear();
+		}
+		local.reveal->lineCounts = &_revealLineCounts;
+	} else if (!_revealLineCounts.counts.empty()) {
+		_revealLineCounts = {};
+	}
 	const auto &previousTextPalette = p.textPalette();
 	p.setTextPalette(textPalette);
 	PaintBlocks(
@@ -4354,7 +4365,7 @@ bool MarkdownArticle::Impl::setScrollLeft(
 		_capturedScrollLefts.erase(identity);
 	}
 	refreshScrolledGeometry(block);
-	RefreshScrollableSegmentRects(_blocks, &_segments);
+	RefreshScrollableSegmentRects(block, &_segments);
 	if (_textRepaintRect) {
 		_textRepaintRect(block.outer);
 	} else if (_textRepaint) {
@@ -4509,13 +4520,18 @@ void MarkdownArticle::Impl::endHorizontalScroll() {
 	_activeHorizontalScrollDrag.reset();
 }
 
-void MarkdownArticle::Impl::finalizeRelayout(int width, int heightBottom) {
+// The laid out width is passed through the _width field, assigned by the
+// callers right before the call, instead of a parameter, because GCC 15
+// IPA-CP with LTO wrongly constant-folded such a parameter to 1 (the lower
+// bound of the std::max(width, 1) clamps in the callers), collapsing rich
+// message bubbles to the minimum width in release Linux builds.
+void MarkdownArticle::Impl::finalizeRelayout(int heightBottom) {
 	const auto &page = layoutStyle().pagePadding;
-	_width = width;
+	++_layoutGeneration;
 	restoreScrollState();
 	refreshScrolledGeometry(_blocks);
 	_laidOutWidth = std::min(
-		width,
+		_width,
 		std::max(
 			ArticleContentMaxRight(_blocks, layoutStyle()) + page.right(),
 			page.left() + page.right() + 1));
@@ -4605,7 +4621,8 @@ void MarkdownArticle::Impl::relayout(int width) {
 	RestoreRelatedArticleImageStates(
 		&_blocks,
 		_relatedArticleImages);
-	finalizeRelayout(width, y);
+	_width = width;
+	finalizeRelayout(y);
 }
 
 void MarkdownArticle::Impl::relayoutRetained(int width) {
@@ -4665,7 +4682,8 @@ void MarkdownArticle::Impl::relayoutRetained(int width) {
 		relayout(width);
 		return;
 	}
-	finalizeRelayout(width, *y);
+	_width = width;
+	finalizeRelayout(*y);
 }
 
 MarkdownArticle::MarkdownArticle(
