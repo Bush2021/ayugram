@@ -174,7 +174,8 @@ Gif::Gif(
 , _videoTimestamp(::Media::View::ExtractVideoTimestamp(realParent))
 , _sensitiveSpoiler(realParent->isMediaSensitive())
 , _hasVideoCover(realParent->media() && realParent->media()->videoCover()) {
-	if (_data->isVideoMessage() && _parent->data()->media()->ttlSeconds()) {
+	const auto media = _parent->data()->media();
+	if (_data->isVideoMessage() && media && media->ttlSeconds()) {
 		if (_spoiler) {
 			_drawTtl = CreateTtlPaintCallback([=] { repaint(); });
 		}
@@ -213,7 +214,7 @@ Gif::Gif(
 
 	setStatusSize(Ui::FileStatusSizeReady);
 
-	if (_data->isVideoMessage() && !_parent->data()->media()->ttlSeconds()) {
+	if (_data->isVideoMessage() && (!media || !media->ttlSeconds())) {
 		_seekl = std::make_shared<VoiceSeekClickHandler>(
 			_data,
 			[](FullMsgId) {});
@@ -278,7 +279,7 @@ QSize Gif::sizeForAspectRatio() const {
 	//}
 	if (_data->hasThumbnail()) {
 		const auto &location = _data->thumbnailLocation();
-		return { location.width(), location.height() };
+		return NonEmptySize({ location.width(), location.height() });
 	}
 	return { 1, 1 };
 }
@@ -530,6 +531,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 	const auto inTTLViewer = _parent->delegate()->elementContext()
 		== Context::TTLViewer;
 	const auto revealed = (isRound
+			&& item->media()
 			&& item->media()->ttlSeconds()
 			&& !inTTLViewer)
 		? 0
@@ -1391,9 +1393,10 @@ TextState Gif::textState(QPoint point, StateRequest request) const {
 	if (QRect(usex + paintx, painty, usew, painth).contains(point)) {
 		ensureDataMediaCreated();
 		if (_spoiler && !_spoiler->revealed) {
+			const auto media = _parent->data()->media();
 			result.link = _sensitiveSpoiler
 				? spoilerTagLink()
-				: (isRound && _parent->data()->media()->ttlSeconds())
+				: (isRound && media && media->ttlSeconds())
 				? _openl
 				: _spoiler->link;
 		} else if (_seekl && isRoundSeekable()) {
@@ -2418,8 +2421,9 @@ void Gif::ensureTranscribeButton() const {
 		return;
 	}
 
+	const auto media = _parent->data()->media();
 	if (_data->isVideoMessage()
-		&& !_parent->data()->media()->ttlSeconds()
+		&& (!media || !media->ttlSeconds())
 		&& !_parent->data()->isScheduled()
 		&& !_parent->data()->isAdminLogEntry()
 		&& (_data->session().premium()
