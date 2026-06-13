@@ -97,6 +97,13 @@ PRIVATE
     ayugram::lib_icu
 )
 
+if (WIN32)
+    # Qt 6.11 QDnsLookup backend (qdnslookup_win.cpp) links DnsQueryEx and
+    # friends directly; Qt6::Network's private dnsapi dependency is not
+    # propagated to this final link, so add it explicitly.
+    target_link_libraries(Telegram PRIVATE Dnsapi)
+endif()
+
 set(ayugram_files
         ayu/ayu_worker.cpp
         ayu/ayu_worker.h

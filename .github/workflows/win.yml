@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         arch: [x64]
-        qt: [""]
+        qt: ["", qt6]
         generator: [""]
 
     env:
@@ -192,7 +192,7 @@ jobs:
           set OUT=%TBUILD%\%REPO_NAME%\out\Release
           mkdir artifact
           move %OUT%\AyuGram.exe artifact/
-          xcopy %OUT%\modules artifact\modules\ /E /I /Y
+          if exist %OUT%\modules xcopy %OUT%\modules artifact\modules\ /E /I /Y
       - uses: actions/upload-artifact@v7
         name: Upload artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
