@@ -47,6 +47,42 @@ constexpr auto kMaxIvZoom = 400;
 		kMaxIvZoom);
 }
 
+// AyuGram: translate lang persistence.
+// QLocale::Language enum values are renumbered between Qt5 and Qt6, so the
+// raw enum int that upstream stores in the settings stream maps to a
+// different language after a Qt major upgrade (e.g. zh -> az). Persist the
+// chosen language by locale name through the KV prefs facility and let it
+// override the legacy enum-int read on load. Grep this tag for every site.
+constexpr auto kTranslateToLanguageKey
+	= std::string_view("translate-to-language");
+constexpr auto kSkipTranslationLanguagesKey
+	= std::string_view("skip-translation-languages");
+
+[[nodiscard]] QByteArray SerializeLanguageIds(
+		const std::vector<LanguageId> &list) {
+	auto names = QStringList();
+	names.reserve(int(list.size()));
+	for (const auto &id : list) {
+		if (id) {
+			names.push_back(id.name());
+		}
+	}
+	return names.join(u";"_q).toUtf8();
+}
+
+[[nodiscard]] std::vector<LanguageId> DeserializeLanguageIds(
+		const QByteArray &data) {
+	auto result = std::vector<LanguageId>();
+	const auto names = QString::fromUtf8(data).split(
+		u";"_q,
+		Qt::SkipEmptyParts);
+	result.reserve(names.size());
+	for (const auto &name : names) {
+		result.push_back(LanguageId::FromName(name));
+	}
+	return result;
+}
+
 [[nodiscard]] WindowPosition Deserialize(const QByteArray &data) {
 	QDataStream stream(data);
 	stream.setVersion(QDataStream::Qt_5_1);
@@ -1167,6 +1203,16 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	_rememberedDeleteMessageOnlyForYou = (rememberedDeleteMessageOnlyForYou == 1);
 	_translateChatEnabled = (translateChatEnabled == 1);
 	_translateToRaw = int(QLocale::Language(translateToRaw));
+	// AyuGram: translate lang persistence -- the locale-name prefs are
+	// Qt-version-stable, unlike the enum-int read above; prefer them.
+	if (const auto stored = readPrefGeneric(kTranslateToLanguageKey)
+			; stored && !stored->isEmpty()) {
+		_translateToRaw = int(
+			LanguageId::FromName(QString::fromUtf8(*stored)).value);
+	}
+	if (const auto stored = readPrefGeneric(kSkipTranslationLanguagesKey)) {
+		_skipTranslationLanguages = DeserializeLanguageIds(*stored);
+	}
 	_windowTitleContent = WindowTitleContent{
 		.hideChatName = (hideChatName == 1),
 		.hideAccountName = (hideAccountName == 1),
@@ -1762,6 +1808,12 @@ rpl::producer<bool> Settings::translateChatEnabledValue() const {
 
 void Settings::setTranslateTo(LanguageId id) {
 	_translateToRaw = int(id.value);
+	// AyuGram: translate lang persistence
+	if (id) {
+		writePrefGeneric(kTranslateToLanguageKey, id.name().toUtf8());
+	} else {
+		clearPref(kTranslateToLanguageKey);
+	}
 }
 
 LanguageId Settings::translateTo() const {
@@ -1782,6 +1834,10 @@ rpl::producer<LanguageId> Settings::translateToValue() const {
 void Settings::setSkipTranslationLanguages(
 		std::vector<LanguageId> languages) {
 	_skipTranslationLanguages = std::move(languages);
+	// AyuGram: translate lang persistence
+	writePrefGeneric(
+		kSkipTranslationLanguagesKey,
+		SerializeLanguageIds(_skipTranslationLanguages.current()));
 }
 
 auto Settings::skipTranslationLanguages() const -> std::vector<LanguageId> {
