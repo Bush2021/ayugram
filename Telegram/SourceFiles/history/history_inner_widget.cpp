@@ -2148,9 +2148,7 @@ void HistoryInner::touchScrollUpdated(const QPoint &screenPos) {
 
 QPoint HistoryInner::mapPointToItem(QPoint p, const Element *view) const {
 	if (view) {
-		const auto top = itemTop(view);
-		p.setY(p.y() - top);
-		return p;
+		return p - QPoint(SelectionViewOffset(this, view), itemTop(view));
 	}
 	return QPoint();
 }
@@ -2167,7 +2165,6 @@ QPoint HistoryInner::mapPointToItem(
 not_null<HistoryItem*> HistoryInner::lookupItemByPoint(
 		QPoint point,
 		not_null<Element*> view) const {
-	point -= QPoint(SelectionViewOffset(this, view), 0);
 	return HistoryView::LookupItemByPoint(view, mapPointToItem(point, view));
 }
 
@@ -2539,16 +2536,36 @@ void HistoryInner::mouseActionFinish(
 	}
 	if (needItemSelectionToggle) {
 		clearTextSelection();
-		if (_dragStateItem && _selected.contains(_dragStateItem)) {
-			_selected.remove(_dragStateItem);
-			repaintItem(_mouseActionItem);
-		} else if (_dragStateItem
-			&& !_dragStateItem->isService()
-			&& _dragStateItem->isRegular()) {
-			if (_selected.size() < MaxSelectedItems) {
-				_selected.emplace(_dragStateItem);
+		const auto pointState = Element::Moused()
+			? Element::Moused()->pointState(
+				mapPointToItem(
+					mapFromGlobal(_mousePosition),
+					Element::Moused()))
+			: HistoryView::PointState::Outside;
+		if (pointState == HistoryView::PointState::GroupPart) {
+			const auto exactItem = _dragStateItem
+				? _dragStateItem
+				: _mouseActionItem;
+			if (exactItem
+				&& !exactItem->isService()
+				&& exactItem->isRegular()) {
+				changeSelection(
+					&_selected,
+					exactItem,
+					SelectAction::Invert);
 				repaintItem(_mouseActionItem);
+			} else {
+				_selected.clear();
+				update();
 			}
+		} else if (_mouseActionItem
+			&& !_mouseActionItem->isService()
+			&& _mouseActionItem->isRegular()) {
+			changeSelectionAsGroup(
+				&_selected,
+				_mouseActionItem,
+				SelectAction::Invert);
+			repaintItem(_mouseActionItem);
 		} else {
 			_selected.clear();
 			update();
@@ -5130,10 +5147,6 @@ void HistoryInner::mouseActionUpdate() {
 		? _curHistory->blocks[_curBlock]->messages[_curItem].get()
 		: nullptr;
 	const auto item = view ? view->data().get() : nullptr;
-	const auto selectionViewOffset = view
-		? QPoint(SelectionViewOffset(this, view), 0)
-		: QPoint(0, 0);
-	point -= selectionViewOffset;
 	if (view) {
 		const auto changed = (Element::Moused() != view);
 		if (changed) {
@@ -5191,7 +5204,7 @@ void HistoryInner::mouseActionUpdate() {
 		dragState = replyBtnState;
 		lnkhost = _replyButtonManager.get();
 	} else if (item) {
-		if (item != _mouseActionItem || ((m + selectionViewOffset) - _dragStartPosition).manhattanLength() >= QApplication::startDragDistance()) {
+		if (item != _mouseActionItem || (m - _dragStartPosition).manhattanLength() >= QApplication::startDragDistance()) {
 			if (_mouseAction == MouseAction::PrepareDrag) {
 				_mouseAction = MouseAction::Dragging;
 				InvokeQueued(this, [=] { performDrag(); });
