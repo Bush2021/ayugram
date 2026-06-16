@@ -1090,6 +1090,8 @@ PRIVATE
     history/history_unread_things.h
     history/history_view_highlight_manager.cpp
     history/history_view_highlight_manager.h
+    history/history_view_pull_to_next_channel.cpp
+    history/history_view_pull_to_next_channel.h
     history/history_view_swipe_back_session.cpp
     history/history_view_swipe_back_session.h
     history/history_widget.cpp

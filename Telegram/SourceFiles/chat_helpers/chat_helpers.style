@@ -1173,6 +1173,8 @@ historyToDownBadgeSize: 22px;
 historyToDownShownAfter: 480px;
 historyToDownDuration: 150;
 
+historyPullNextThreshold: 110px;
+
 dialogsToUpAbove: icon {{ "history_down_arrow-flip_vertical", historyToDownFg, point(0px, 1px) }};
 dialogsToUpAboveOver: icon {{ "history_down_arrow-flip_vertical", historyToDownFgOver, point(0px, 1px) }};
 

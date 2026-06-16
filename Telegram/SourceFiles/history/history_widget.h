@@ -114,6 +114,7 @@ class PinnedTracker;
 class TranslateBar;
 class ComposeSearch;
 class SubsectionTabs;
+class PullToNextChannel;
 struct SelectedQuote;
 class SuggestOptionsBar;
 enum class SuggestMode;
@@ -828,6 +829,7 @@ private:
 	Ui::Animations::Simple _scrollToAnimation;
 
 	HistoryView::CornerButtons _cornerButtons;
+	std::unique_ptr<HistoryView::PullToNextChannel> _pullToNext;
 
 	std::unique_ptr<ChatHelpers::FieldAutocomplete> _autocomplete;
 	std::unique_ptr<Ui::Emoji::SuggestionsController> _emojiSuggestions;
