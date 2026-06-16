@@ -1830,9 +1830,9 @@ void MainWidget::showNewSection(
 	auto saveInStack = (params.way == SectionShow::Way::Forward);
 	const auto thirdSectionTop = getThirdSectionTop();
 	const auto newThirdGeometry = QRect(
-		width() - st::columnMinimalWidthThird,
+		width() - _thirdColumnWidth,
 		thirdSectionTop,
-		st::columnMinimalWidthThird,
+		_thirdColumnWidth,
 		height() - thirdSectionTop);
 	auto newThirdSection = (isThreeColumn() && params.thirdColumn)
 		? memento->createWidget(
