@@ -2836,7 +2836,7 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 					});
 
 				if (settings.stickerConfirmation() && (_mode == Mode::Full || _mode == Mode::ChatIntro) && _requireConfirmation) {
-					Ui::show(Ui::MakeConfirmBox({
+					_show->showBox(Ui::MakeConfirmBox({
 						.text = tr::ayu_ConfirmationSticker(),
 						.confirmed = sendStickerCallback,
 						.confirmText = tr::lng_send_button()

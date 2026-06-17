@@ -538,7 +538,7 @@ void GifsListWidget::selectInlineResult(
 
 			const auto &settings = AyuSettings::getInstance();
 			if (settings.gifConfirmation()) {
-				Ui::show(Ui::MakeConfirmBox({
+				_show->showBox(Ui::MakeConfirmBox({
 					.text = tr::ayu_ConfirmationGIF(),
 					.confirmed = sendGIFCallback,
 					.confirmText = tr::lng_send_button()
