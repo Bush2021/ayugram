@@ -100,6 +100,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "base/unixtime.h"
 
@@ -469,10 +470,13 @@ ChatWidget::ChatWidget(
 		}) | rpl::on_next([=](const Api::SendAction &action) {
 			if (action.options.scheduled) {
 				_composeControls->cancelReplyMessage();
-				crl::on_main(this, [=, t = _topic] {
-					controller->showSection(
-						std::make_shared<HistoryView::ScheduledMemento>(t));
-				});
+				const auto &ghost = AyuSettings::ghost(&session());
+				if (!ghost.isUseScheduledMessages()) {
+					crl::on_main(this, [=, t = _topic] {
+						controller->showSection(
+							std::make_shared<HistoryView::ScheduledMemento>(t));
+					});
+				}
 			}
 		}, lifetime());
 	}
