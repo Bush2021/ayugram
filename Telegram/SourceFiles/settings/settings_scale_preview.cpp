@@ -32,7 +32,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QScreen>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_userpic.h"
+#include "ui/chat/chat_style_radius.h"
 
 
 namespace Settings {
@@ -704,13 +706,15 @@ void Preview::paintReply(Painter &p, QRect clip) {
 			outline,
 			_replyRect.height());
 		p.drawRoundedRect(_replyRect, radius, radius);
-		p.setOpacity(Ui::kDefaultBgOpacity);
-		p.setClipRect(
-			_replyRect.x() + outline,
-			_replyRect.y(),
-			_replyRect.width() - outline,
-			_replyRect.height());
-		p.drawRoundedRect(_replyRect, radius, radius);
+		if (!AyuSettings::getInstance().simpleQuotesAndReplies()) {
+			p.setOpacity(Ui::kDefaultBgOpacity);
+			p.setClipRect(
+				_replyRect.x() + outline,
+				_replyRect.y(),
+				_replyRect.width() - outline,
+				_replyRect.height());
+			p.drawRoundedRect(_replyRect, radius, radius);
+		}
 	}
 	p.setOpacity(1.);
 	p.setClipping(false);
@@ -769,7 +773,7 @@ void Preview::validateBubbleCache() {
 	if (!_bubbleCorners.p[0].isNull()) {
 		return;
 	}
-	const auto radius = scaled(16); // st::bubbleRadiusLarge
+	const auto radius = scaled(Ui::BubbleRadiusLarge());
 	_bubbleCorners = Ui::PrepareCornerPixmaps(radius, st::msgInBg);
 	_bubbleCorners.p[2] = {};
 	_bubbleTail = scaled(st::historyBubbleTailInLeft, st::msgInBg->c);

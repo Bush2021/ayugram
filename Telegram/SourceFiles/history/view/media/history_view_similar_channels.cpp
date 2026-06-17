@@ -35,6 +35,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_polls.h"
 
+// AyuGram includes
+#include "ui/chat/chat_style_radius.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -302,7 +306,7 @@ void SimilarChannels::draw(Painter &p, const PaintContext &context) const {
 		if (cachedp) {
 			q->setCompositionMode(QPainter::CompositionMode_DestinationIn);
 			const auto corners = _roundedCorners.data();
-			const auto side = st::bubbleRadiusLarge;
+			const auto side = Ui::BubbleRadiusLarge();
 			q->drawImage(0, 0, corners[Images::kTopLeft]);
 			q->drawImage(width() - side, 0, corners[Images::kTopRight]);
 			q->drawImage(0, height() - side, corners[Images::kBottomLeft]);
@@ -473,7 +477,7 @@ void SimilarChannels::ensureCacheReady(QSize size) const {
 			QImage::Format_ARGB32_Premultiplied);
 		_roundedCache.setDevicePixelRatio(ratio);
 	}
-	const auto radius = st::bubbleRadiusLarge;
+	const auto radius = Ui::BubbleRadiusLarge();
 	if (_roundedCorners.front().size() != QSize(radius, radius) * ratio) {
 		_roundedCorners = Images::CornersMask(radius);
 	}
