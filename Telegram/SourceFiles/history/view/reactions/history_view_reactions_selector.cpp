@@ -43,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/utils/qt_key_modifiers_extended.h"
 
 
 namespace HistoryView::Reactions {
@@ -1440,7 +1441,9 @@ AttachSelectorResult AttachSelectorToMenu(
 	const auto itemId = item->fullId();
 
 	selector->chosen() | rpl::on_next([=](ChosenReaction reaction) {
-		menu->hideMenu();
+		if (!base::IsExtendedContextMenuModifierPressed()) {
+			menu->hideMenu();
+		}
 		reaction.context = itemId;
 		chosen(std::move(reaction));
 	}, selector->lifetime());
