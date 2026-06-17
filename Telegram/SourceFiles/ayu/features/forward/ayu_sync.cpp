@@ -190,7 +190,7 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 
 	const auto finalCheck = [=]
 	{
-		return !photo.first->loading();
+		return view->loaded();
 	};
 
 	const auto saveToFiles = [=]
