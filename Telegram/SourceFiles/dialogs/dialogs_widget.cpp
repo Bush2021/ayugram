@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/swipe_handler.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
@@ -1831,8 +1832,12 @@ void Widget::processSearchFocusChange() {
 	updateSuggestions(anim::type::normal);
 }
 
+bool Widget::searchActive() const {
+	return Ui::ScreenReaderModeActive() ? _searchEngaged : _searchHasFocus;
+}
+
 void Widget::updateSuggestions(anim::type animated) {
-	const auto suggest = (_searchHasFocus || _searchSuggestionsLocked)
+	const auto suggest = (searchActive() || _searchSuggestionsLocked)
 		&& !_searchState.inChat
 		&& (_inner->state() == WidgetState::Default);
 	if (anim::Disabled() || !session().data().chatsListLoaded()) {
@@ -3478,7 +3483,7 @@ void Widget::listScrollUpdated() {
 void Widget::updateCancelSearch() {
 	const auto shown = !_searchState.query.isEmpty()
 		|| (!_searchState.inChat
-			&& (_searchHasFocus || _searchSuggestionsLocked));
+			&& (searchActive() || _searchSuggestionsLocked));
 	_cancelSearch->toggle(shown, anim::type::normal);
 	if (_searchState.inChat) {
 		_cancelSearch->setAccessibleName(shown
@@ -3515,6 +3520,9 @@ QString Widget::validateSearchQuery() {
 void Widget::applySearchUpdate() {
 	auto copy = _searchState;
 	copy.query = validateSearchQuery();
+	if (Ui::ScreenReaderModeActive() && !copy.query.isEmpty()) {
+		_searchEngaged = true;
+	}
 	applySearchState(std::move(copy));
 
 	if (_chooseFromUser->toggled()
@@ -4297,7 +4305,8 @@ void Widget::keyPressEvent(QKeyEvent *e) {
 		//} else {
 		//	e->ignore();
 		//}
-	} else if ((e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Tab)
+	} else if ((e->key() == Qt::Key_Backspace
+			|| (e->key() == Qt::Key_Tab && !Ui::ScreenReaderModeActive()))
 		&& _searchHasFocus
 		&& !_searchState.inChat
 		&& _searchState.query.isEmpty()) {
@@ -4364,7 +4373,7 @@ bool Widget::redirectToSearchPossible() const {
 		&& !_childList
 		&& _search->isVisible()
 		&& !_search->hasFocus()
-		&& hasFocus();
+		&& (hasFocus() || _inner->hasFocus());
 }
 
 bool Widget::redirectKeyToSearch(QKeyEvent *e) const {
@@ -4528,6 +4537,7 @@ void Widget::setSearchQuery(const QString &query, int cursorPosition) {
 }
 
 bool Widget::cancelSearch(CancelSearchOptions options) {
+	_searchEngaged = false;
 	const auto clearingSuggestionsQuery = _suggestions
 		&& _suggestions->consumeSearchQuery(QString());
 	if (clearingSuggestionsQuery) {
