@@ -663,6 +663,8 @@ private:
 	int _groupThumbsLeft = 0;
 	int _groupThumbsTop = 0;
 	Ui::Text::String _caption;
+	Ui::Text::QuotePaintCache _captionPreCache;
+	Ui::Text::QuotePaintCache _captionBlockquoteCache;
 	QRect _captionRect;
 	ClickHandlerPtr _captionExpandLink;
 	int _captionShowMoreWidth = 0;

@@ -32,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/layers/layer_manager.h"
 #include "ui/text/text_utilities.h"
+#include "ui/chat/chat_style.h"
 #include "ui/platform/ui_platform_window_title.h"
 #include "ui/toast/toast.h"
 #include "ui/text/format_values.h"
@@ -331,6 +332,28 @@ QWidget *PipDelegate::pipParentWidget() {
 	return result.items.empty()
 		? std::nullopt
 		: std::make_optional(std::move(result));
+}
+
+void RefreshCaptionQuoteCaches(
+		Ui::Text::QuotePaintCache &blockquote,
+		Ui::Text::QuotePaintCache &pre) {
+	const auto withAlpha = [](QColor color, float64 opacity) {
+		color.setAlpha(int(opacity * 255));
+		return color;
+	};
+
+	const auto accent = st::mediaviewTextLinkFg->c;
+	blockquote.bg = withAlpha(accent, Ui::kDefaultBgOpacity);
+	blockquote.outlines[0] = withAlpha(accent, Ui::kDefaultOutline1Opacity);
+	blockquote.outlines[1] = blockquote.outlines[2] = QColor(0, 0, 0, 0);
+	blockquote.icon = accent;
+
+	const auto mono = st::mediaviewCaptionFg->c;
+	pre.bg = QColor(0, 0, 0, 192);
+	pre.outlines[0] = withAlpha(mono, Ui::kDefaultOutline1Opacity);
+	pre.outlines[1] = pre.outlines[2] = QColor(0, 0, 0, 0);
+	pre.header = withAlpha(mono, Ui::kDefaultOutline2Opacity);
+	pre.icon = withAlpha(mono, Ui::kDefaultOutline3Opacity);
 }
 
 } // namespace
@@ -3974,9 +3997,9 @@ void OverlayWidget::refreshFromLabel() {
 
 void OverlayWidget::refreshCaption() {
 	_caption = Ui::Text::String();
-	const auto caption = StripQuoteEntities([&] {
+	const auto caption = [&] {
 		if (_stories) {
-			return _stories->captionText();
+			return StripQuoteEntities(_stories->captionText());
 		} else if (_message) {
 			if (const auto caption = InstantViewMediaCaption(
 					_message,
@@ -4014,7 +4037,7 @@ void OverlayWidget::refreshCaption() {
 			return _message->translatedText();
 		}
 		return TextWithEntities();
-	}());
+	}();
 	if (caption.text.isEmpty()) {
 		if (_streamed && _streamed->controls) {
 			_streamed->controls->setTimestamps({});
@@ -4059,6 +4082,15 @@ void OverlayWidget::refreshCaption() {
 		_caption.setSpoilerLinkFilter([=](const ClickContext &context) {
 			return (weak != nullptr);
 		});
+	}
+	if (_caption.hasCollapsedBlockquots()) {
+		_caption.setBlockquoteExpandCallback(crl::guard(_widget, [=](
+				int index,
+				bool expanded) {
+			const auto wasGeometry = captionGeometry();
+			refreshCaptionGeometry();
+			update(wasGeometry.united(captionGeometry()));
+		}));
 	}
 }
 
@@ -6808,10 +6840,13 @@ void OverlayWidget::paintCaptionContent(
 	}
 	if (inner.intersects(clip)) {
 		p.setPen(st::mediaviewCaptionFg);
+		RefreshCaptionQuoteCaches(_captionBlockquoteCache, _captionPreCache);
 		_caption.draw(p, {
 			.position = inner.topLeft(),
 			.availableWidth = inner.width(),
 			.palette = &st::mediaviewTextPalette,
+			.pre = &_captionPreCache,
+			.blockquote = &_captionBlockquoteCache,
 			.spoiler = Ui::Text::DefaultSpoilerCache(),
 			.pausedEmoji = On(PowerSaving::kEmojiChat),
 			.pausedSpoiler = On(PowerSaving::kChatSpoiler),
