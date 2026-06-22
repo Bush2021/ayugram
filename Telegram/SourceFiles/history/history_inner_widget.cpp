@@ -261,6 +261,13 @@ public:
 			_widget->elementShowTooltip(text, hiddenCallback);
 		}
 	}
+	void elementShowHiddenSenderTooltip(
+			FullMsgId itemId,
+			const TextWithEntities &text) override {
+		if (_widget) {
+			_widget->elementShowHiddenSenderTooltip(itemId, text);
+		}
+	}
 	bool elementAnimationsPaused() override {
 		return _widget ? _widget->elementAnimationsPaused() : false;
 	}
@@ -4850,6 +4857,26 @@ void HistoryInner::elementShowTooltip(
 		const TextWithEntities &text,
 		Fn<void()> hiddenCallback) {
 	_widget->showInfoTooltip(text, std::move(hiddenCallback));
+}
+
+void HistoryInner::elementShowHiddenSenderTooltip(
+		FullMsgId itemId,
+		const TextWithEntities &text) {
+	auto area = QRect();
+	if (const auto item = _controller->session().data().message(itemId)) {
+		if (const auto view = viewByItem(item)) {
+			const auto tooltip
+				= view->Get<HistoryView::HiddenSenderTooltip>();
+			const auto top = itemTop(view);
+			if (tooltip && !tooltip->linkRect.isEmpty() && top >= 0) {
+				const auto local = tooltip->linkRect;
+				area = QRect(
+					mapToGlobal(QPoint(local.x(), top + local.y())),
+					local.size());
+			}
+		}
+	}
+	_widget->showHiddenSenderTooltip(area, text);
 }
 
 bool HistoryInner::elementAnimationsPaused() {

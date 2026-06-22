@@ -562,6 +562,11 @@ void DefaultElementDelegate::elementShowTooltip(
 	Fn<void()> hiddenCallback) {
 }
 
+void DefaultElementDelegate::elementShowHiddenSenderTooltip(
+	FullMsgId itemId,
+	const TextWithEntities &text) {
+}
+
 bool DefaultElementDelegate::elementHideReply(
 		not_null<const Element*> view) {
 	return false;

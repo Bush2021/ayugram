@@ -509,6 +509,9 @@ Message::Message(
 	}
 	initLogEntryOriginal();
 	initPsa();
+	if (data->displayHiddenSenderInfo()) {
+		AddComponents(HiddenSenderTooltip::Bit());
+	}
 	setupReactions(replacing);
 	auto animation = replacing ? replacing->takeEffectAnimation() : nullptr;
 	if (animation) {
@@ -2471,6 +2474,15 @@ void Message::paintFromName(
 	const auto nameWidth = std::min(
 		nameText->maxWidth(),
 		nameAvailableWidth);
+	if (!from) {
+		if (const auto tooltip = Get<HiddenSenderTooltip>()) {
+			tooltip->linkRect = QRect(
+				availableLeft,
+				trect.top(),
+				nameWidth,
+				st::msgNameFont->height);
+		}
+	}
 	paintLinkRipple(
 		p,
 		nameLinkHandler,
@@ -2733,20 +2745,36 @@ void Message::paintForwardedInfo(
 			&& _linkRipple->link
 			&& !_linkRipple->ripple
 			&& rippleBelongsHere;
+		const auto hiddenTooltip = Get<HiddenSenderTooltip>();
+		const auto recomputeHidden = hiddenTooltip
+			&& (hiddenTooltip->cachedWidth != useWidth);
+		const auto hiddenSenderRange = recomputeHidden
+			? forwarded->text.linkRangeFor(
+				HiddenSenderInfo::ForwardClickHandler())
+			: TextSelection();
 		auto highlightPath = QPainterPath();
 		auto highlightRequest = Ui::Text::HighlightInfoRequest{
-			.range = rippleLinkRange,
+			.range = needRippleMask ? rippleLinkRange : hiddenSenderRange,
 			.outPath = &highlightPath,
 		};
+		const auto needHighlight = needRippleMask
+			|| !hiddenSenderRange.empty();
 		forwarded->text.draw(p, {
 			.position = { trect.x(), trect.y() },
 			.availableWidth = useWidth,
 			.palette = &fwdPalette,
 			.paused = p.inactive(),
-			.highlight = needRippleMask ? &highlightRequest : nullptr,
+			.highlight = needHighlight ? &highlightRequest : nullptr,
 			.elisionLines = 2,
 			.elisionBreakEverywhere = breakEverywhere,
 		});
+		if (recomputeHidden) {
+			hiddenTooltip->cachedWidth = useWidth;
+			if (!hiddenSenderRange.empty() && !highlightPath.isEmpty()) {
+				hiddenTooltip->linkRect
+					= highlightPath.boundingRect().toRect();
+			}
+		}
 		if (needRippleMask && !highlightPath.isEmpty()) {
 			createLinkRippleMask(
 				highlightPath,

@@ -236,9 +236,14 @@ ClickHandlerPtr HiddenSenderInfo::ForwardClickHandler() {
 	static const auto hidden = std::make_shared<LambdaClickHandler>([](
 			ClickContext context) {
 		const auto my = context.other.value<ClickHandlerContext>();
-		const auto weak = my.sessionWindow;
-		if (const auto strong = weak.get()) {
-			strong->showToast(tr::lng_forwarded_hidden(tr::now));
+		auto text = tr::lng_forwarded_hidden(tr::now, Ui::Text::WithEntities);
+		const auto delegate = my.elementDelegate
+			? my.elementDelegate()
+			: nullptr;
+		if (delegate) {
+			delegate->elementShowHiddenSenderTooltip(my.itemId, text);
+		} else if (const auto strong = my.sessionWindow.get()) {
+			strong->showToast(std::move(text));
 		}
 	});
 	return hidden;

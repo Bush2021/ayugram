@@ -2061,6 +2061,27 @@ void ListWidget::elementShowTooltip(
 	_topToast.show(parentWidget(), &session(), text, hiddenCallback);
 }
 
+void ListWidget::elementShowHiddenSenderTooltip(
+		FullMsgId itemId,
+		const TextWithEntities &text) {
+	const auto scroll = _delegate->listScrollArea();
+	if (!scroll) {
+		return;
+	}
+	auto area = QRect();
+	if (const auto view = viewForItem(itemId)) {
+		if (const auto tooltip = view->Get<HiddenSenderTooltip>()) {
+			const auto local = tooltip->linkRect;
+			if (!local.isEmpty()) {
+				area = QRect(
+					mapToGlobal(QPoint(local.x(), itemTop(view) + local.y())),
+					local.size());
+			}
+		}
+	}
+	_hiddenSenderTooltip.show(scroll, area, text);
+}
+
 bool ListWidget::elementAnimationsPaused() {
 	return _delegate->listAnimationsPaused();
 }

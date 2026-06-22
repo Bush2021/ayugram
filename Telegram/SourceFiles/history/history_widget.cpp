@@ -2644,6 +2644,7 @@ void HistoryWidget::showHistory(
 	_highlighter.clear();
 	controller()->sendingAnimation().clear();
 	_topToast.hide(anim::type::instant);
+	_hiddenSenderTooltip.hide();
 	if (_history) {
 		if (_peer->id == peerId) {
 			updateForwarding();
@@ -9045,6 +9046,12 @@ void HistoryWidget::showInfoTooltip(
 		&session(),
 		text,
 		std::move(hiddenCallback));
+}
+
+void HistoryWidget::showHiddenSenderTooltip(
+		QRect globalArea,
+		const TextWithEntities &text) {
+	_hiddenSenderTooltip.show(_scroll.data(), globalArea, text);
 }
 
 void HistoryWidget::showPremiumStickerTooltip(
