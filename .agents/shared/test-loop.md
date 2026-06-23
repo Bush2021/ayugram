@@ -41,12 +41,15 @@ starts at 1); the commit message carries no attempt marker. Commits follow "Comm
 
 ```
 TEST_AUTHOR -> RUN -> ASSESS (adversarial — see "Assessing"):
-  APPROVED       -> reset to the impl commit (drop overlay); return DONE up. Task complete.
+  APPROVED       -> reset to the impl commit (drop overlay); delete the test binary; return DONE up.
   TEST_FLAW      -> fix the overlay only; back to RUN. Does NOT cost an impl attempt.
   IMPL_BUG       -> spawn impl-fix agent (input = test.md, latest attempt's Root cause / Fix hint);
                     it commits a NEW attempt; re-apply overlay (--3way, else re-author); RUN. attempt++
-  UNRECOVERABLE  -> return BLOCKED up with the reason. Stop.
-  attempt > MAX  -> return BLOCKED up with test.md + "improve" notes. Stop.
+  UNRECOVERABLE  -> delete the test binary; return BLOCKED up with the reason. Stop.
+  attempt > MAX  -> delete the test binary; return BLOCKED up with test.md + "improve" notes. Stop.
+
+On every TERMINAL exit (APPROVED / BLOCKED / UNRECOVERABLE / cap) "delete the test binary" means the
+step in "Leave no test binary behind" below.
 ```
 
 Early-escalation rule: if two consecutive ASSESS rounds produce the **same failure signature**
@@ -54,8 +57,8 @@ Early-escalation rule: if two consecutive ASSESS rounds produce the **same failu
 the attempt budget chasing it.
 
 UNRECOVERABLE conditions: the app reaches a login screen / `AUTH_KEY_DUPLICATED` and re-copying the
-test account does not recover it; a file-lock build error (`LNK1104`, `C1041`) that persists after a
-`taskkill`; `test_TelegramForcePortable` missing when SETUP runs; or a crash with no usable
+test account does not recover it; a file-lock build error (`LNK1104`, `C1041`) that persists after
+the path-scoped kill; `test_TelegramForcePortable` missing when SETUP runs; or a crash with no usable
 diagnostic after one retry.
 
 ## Handoff tokens
@@ -111,8 +114,21 @@ are structurally protected — only `TelegramForcePortable` is ever destroyed. U
 (or `Copy-Item -Recurse` / `Remove-Item -Recurse -Force`) for the folder ops.
 
 **Serialize app runs.** Never have two `Telegram.exe` instances alive against this account at once —
-concurrent reuse of one auth key can trigger a server-side session reset. Always `tasklist` and
-`taskkill /IM Telegram.exe /F` any stragglers before SETUP, launching, or rebuilding.
+concurrent reuse of one auth key can trigger a server-side session reset. Before SETUP, launching, or
+rebuilding, kill any straggler **of THIS checkout's binary only** — the one whose full executable
+path is `EXE` (`out/Debug/Telegram.exe` in this checkout). Match on the full path; do NOT blanket-kill
+every `Telegram.exe` on the machine. The user may be running a system-installed client or another
+checkout's build against unrelated accounts — those use different auth keys, never conflict with this
+account, and MUST be left alive. On Windows, scope the kill by path:
+
+    $exe = (Resolve-Path "$EXE").Path
+    Get-CimInstance Win32_Process -Filter "Name = 'Telegram.exe'" |
+      Where-Object { $_.ExecutablePath -eq $exe } |
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+
+`taskkill /IM Telegram.exe /F` is forbidden here and anywhere else in this loop — it is image-name-wide
+and takes down the user's unrelated clients. Every "kill stragglers" / "taskkill" step below means
+this path-scoped kill.
 
 **Avoid destructive calls.** The overlay must never trigger logout / session-termination /
 account-deletion. Tests that genuinely need those use a separate burner account, not this one. (If a
@@ -200,8 +216,8 @@ highest level that still exercises the change (often a direct data-layer call li
 ## Build & run discipline
 
 - Build with `BUILD`. A single changed TU compiles fast; only the overlay-touched files + link
-  rebuild between rounds. On `LNK1104`/`C1041`, `taskkill /IM Telegram.exe /F`, wait, retry once;
-  if it persists -> UNRECOVERABLE.
+  rebuild between rounds. On `LNK1104`/`C1041`, run the path-scoped kill (Test account → "Serialize
+  app runs"), wait, retry once; if it persists -> UNRECOVERABLE.
 - **Codegen does not track resource mtimes.** If the task changed only a resource the style codegen
   consumes (an icon `.svg`, etc.) without touching a `.style`, an incremental build will NOT re-pack
   it and the binary keeps the OLD asset. Before building such a task force regeneration — touch the
@@ -209,9 +225,23 @@ highest level that still exercises the change (often a direct data-layer call li
   shows no difference from before is the symptom of skipping this.
 - Run: run the SETUP steps (Test account) -> launch `EXE` in the background -> poll `test_log.txt`
   every ~5s -> on each `SCREENSHOT:` read the image and judge it -> detect `TEST_COMPLETE` (success)
-  or process death (crash) or no new output for the watchdog cap (hang) -> `taskkill` any straggler
-  -> optional CLEANUP -> save the overlay (`git diff > <TASK_DIR>/test-overlay.patch`) -> THEN
-  `git reset --hard <IMPL_SHA>` (back to impl-only — the patch must be saved before this reset).
+  or process death (crash) or no new output for the watchdog cap (hang) -> path-scoped kill of any
+  straggler (Test account → "Serialize app runs") -> optional CLEANUP -> save the overlay
+  (`git diff > <TASK_DIR>/test-overlay.patch`) -> THEN `git reset --hard <IMPL_SHA>` (back to
+  impl-only — the patch must be saved before this reset).
+
+### Leave no test binary behind
+
+The on-disk `EXE` (`out/Debug/Telegram.exe`) always contains the compiled overlay after a test run —
+`git reset --hard` only reverts the source, not the built binary. So when the loop reaches a TERMINAL
+verdict (APPROVED, BLOCKED, UNRECOVERABLE, or attempt cap), after the final path-scoped kill and
+`git reset --hard <IMPL_SHA>`, **delete the built `EXE`** so no overlay-laden test binary is left for
+the user to launch by mistake:
+
+    Remove-Item -Force "$EXE"
+
+A clean, feature-ready binary is one `BUILD` away on demand. (Delete only on terminal exit — between
+attempts the next round rebuilds the overlay, so the binary is reused there.)
 
 ## Assessing (adversarial)
 

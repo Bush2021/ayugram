@@ -208,8 +208,9 @@ stays in YOUR context, not the orchestrator's):
 3. ASSESS   — task.md Phase 3 (refine plan, size phases).
 4. IMPLEMENT— task.md Phase 4, one subagent per plan phase. Implementation agents do NOT commit
    yet; you commit after build passes.
-5. BUILD    — task.md Phase 5 (build with BUILD, fix errors). On file-lock errors, taskkill and
-   retry once, else stop.
+5. BUILD    — task.md Phase 5 (build with BUILD, fix errors). On file-lock errors, run the
+   path-scoped kill of THIS checkout's binary (see test-loop.md "Serialize app runs") and retry
+   once, else stop.
 6. REVIEW   — task.md Phase 6 but a SINGLE pass (not 3): one review agent, then one fix agent if
    NEEDS_CHANGES, then rebuild. (Tests catch behavior; review catches dead code / duplication /
    placement / style.)
