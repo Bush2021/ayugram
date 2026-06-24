@@ -771,9 +771,13 @@ void StickerSetBox::updateButtons() {
 		const auto type = _inner->setType();
 		const auto share = [=] {
 			copyStickersLink();
-			showToast(type == Data::StickersType::Emoji
+			showToast({
+				.text = { type == Data::StickersType::Emoji
 					? tr::lng_stickers_copied_emoji(tr::now)
-					: tr::lng_stickers_copied(tr::now));
+					: tr::lng_stickers_copied(tr::now) },
+				.iconLottie = u"toast/voip_invite"_q,
+				.iconLottieSize = st::toastLottieIconSize,
+			});
 		};
 		const auto fillSetCreatorMenu = [&] {
 			using Filler = Fn<void(not_null<Ui::PopupMenu*>)>;

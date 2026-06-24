@@ -1125,9 +1125,16 @@ void Filler::addTopicLink() {
 		if (const auto strong = weak.get()) {
 			const auto link = Info::Profile::TopicLink(strong, true);
 			QGuiApplication::clipboard()->setText(link);
-			controller->showToast(channel->hasUsername()
-				? tr::lng_channel_public_link_copied(tr::now)
-				: tr::lng_context_about_private_link(tr::now));
+			if (channel->hasUsername()) {
+				controller->showToast({
+					.text = { tr::lng_channel_public_link_copied(tr::now) },
+					.iconLottie = u"toast/voip_invite"_q,
+					.iconLottieSize = st::toastLottieIconSize,
+				});
+			} else {
+				controller->showToast(
+					tr::lng_context_about_private_link(tr::now));
+			}
 		}
 	}, &st::menuIconCopy);
 }
