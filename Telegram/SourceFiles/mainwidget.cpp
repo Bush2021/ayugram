@@ -1360,6 +1360,8 @@ bool MainWidget::showHistoryInDifferentWindow(
 		return true;
 	} else if (windowId().hasChatsList()) {
 		return false;
+	} else if (params.preferCurrentWindow) {
+		return false;
 	}
 	const auto account = not_null(&session().account());
 	auto primary = Core::App().separateWindowFor(account);
@@ -1489,6 +1491,9 @@ void MainWidget::showHistory(
 			|| (params.animated == anim::type::instant)) {
 			return false;
 		}
+		if (params.slideFromBottom) {
+			return !_history->isHidden();
+		}
 		if (!peerId) {
 			if (isOneColumn()) {
 				return _dialogs && _dialogs->isHidden();
@@ -1562,7 +1567,9 @@ void MainWidget::showHistory(
 		if (!_showAnimation) {
 			if (!animationParams.oldContentCache.isNull()) {
 				_history->showAnimated(
-					back
+					params.slideFromBottom
+						? Window::SlideDirection::FromBottom
+						: back
 						? Window::SlideDirection::FromLeft
 						: Window::SlideDirection::FromRight,
 					animationParams);
@@ -1836,9 +1843,9 @@ void MainWidget::showNewSection(
 	auto saveInStack = (params.way == SectionShow::Way::Forward);
 	const auto thirdSectionTop = getThirdSectionTop();
 	const auto newThirdGeometry = QRect(
-		width() - st::columnMinimalWidthThird,
+		width() - _thirdColumnWidth,
 		thirdSectionTop,
-		st::columnMinimalWidthThird,
+		_thirdColumnWidth,
 		height() - thirdSectionTop);
 	auto newThirdSection = (isThreeColumn() && params.thirdColumn)
 		? memento->createWidget(

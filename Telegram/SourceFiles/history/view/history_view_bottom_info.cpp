@@ -77,6 +77,20 @@ namespace {
 	return map.back().text;
 }
 
+[[nodiscard]] QString FormatEditedDate(QDateTime sent, QDateTime edited) {
+	const auto today = QDateTime::currentDateTime().date();
+	const auto time = QLocale().toString(edited.time(), QLocale::ShortFormat);
+	if (sent.date() == today && edited.date() == today) {
+		return tr::lng_edited_at(tr::now, lt_time, time);
+	}
+	return tr::lng_edited_on(
+		tr::now,
+		lt_date,
+		langDayOfMonthShort(edited.date()),
+		lt_time,
+		time);
+}
+
 } // namespace
 
 struct BottomInfo::Effect {
@@ -468,11 +482,16 @@ void BottomInfo::layout() {
 void BottomInfo::layoutDateText() {
 	const auto &settings = AyuSettings::getInstance();
 
+	const auto editedPrimary = (_data.flags & Data::Flag::EditedPrimary)
+		&& !(_data.flags & Data::Flag::ForwardedDate);
+
 	if (!settings.replaceBottomInfoWithIcons()) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
 			? (settings.deletedMark() + ' ')
 			: QString();
-		const auto edited = (_data.flags & Data::Flag::Edited)
+		const auto edited = editedPrimary
+			? QString()
+			: (_data.flags & Data::Flag::Edited)
 			? (settings.editedMark() + ' ')
 			: (_data.flags & Data::Flag::EstimateDate)
 			? (tr::lng_approximate(tr::now) + ' ')
@@ -481,7 +500,9 @@ void BottomInfo::layoutDateText() {
 			: QString();
 		const auto author = settings.filterZalgo() ? filterZalgo(_data.author) : _data.author;
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
-		const auto date = edited + ((_data.flags & Data::Flag::ForwardedDate)
+		const auto date = editedPrimary
+			? FormatEditedDate(_data.date, _data.editedDate)
+			: edited + ((_data.flags & Data::Flag::ForwardedDate)
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time()));
 		const auto afterAuthor = prefix + date;
@@ -550,19 +571,23 @@ void BottomInfo::layoutDateText() {
 		}
 
 		TextWithEntities edited;
-		if (_data.flags & Data::Flag::Edited) {
-			edited = Ui::Text::IconEmoji(&st::editedIcon);
-			edited.append(' ');
-		} else if (_data.flags & Data::Flag::EstimateDate) {
-			edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
-		} else if (_data.scheduleRepeatPeriod) {
-			edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
+		if (!editedPrimary) {
+			if (_data.flags & Data::Flag::Edited) {
+				edited = Ui::Text::IconEmoji(&st::editedIcon);
+				edited.append(' ');
+			} else if (_data.flags & Data::Flag::EstimateDate) {
+				edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
+			} else if (_data.scheduleRepeatPeriod) {
+				edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
+			}
 		}
 
 		const auto author = settings.filterZalgo() ? filterZalgo(_data.author) : _data.author;
 		const auto prefix = !author.isEmpty() ? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q) : QString();
 
-		const auto dateStr = (_data.flags & Data::Flag::ForwardedDate)
+		const auto dateStr = editedPrimary
+			? FormatEditedDate(_data.date, _data.editedDate)
+			: (_data.flags & Data::Flag::ForwardedDate)
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time());
 
@@ -757,8 +782,12 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 			}
 		}
 	}
-	if (message->displayedEditDate()) {
+	if (const auto editedDate = message->displayedEditDate()) {
 		result.flags |= Flag::Edited;
+		if (item->history()->session().messagePrimaryEditedDate()) {
+			result.flags |= Flag::EditedPrimary;
+			result.editedDate = base::unixtime::parse(editedDate);
+		}
 	}
 	if (const auto views = item->Get<HistoryMessageViews>()) {
 		if (views->views.count >= 0) {

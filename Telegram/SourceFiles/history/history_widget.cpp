@@ -106,6 +106,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_components.h"
 #include "history/history_streamed_drafts.h"
 #include "history/history_unread_things.h"
+#include "history/history_view_pull_to_next_channel.h"
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/controls/compose_controls_common.h"
 #include "history/view/controls/history_view_characters_limit.h"
@@ -289,6 +290,10 @@ HistoryWidget::HistoryWidget(
 	_scroll.data(),
 	controller->chatStyle(),
 	static_cast<HistoryView::CornerButtonsDelegate*>(this))
+, _pullToNext(std::make_unique<HistoryView::PullToNextChannel>(
+	this,
+	_scroll.data(),
+	controller))
 , _supportAutocomplete(session().supportMode()
 	? object_ptr<Support::Autocomplete>(this, &session())
 	: nullptr)
@@ -2259,6 +2264,29 @@ void HistoryWidget::fileChosen(ChatHelpers::FileChosen &&data) {
 			Data::InsertCustomEmoji(_field.data(), data.document);
 		}
 	} else if (_history) {
+		if (data.needsCaption) {
+			const auto document = data.document;
+			const auto from = data.messageSendingFrom;
+			Ui::SendGifWithCaption(
+				controller()->uiShow(),
+				_field,
+				document,
+				_peer,
+				sendMenuDetails(),
+				crl::guard(this, [=](
+						Api::SendOptions options,
+						TextWithTags caption) {
+					controller()->sendingAnimation().appendSending(from);
+					auto messageToSend = Api::MessageToSend(
+						prepareSendAction(options));
+					messageToSend.textWithTags = std::move(caption);
+					sendExistingDocument(
+						document,
+						std::move(messageToSend),
+						from.localId);
+				}));
+			return;
+		}
 		controller()->sendingAnimation().appendSending(
 			data.messageSendingFrom);
 		const auto localId = data.messageSendingFrom.localId;
@@ -2736,6 +2764,7 @@ void HistoryWidget::showHistory(
 	_highlighter.clear();
 	controller()->sendingAnimation().clear();
 	_topToast.hide(anim::type::instant);
+	_hiddenSenderTooltip.hide();
 	if (_history) {
 		if (_peer->id == peerId) {
 			updateForwarding();
@@ -3025,6 +3054,7 @@ void HistoryWidget::showHistory(
 		_scroll->hide();
 		_list = _scroll->setOwnedWidget(
 			object_ptr<HistoryInner>(this, _scroll, controller(), _history));
+		_pullToNext->attachToContent(_list);
 		_list->sendIntroSticker(
 		) | rpl::on_next([=](not_null<DocumentData*> sticker) {
 			sendExistingDocument(
@@ -3191,6 +3221,7 @@ void HistoryWidget::setHistory(History *history) {
 	if (_history == history) {
 		return;
 	}
+	_pullToNext->setHistory(history);
 
 	const auto &settings = AyuSettings::getInstance();
 
@@ -5543,16 +5574,21 @@ void HistoryWidget::showAnimated(
 	if (_requestsBar) {
 		_requestsBar->finishAnimating();
 	}
-	_topShadow->setVisible(params.withTopBarShadow ? false : true);
+	const auto fromBottom = (direction == Window::SlideDirection::FromBottom);
+	_topShadow->setVisible(fromBottom
+		? params.withTopBarShadow
+		: !params.withTopBarShadow);
 	_preserveScrollTop = false;
 	_stickerToast = nullptr;
 
 	auto newContentCache = Ui::GrabWidget(this);
 
 	hideChildWidgets();
-	if (params.withTopBarShadow) _topShadow->show();
+	if (params.withTopBarShadow && !fromBottom) {
+		_topShadow->show();
+	}
 
-	if (_history) {
+	if (_history && !fromBottom) {
 		_topBar->show();
 		_topBar->setAnimatingMode(true);
 	}
@@ -7383,6 +7419,7 @@ void HistoryWidget::updateControlsGeometry() {
 	updateFieldSize();
 
 	_cornerButtons.updatePositions();
+	_pullToNext->updateGeometry();
 
 	if (_membersDropdown) {
 		_membersDropdown->setMaxHeight(countMembersDropdownHeightMax());
@@ -8733,6 +8770,48 @@ void HistoryWidget::checkPinnedBarState() {
 		}
 	}, _pinnedBar->lifetime());
 
+	_pinnedBar->barRightClicks(
+	) | rpl::on_next([=] {
+		if (_pinnedBarHasCustomButton) {
+			return;
+		}
+		const auto reference = _pinnedClickedId
+			? _pinnedClickedId
+			: _pinnedTracker->currentMessageId().message;
+		if (!reference) {
+			return;
+		}
+		const auto universal = [&](FullMsgId id) {
+			return (!id || !_migrated || peerIsChannel(id.peer))
+				? id.msg
+				: (id.msg - ServerMaxMsgId);
+		};
+		const auto migrated = _migrated ? _migrated->peer.get() : nullptr;
+		const auto referenceId = universal(reference);
+		const auto top = Data::ResolveTopPinnedId(
+			_peer,
+			MsgId(0), // topicRootId
+			PeerId(0), // monoforumPeerId
+			migrated);
+		const auto targetId = (top && referenceId >= universal(top))
+			? Data::ResolveMinPinnedId(
+				_peer,
+				MsgId(0), // topicRootId
+				PeerId(0), // monoforumPeerId
+				migrated)
+			: _pinnedTracker->nextPinnedId(referenceId);
+		if (!targetId) {
+			return;
+		}
+		controller()->showPeerHistory(
+			session().data().peer(targetId.peer),
+			Window::SectionShow::Way::Forward,
+			targetId.msg);
+		_pinnedClickedId = FullMsgId();
+		_minPinnedId = std::nullopt;
+		updatePinnedViewer();
+	}, _pinnedBar->lifetime());
+
 	_pinnedBarHeight = 0;
 	_pinnedBar->heightValue(
 	) | rpl::on_next([=](int height) {
@@ -8824,6 +8903,7 @@ void HistoryWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
 	};
 	auto customButton = CreatePinnedBarCustomButton(this, item, context);
 	if (customButton) {
+		_pinnedBarHasCustomButton = true;
 		struct State {
 			base::unique_qptr<Ui::PopupMenu> menu;
 		};
@@ -8840,6 +8920,7 @@ void HistoryWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
 		_pinnedBar->setRightButton(std::move(customButton));
 		return;
 	}
+	_pinnedBarHasCustomButton = false;
 
 	const auto close = !many;
 	auto button = object_ptr<Ui::IconButton>(
@@ -9165,6 +9246,12 @@ void HistoryWidget::showInfoTooltip(
 		&session(),
 		text,
 		std::move(hiddenCallback));
+}
+
+void HistoryWidget::showHiddenSenderTooltip(
+		QRect globalArea,
+		const TextWithEntities &text) {
+	_hiddenSenderTooltip.show(_scroll.data(), globalArea, text);
 }
 
 void HistoryWidget::showPremiumStickerTooltip(

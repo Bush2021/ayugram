@@ -153,7 +153,6 @@ base::options::toggle OptionCustomNotification({
 	.scope = [] {
 		return Platform::Notifications::Enforced();
 	},
-	.restartRequired = true,
 });
 
 const char kOptionGNotification[] = "gnotification";
@@ -172,7 +171,6 @@ base::options::toggle OptionGNotification({
 		return false;
 #endif // __has_include(<gio/gio.hpp>)
 	},
-	.restartRequired = true,
 });
 
 base::options::toggle HideReplyButtonOption({
@@ -214,6 +212,13 @@ System::System()
 			|| type == ChangeType::CountMessages) {
 			Core::App().domain().notifyUnreadBadgeChanged();
 		}
+	}, lifetime());
+
+	rpl::merge(
+		OptionCustomNotification.changes(),
+		OptionGNotification.changes()
+	 ) | rpl::on_next([=] {
+		createManager();
 	}, lifetime());
 }
 

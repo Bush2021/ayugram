@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_session.h"
 #include "iv/iv_cached_media.h"
+#include "iv/iv_rich_page.h"
 #include "base/unixtime.h"
 #include "boxes/premium_preview_box.h"
 #include "core/application.h"
@@ -569,6 +570,11 @@ void DefaultElementDelegate::elementCancelUpload(const FullMsgId &context) {
 void DefaultElementDelegate::elementShowTooltip(
 	const TextWithEntities &text,
 	Fn<void()> hiddenCallback) {
+}
+
+void DefaultElementDelegate::elementShowHiddenSenderTooltip(
+	FullMsgId itemId,
+	const TextWithEntities &text) {
 }
 
 bool DefaultElementDelegate::elementHideReply(
@@ -2047,6 +2053,7 @@ void Element::validateText() {
 		}
 		const auto &layoutSt = st::messageMarkdown;
 		const auto session = &history()->session();
+		const auto richLimits = Iv::ResolveRichMessageLimits(session);
 		runtime->page = std::move(page);
 		runtime->mediaRuntime = Iv::CreateMessageMediaRuntime(
 			session,
@@ -2058,6 +2065,8 @@ void Element::validateText() {
 			.mediaRuntime = runtime->mediaRuntime,
 			.dimensionsOverride = Iv::Markdown::CaptureMarkdownPrepareDimensions(
 				layoutSt),
+			.tableRenderLimits = Iv::Markdown::PrepareTableRenderLimitsForRichMessage(
+				richLimits),
 		});
 		if (!prepared.supported()) {
 			clearRichPage();

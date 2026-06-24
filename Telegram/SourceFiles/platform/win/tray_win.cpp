@@ -64,23 +64,6 @@ bool DarkTasbarValueValid/* = false*/;
 	return (value == 0);
 }
 
-[[nodiscard]] std::optional<bool> IsDarkTaskbar() {
-	static const auto kSystemVersion = QOperatingSystemVersion::current();
-	static const auto kDarkModeAddedVersion = QOperatingSystemVersion(
-		QOperatingSystemVersion::Windows,
-		10,
-		0,
-		18282);
-	static const auto kSupported = (kSystemVersion >= kDarkModeAddedVersion);
-	if (!kSupported) {
-		return std::nullopt;
-	} else if (!DarkTasbarValueValid) {
-		DarkTasbarValueValid = true;
-		DarkTaskbar = ReadDarkTaskbarValue();
-	}
-	return DarkTaskbar;
-}
-
 [[nodiscard]] QImage MonochromeIconFor(int size, bool darkMode) {
 	Expects(size > 0);
 
@@ -482,6 +465,23 @@ QString Tray::GhostJumpListIconPath() {
 
 bool HasMonochromeSetting() {
 	return IsDarkTaskbar().has_value();
+}
+
+std::optional<bool> IsDarkTaskbar() {
+	static const auto kSystemVersion = QOperatingSystemVersion::current();
+	static const auto kDarkModeAddedVersion = QOperatingSystemVersion(
+		QOperatingSystemVersion::Windows,
+		10,
+		0,
+		18282);
+	static const auto kSupported = (kSystemVersion >= kDarkModeAddedVersion);
+	if (!kSupported) {
+		return std::nullopt;
+	} else if (!DarkTasbarValueValid) {
+		DarkTasbarValueValid = true;
+		DarkTaskbar = ReadDarkTaskbarValue();
+	}
+	return DarkTaskbar;
 }
 
 void RefreshTaskbarThemeValue() {
