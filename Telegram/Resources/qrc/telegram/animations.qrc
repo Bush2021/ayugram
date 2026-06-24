@@ -61,6 +61,7 @@
     <file alias="toast/pin.tgs">../../animations/toast/pin.tgs</file>
     <file alias="toast/unpin.tgs">../../animations/toast/unpin.tgs</file>
     <file alias="toast/chats_archived.tgs">../../animations/toast/chats_archived.tgs</file>
+    <file alias="toast/star_premium_2.tgs">../../animations/toast/star_premium_2.tgs</file>
     <file alias="rtmp.tgs">../../animations/rtmp.tgs</file>
     <file alias="show_or_premium_lastseen.tgs">../../animations/show_or_premium_lastseen.tgs</file>
     <file alias="show_or_premium_readtime.tgs">../../animations/show_or_premium_readtime.tgs</file>
