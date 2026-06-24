@@ -30,6 +30,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/buttons.h"
+#include "ui/controls/swipe_handler.h"
+#include "ui/controls/swipe_handler_data.h"
 #include "ui/layers/layer_manager.h"
 #include "ui/text/text_utilities.h"
 #include "ui/chat/chat_style.h"
@@ -848,6 +850,7 @@ OverlayWidget::OverlayWidget()
 		}
 		return base::EventFilterResult::Continue;
 	});
+	setupSwipeNavigation();
 	_helper->mouseEvents(
 	) | rpl::on_next([=](not_null<QMouseEvent*> e) {
 		if (_helper->skipTitleHitTest(e->windowPos().toPoint())) {
@@ -7094,10 +7097,15 @@ void OverlayWidget::handleKeyRelease(not_null<QKeyEvent*> e) {
 void OverlayWidget::handleWheelEvent(not_null<QWheelEvent*> e) {
 	constexpr auto step = int(QWheelEvent::DefaultDeltasPerStep);
 
+	const auto angle = e->angleDelta();
+	if (_swipeNavigating || std::abs(angle.x()) > std::abs(angle.y())) {
+		_verticalWheelDelta = 0;
+		return;
+	}
 	const auto acceptForJump = !_stories
 		&& ((e->source() == Qt::MouseEventNotSynthesized)
 			|| (e->source() == Qt::MouseEventSynthesizedBySystem));
-	_verticalWheelDelta += e->angleDelta().y();
+	_verticalWheelDelta += angle.y();
 	while (qAbs(_verticalWheelDelta) >= step) {
 		if (_verticalWheelDelta < 0) {
 			_verticalWheelDelta += step;
@@ -7115,6 +7123,55 @@ void OverlayWidget::handleWheelEvent(not_null<QWheelEvent*> e) {
 			}
 		}
 	}
+}
+
+void OverlayWidget::setupSwipeNavigation() {
+	struct State {
+		Ui::Controls::SwipeBackResult back;
+		bool mirrored = false;
+	};
+	const auto state = lifetime().make_state<State>();
+	const auto colors = []() -> std::pair<QColor, QColor> {
+		return {
+			st::mediaviewControlBg->c,
+			st::mediaviewControlFg->c,
+		};
+	};
+	auto update = [=](Ui::Controls::SwipeContextData data) {
+		_swipeNavigating = (data.translation != 0);
+		if (data.translation != 0) {
+			const auto mirrored = (data.translation < 0);
+			if (!state->back.callback || state->mirrored != mirrored) {
+				state->back = Ui::Controls::SetupSwipeBack(
+					_body,
+					colors,
+					mirrored,
+					false,
+					[=] { return _minUsedTop + _maxUsedHeight / 2; });
+				state->mirrored = mirrored;
+			}
+			state->back.callback(data);
+		} else if (state->back.lifetime) {
+			state->back = {};
+		}
+	};
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
+		if (_stories) {
+			return Ui::Controls::SwipeHandlerFinishData();
+		}
+		const auto next = (data.direction == Qt::LeftToRight);
+		if (next ? !_rightNavVisible : !_leftNavVisible) {
+			return Ui::Controls::SwipeHandlerFinishData();
+		}
+		return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
+			moveToNext(next ? 1 : -1);
+		});
+	};
+	Ui::Controls::SetupSwipeHandler({
+		.widget = _body,
+		.update = std::move(update),
+		.init = std::move(init),
+	});
 }
 
 bool OverlayWidget::handleNativeGesture(not_null<QNativeGestureEvent*> e) {
