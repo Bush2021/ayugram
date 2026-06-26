@@ -1293,9 +1293,16 @@ void HistoryInner::setTextSelection(
 
 TextSelection HistoryInner::getSelectedTextRange(
 		not_null<HistoryItem*> item) const {
-	return hasSelectedText() && (_selectedTextItem == item)
-		? _selectedTextSelection.flatRangeForEdit()
-		: TextSelection();
+	if (!hasSelectedText()) {
+		return TextSelection();
+	} else if (_selectedTextItem == item) {
+		return _selectedTextSelection.flatRangeForEdit();
+	} else if (const auto view = viewByItem(_selectedTextItem)) {
+		if (view->textItem() == item) {
+			return _selectedTextSelection.flatRangeForEdit();
+		}
+	}
+	return TextSelection();
 }
 
 auto HistoryInner::getSelectedTextSelection(
@@ -3414,7 +3421,21 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						hasCopyRestrictionForSelected()));
 				}, &st::menuIconTranslate);
 			}
-			addItemActions(item, item);
+			const auto editItem = [&]() -> HistoryItem* {
+				const auto view = item->groupId()
+					? viewByItem(item)
+					: nullptr;
+				if (!view) {
+					return item;
+				} else if (const auto part = view->selectedQuote(
+						_selectedTextSelection).item) {
+					return part;
+				} else if (const auto textItem = view->textItem()) {
+					return textItem;
+				}
+				return item;
+			}();
+			addItemActions(item, editItem);
 		} else {
 			addReplyAction(partItemOrLeader);
 			addTodoListAction(partItemOrLeader);
