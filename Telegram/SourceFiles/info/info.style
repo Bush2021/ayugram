@@ -427,6 +427,11 @@ infoProfileTopBarActionButtonIconTop: 6px;
 infoProfileTopBarActionButtonTextTop: infoProfileTopBarActionButtonIconSize + infoProfileTopBarActionButtonIconTop + 1px;
 infoProfileTopBarActionButtonTextSkip: 4px;
 infoProfileTopBarActionButtonFont: font(11px);
+infoProfileTopBarActionButtonShadow: BoxShadow {
+	blurRadius: 1px;
+	offset: point(0px, 0px);
+	opacity: 0.25;
+}
 
 infoProfileTopBarActionButtonsPadding: margins(18px, 0px, 18px, 16px);
 infoProfileTopBarActionButtonsHeight: infoProfileTopBarActionButtonSize + infoProfileTopBarActionButtonsPadding.topBottom;
