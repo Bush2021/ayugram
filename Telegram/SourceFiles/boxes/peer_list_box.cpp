@@ -886,6 +886,7 @@ int PeerListRow::paintNameIconGetWidth(
 		int availableWidth,
 		int outerWidth,
 		bool selected) {
+	_statusIconRect = QRect();
 	if (_skipPeerBadge
 		|| special()
 		|| !_savedMessagesStatus.isEmpty()
@@ -893,7 +894,7 @@ int PeerListRow::paintNameIconGetWidth(
 		|| _isVerifyCodesChat) {
 		return 0;
 	}
-	return _badge.drawGetWidth(p, {
+	const auto width = _badge.drawGetWidth(p, {
 		.peer = peer(),
 		.rectForName = QRect(
 			nameLeft,
@@ -919,6 +920,8 @@ int PeerListRow::paintNameIconGetWidth(
 		.now = now,
 		.paused = false,
 	});
+	_statusIconRect = _badge.emojiStatusRect();
+	return width;
 }
 
 int PeerListRow::paintNameIconGetLeadingWidth(
@@ -955,6 +958,10 @@ int PeerListRow::paintNameIconGetLeadingWidth(
 		QPoint(nameLeft, nameTop),
 		st);
 	return skip;// ? skip + st::dialogsChatTypeSkip) : 0;
+}
+
+void PeerListRow::paintStatusIcon(Painter &p, crl::time now, bool paused) {
+	_badge.paintEmojiStatusFrame(p, now, paused);
 }
 
 void PeerListRow::paintStatusText(

@@ -140,6 +140,11 @@ public:
 		int outerWidth,
 		bool selected);
 
+	[[nodiscard]] QRect statusIconRect() const {
+		return _statusIconRect;
+	}
+	void paintStatusIcon(Painter &p, crl::time now, bool paused);
+
 	virtual QSize rightActionSize() const {
 		return QSize();
 	}
@@ -324,6 +329,7 @@ private:
 	Ui::Text::String _name;
 	Ui::Text::String _status;
 	Ui::PeerBadge _badge;
+	QRect _statusIconRect;
 	StatusType _statusType = StatusType::Online;
 	crl::time _statusValidTill = 0;
 	base::flat_set<QChar> _nameFirstLetters;
