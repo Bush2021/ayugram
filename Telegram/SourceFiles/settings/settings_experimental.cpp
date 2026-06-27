@@ -304,7 +304,7 @@ void SetupExperimental(
 		addToggle(kOptionFastButtonsMode);
 	}
 	addToggle(Window::kOptionDisableTouchbar);
-	addToggle(Info::kAlternativeScrollProcessing);
+	addToggle(Info::kClassicProfileScroll);
 	addToggle(kModerateCommonGroups);
 	addToggle(kForceComposeSearchOneColumn);
 	addToggle(ChatHelpers::kOptionUnlimitedRecentStickers);
