@@ -185,7 +185,8 @@ bool ListZoom::handleNativeGesture(not_null<QNativeGestureEvent*> e) {
 	} else if (!isZoomable()) {
 		return false;
 	}
-	const auto anchor = e->position().toPoint();
+	// Upstream uses e->position(), which Qt 5 lacks on QNativeGestureEvent.
+	const auto anchor = e->pos();
 	_pinchAccumulated += e->value();
 	while (_pinchAccumulated >= kPinchStep) {
 		_pinchAccumulated -= kPinchStep;
