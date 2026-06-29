@@ -791,6 +791,12 @@ void AyuSettings::setDisableOpenLinkWarning(bool val) {
 	save();
 }
 
+void AyuSettings::setDisablePullToNextChannel(bool val) {
+	if (_disablePullToNextChannel.current() == val) return;
+	_disablePullToNextChannel = val;
+	save();
+}
+
 void AyuSettings::setIncreaseWebviewHeight(bool val) {
 	if (_increaseWebviewHeight.current() == val) return;
 	_increaseWebviewHeight = val;
@@ -1222,6 +1228,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"hideSimilarChannels", s._hideSimilarChannels.current()},
 		{"messageBubbleRadius", s._messageBubbleRadius.current()},
 		{"disableOpenLinkWarning", s._disableOpenLinkWarning.current()},
+		{"disablePullToNextChannel", s._disablePullToNextChannel.current()},
 		{"wideMultiplier", s._wideMultiplier.current()},
 		{"spoofWebviewAsAndroid", s._spoofWebviewAsAndroid.current()},
 		{"increaseWebviewHeight", s._increaseWebviewHeight.current()},
@@ -1329,6 +1336,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._hideSimilarChannels = j.value("hideSimilarChannels", defaults._hideSimilarChannels.current());
 	s._messageBubbleRadius = j.value("messageBubbleRadius", defaults._messageBubbleRadius.current());
 	s._disableOpenLinkWarning = j.value("disableOpenLinkWarning", defaults._disableOpenLinkWarning.current());
+	s._disablePullToNextChannel = j.value("disablePullToNextChannel", defaults._disablePullToNextChannel.current());
 	s._wideMultiplier = j.value("wideMultiplier", defaults._wideMultiplier.current());
 	s._spoofWebviewAsAndroid = j.value("spoofWebviewAsAndroid", defaults._spoofWebviewAsAndroid.current());
 	s._increaseWebviewHeight = j.value("increaseWebviewHeight", defaults._increaseWebviewHeight.current());

@@ -8408,6 +8408,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AdsModeStrict" = "Strict Block";
 "ayu_DisableStories" = "Disable Stories";
 "ayu_DisableOpenLinkWarning" = "Disable Open Link Warning";
+"ayu_DisablePullToNextChannel" = "Disable Pull to Next Channel";
 "ayu_DisableCustomBackgrounds" = "Disable Custom Backgrounds";
 "ayu_HidePremiumStatuses" = "Hide Premium Statuses";
 "ayu_SmoothScroll" = "Smooth Scroll";

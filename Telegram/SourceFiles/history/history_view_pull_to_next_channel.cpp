@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_view_pull_to_next_channel.h"
 
 #include "apiwrap.h"
+#include "ayu/ayu_settings.h"
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
 #include "base/platform/base_platform_haptic.h"
@@ -593,6 +594,9 @@ void PullToNextChannel::setHistory(History *history) {
 }
 
 bool PullToNextChannel::active() const {
+	if (AyuSettings::getInstance().disablePullToNextChannel()) {
+		return false;
+	}
 	return _history
 		&& _history->peer->isBroadcast()
 		&& atBottom()

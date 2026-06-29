@@ -373,6 +373,13 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	ayu.addSettingToggle({
+		.id = u"ayu/disablePullToNextChannel"_q,
+		.title = tr::ayu_DisablePullToNextChannel(),
+		.getter = &AyuSettings::disablePullToNextChannel,
+		.setter = &AyuSettings::setDisablePullToNextChannel,
+	});
+
+	ayu.addSettingToggle({
 		.id = u"ayu/disableNotificationsDelay"_q,
 		.title = tr::ayu_DisableNotificationsDelay(),
 		.getter = &AyuSettings::disableNotificationsDelay,

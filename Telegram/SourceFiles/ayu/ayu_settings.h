@@ -349,6 +349,7 @@ public:
 	[[nodiscard]] bool hideSimilarChannels() const { return _hideSimilarChannels.current(); }
 	[[nodiscard]] int messageBubbleRadius() const { return _messageBubbleRadius.current(); }
 	[[nodiscard]] bool disableOpenLinkWarning() const { return _disableOpenLinkWarning.current(); }
+	[[nodiscard]] bool disablePullToNextChannel() const { return _disablePullToNextChannel.current(); }
 	[[nodiscard]] double wideMultiplier() const { return _wideMultiplier.current(); }
 	[[nodiscard]] bool spoofWebviewAsAndroid() const { return _spoofWebviewAsAndroid.current(); }
 	[[nodiscard]] bool increaseWebviewHeight() const { return _increaseWebviewHeight.current(); }
@@ -434,6 +435,7 @@ public:
 	void setHideSimilarChannels(bool val);
 	void setMessageBubbleRadius(int val);
 	void setDisableOpenLinkWarning(bool val);
+	void setDisablePullToNextChannel(bool val);
 	void setWideMultiplier(double val);
 	void setSpoofWebviewAsAndroid(bool val);
 	void setIncreaseWebviewHeight(bool val);
@@ -536,6 +538,8 @@ public:
 	[[nodiscard]] rpl::producer<int> messageBubbleRadiusChanges() const { return _messageBubbleRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> disableOpenLinkWarningValue() const { return _disableOpenLinkWarning.value(); }
 	[[nodiscard]] rpl::producer<bool> disableOpenLinkWarningChanges() const { return _disableOpenLinkWarning.changes(); }
+	[[nodiscard]] rpl::producer<bool> disablePullToNextChannelValue() const { return _disablePullToNextChannel.value(); }
+	[[nodiscard]] rpl::producer<bool> disablePullToNextChannelChanges() const { return _disablePullToNextChannel.changes(); }
 	[[nodiscard]] rpl::producer<double> wideMultiplierValue() const { return _wideMultiplier.value(); }
 	[[nodiscard]] rpl::producer<double> wideMultiplierChanges() const { return _wideMultiplier.changes(); }
 	[[nodiscard]] rpl::producer<bool> spoofWebviewAsAndroidValue() const { return _spoofWebviewAsAndroid.value(); }
@@ -695,6 +699,7 @@ private:
 	rpl::variable<bool> _hideSimilarChannels = false;
 	rpl::variable<int> _messageBubbleRadius = 16;
 	rpl::variable<bool> _disableOpenLinkWarning = false;
+	rpl::variable<bool> _disablePullToNextChannel = false;
 	rpl::variable<double> _wideMultiplier = 1.0;
 	rpl::variable<bool> _spoofWebviewAsAndroid = false;
 	rpl::variable<bool> _increaseWebviewHeight = false;
