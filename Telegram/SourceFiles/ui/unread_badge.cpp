@@ -122,6 +122,8 @@ bool ScaledBotVerifiedEmoji::readyInDefaultState() {
 struct PeerBadge::EmojiStatus {
 	EmojiStatusId id;
 	std::unique_ptr<Ui::Text::CustomEmoji> emoji;
+	QPoint lastPosition;
+	QColor lastColor;
 	int skip = 0;
 };
 
@@ -442,12 +444,14 @@ int PeerBadge::drawPremiumEmojiStatus(
 	if (!_emojiStatus->emoji) {
 		return 0;
 	}
+	_emojiStatus->lastPosition = QPoint(
+		iconx - 2 * _emojiStatus->skip,
+		icony + _emojiStatus->skip);
+	_emojiStatus->lastColor = (*descriptor.premiumFg)->c;
 	_emojiStatus->emoji->paint(p, {
-		.textColor = (*descriptor.premiumFg)->c,
+		.textColor = _emojiStatus->lastColor,
 		.now = descriptor.now,
-		.position = QPoint(
-			iconx - 2 * _emojiStatus->skip,
-			icony + _emojiStatus->skip),
+		.position = _emojiStatus->lastPosition,
 		.paused = descriptor.paused || On(PowerSaving::kEmojiStatus),
 	});
 	return iconw - 4 * _emojiStatus->skip;
@@ -523,6 +527,30 @@ int PeerBadge::drawExteraSupporter(Painter &p, const Descriptor &descriptor) {
 		rectForName.y(),
 		descriptor.outerWidth);
 	return iconw;
+}
+
+QRect PeerBadge::emojiStatusRect() const {
+	if (!_emojiStatus || !_emojiStatus->emoji) {
+		return QRect();
+	}
+	return QRect(
+		_emojiStatus->lastPosition,
+		Size(st::emojiSize - 2 * _emojiStatus->skip));
+}
+
+void PeerBadge::paintEmojiStatusFrame(
+		QPainter &p,
+		crl::time now,
+		bool paused) {
+	if (!_emojiStatus || !_emojiStatus->emoji) {
+		return;
+	}
+	_emojiStatus->emoji->paint(p, {
+		.textColor = _emojiStatus->lastColor,
+		.now = now,
+		.position = _emojiStatus->lastPosition,
+		.paused = paused || On(PowerSaving::kEmojiStatus),
+	});
 }
 
 void PeerBadge::unload() {

@@ -1347,9 +1347,16 @@ void HistoryInner::setTextSelection(
 
 TextSelection HistoryInner::getSelectedTextRange(
 		not_null<HistoryItem*> item) const {
-	return hasSelectedText() && (_selectedTextItem == item)
-		? _selectedTextSelection.flatRangeForEdit()
-		: TextSelection();
+	if (!hasSelectedText()) {
+		return TextSelection();
+	} else if (_selectedTextItem == item) {
+		return _selectedTextSelection.flatRangeForEdit();
+	} else if (const auto view = viewByItem(_selectedTextItem)) {
+		if (view->textItem() == item) {
+			return _selectedTextSelection.flatRangeForEdit();
+		}
+	}
+	return TextSelection();
 }
 
 auto HistoryInner::getSelectedTextSelection(
@@ -3494,7 +3501,21 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconTranslate);
 			}
 			AyuUi::AddCreateFilterAction(_menu, _controller, item, selectedText.rich.text);
-			addItemActions(item, item);
+			const auto editItem = [&]() -> HistoryItem* {
+				const auto view = item->groupId()
+					? viewByItem(item)
+					: nullptr;
+				if (!view) {
+					return item;
+				} else if (const auto part = view->selectedQuote(
+						_selectedTextSelection).item) {
+					return part;
+				} else if (const auto textItem = view->textItem()) {
+					return textItem;
+				}
+				return item;
+			}();
+			addItemActions(item, editItem);
 		} else {
 			addReplyAction(partItemOrLeader);
 			addTodoListAction(partItemOrLeader);
@@ -3504,17 +3525,18 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				const auto mediaHasTextForCopy = media && media->hasTextForCopy();
 				if (const auto document = media ? media->getDocument() : nullptr) {
 					if (!view->isIsolatedEmoji() && document->sticker()) {
+						const auto sending = item->isSending();
 						if (document->sticker()->set) {
 							_menu->addAction(document->isStickerSetInstalled() ? tr::lng_context_pack_info(tr::now) : tr::lng_context_pack_add(tr::now), [=] {
 								showStickerPackInfo(document);
 							}, &st::menuIconStickers);
-						} else {
+						} else if (!sending) {
 							Api::AddAddToOwnedSetAction(
 								Ui::Menu::CreateAddActionCallback(_menu),
 								_controller->uiShow(),
 								document);
 						}
-						{
+						if (!sending) {
 							const auto isFaved = session->data().stickers().isFaved(document);
 							_menu->addAction(isFaved ? tr::lng_faved_stickers_remove(tr::now) : tr::lng_faved_stickers_add(tr::now), [=] {
 								Api::ToggleFavedSticker(controller->uiShow(), document, itemId);
@@ -4228,6 +4250,23 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 			&& selectedState.canDeleteCount == selectedState.count) {
 			_widget->confirmDeleteSelected();
 		}
+	} else if (HistoryView::KeyboardTextSelection::IsExtendKey(e->key())
+		&& (e->modifiers() & Qt::ShiftModifier)
+		&& hasSelectedText()) {
+		const auto view = viewByItem(_selectedTextItem);
+		const auto next = view
+			? _keyboardTextSelection.extend(
+				view,
+				_selectedTextSelection,
+				e->key(),
+				e->modifiers())
+			: std::optional<MessageSelection>();
+		if (next) {
+			setTextSelection(view, *next);
+			e->accept();
+		} else {
+			e->ignore();
+		}
 	} else if (!(e->modifiers() & ~Qt::ShiftModifier)
 		&& e->key() != Qt::Key_Shift) {
 		_widget->tryProcessKeyInput(e);
@@ -4558,6 +4597,14 @@ void HistoryInner::changeItemsRevealHeight(int revealHeight) {
 	updateSize();
 }
 
+void HistoryInner::setPullBottomInset(int inset) {
+	if (_pullBottomInset == inset) {
+		return;
+	}
+	_pullBottomInset = inset;
+	updateSize();
+}
+
 void HistoryInner::updateSize() {
 	const auto visibleHeight = _scroll->height();
 	auto collapseGapTotal = 0;
@@ -4602,7 +4649,8 @@ void HistoryInner::updateSize() {
 
 	const auto newHeight = _historyMarginTop
 		+ itemsHeight
-		+ _historyMarginBottom;
+		+ _historyMarginBottom
+		+ _pullBottomInset;
 	if (width() != _scroll->width() || height() != newHeight) {
 		resize(_scroll->width(), newHeight);
 

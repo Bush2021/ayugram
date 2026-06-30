@@ -297,13 +297,14 @@ void AddDocumentActions(
 			[=] { ShowStickerPackInfo(document, list); },
 			&st::menuIconStickers);
 	}
-	if (document->sticker() && !document->sticker()->set) {
+	const auto sending = item && item->isSending();
+	if (!sending && document->sticker() && !document->sticker()->set) {
 		Api::AddAddToOwnedSetAction(
 			Ui::Menu::CreateAddActionCallback(menu),
 			controller->uiShow(),
 			document);
 	}
-	if (document->sticker()) {
+	if (!sending && document->sticker()) {
 		const auto isFaved = document->owner().stickers().isFaved(document);
 		menu->addAction(
 			(isFaved

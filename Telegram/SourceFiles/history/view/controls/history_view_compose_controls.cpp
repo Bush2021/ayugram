@@ -2413,7 +2413,8 @@ void ComposeControls::initKeyHandler() {
 		}
 	}, _wrap->lifetime());
 
-	base::install_event_filter(_wrap.get(), _field, [=](not_null<QEvent*> e) {
+	base::install_event_filter(_wrap.get(), _field->rawTextEdit(), [=](
+			not_null<QEvent*> e) {
 		using Result = base::EventFilterResult;
 		if (e->type() != QEvent::KeyPress) {
 			return Result::Continue;

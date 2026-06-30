@@ -480,6 +480,8 @@ PRIVATE
     boxes/moderate_messages_box.h
     boxes/peer_list_box.cpp
     boxes/peer_list_box.h
+    boxes/peer_list_scroll_cache.cpp
+    boxes/peer_list_scroll_cache.h
     boxes/peer_list_controllers.cpp
     boxes/peer_list_controllers.h
     boxes/peer_list_section_headers.cpp
@@ -1170,6 +1172,8 @@ PRIVATE
     history/view/history_view_group_members_widget.cpp
     history/view/history_view_group_members_widget.h
     history/view/history_view_item_preview.h
+    history/view/history_view_keyboard_text_selection.cpp
+    history/view/history_view_keyboard_text_selection.h
     history/view/history_view_list_widget.cpp
     history/view/history_view_list_widget.h
     history/view/history_view_message.cpp

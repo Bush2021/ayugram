@@ -551,6 +551,7 @@ void Application::startMediaView() {
 	// only after first show and then hide.
 	InvokeQueued(this, [=] {
 		_mediaView = std::make_unique<Media::View::OverlayWidget>();
+		_mediaView->setSystemMediaControls(_mediaControlsManager.get());
 	});
 #elif defined Q_OS_WIN // Q_OS_MAC || Q_OS_WIN
 	// On Windows we needed such hack for the main window, otherwise
@@ -558,9 +559,11 @@ void Application::startMediaView() {
 	// was broken / lost to some invalid values.
 	const auto current = _lastActivePrimaryWindow->widget()->geometry();
 	_mediaView = std::make_unique<Media::View::OverlayWidget>();
+	_mediaView->setSystemMediaControls(_mediaControlsManager.get());
 	_lastActivePrimaryWindow->widget()->Ui::RpWidget::setGeometry(current);
 #else
 	_mediaView = std::make_unique<Media::View::OverlayWidget>();
+	_mediaView->setSystemMediaControls(_mediaControlsManager.get());
 #endif // Q_OS_MAC || Q_OS_WIN
 }
 

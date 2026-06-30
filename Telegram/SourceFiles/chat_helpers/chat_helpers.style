@@ -1178,7 +1178,8 @@ historyToDownBadgeSize: 22px;
 historyToDownShownAfter: 480px;
 historyToDownDuration: 150;
 
-historyPullNextThreshold: 110px;
+historyPullNextThreshold: 48px;
+historyPullNextExpand: 110px;
 historyPullNextMaxHeight: 150px;
 historyPullNextAvatar: 56px;
 historyPullNextSkip: 8px;
