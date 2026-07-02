@@ -35,6 +35,7 @@
 #include "history/history_item_components.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
+#include "main/main_session.h"
 #include "main/session/send_as_peers.h"
 #include "styles/style_ayu_icons.h"
 #include "styles/style_layers.h"
@@ -79,6 +80,13 @@ Fn<void()> ClearDeletedMessagesHandler(not_null<Window::SessionController*> cont
 void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
 	const auto session = &peer->session();
 
+	if (const auto channel = peer->asChannel()) {
+		if (channel->isMegagroup() && channel->canDeleteMessages()) {
+			session->api().deleteAllFromParticipant(channel, session->user());
+			return;
+		}
+	}
+
 	auto collected = std::make_shared<std::vector<MsgId>>();
 
 	const auto removeNext = std::make_shared<Fn<void(int)>>();
@@ -113,9 +121,30 @@ void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
 		};
 		const auto fail = [=](const MTP::Error &error)
 		{
-			DEBUG_LOG(("Delete batch failed: %1").arg(error.type()));
-			const auto delay = crl::time(1000);
-			base::call_delayed(delay, [=] { (*removeNext)(index); });
+			const auto type = error.type();
+			DEBUG_LOG(("Delete batch %1 failed: %2").arg(batch).arg(type));
+
+			if (type.startsWith(u"FLOOD_WAIT_"_q)
+				|| type.startsWith(u"FLOOD_PREMIUM_WAIT_"_q)) {
+				const auto underscore = type.lastIndexOf('_');
+				const auto seconds = (underscore >= 0)
+					? type.mid(underscore + 1).toInt()
+					: 0;
+				const auto delay = crl::time(std::max(seconds, 1) * 1000);
+				base::call_delayed(delay, [=] { (*removeNext)(index); });
+				return;
+			}
+
+			if (type == u"MESSAGE_DELETE_FORBIDDEN"_q
+				|| type == u"MSG_ID_INVALID"_q
+				|| type == u"MESSAGE_ID_INVALID"_q) {
+				DEBUG_LOG(("Skipping batch %1 (%2 ids)").arg(batch).arg(ids.size()));
+				const auto delay = crl::time(500 + base::RandomValue<int>() % 500);
+				base::call_delayed(delay, [=] { (*removeNext)(index + ids.size()); });
+				return;
+			}
+
+			DEBUG_LOG(("Stopping deletion, unrecoverable error: %1").arg(type));
 		};
 
 		if (const auto channel = peer->asChannel()) {
@@ -439,16 +468,12 @@ void AddDeleteOwnMessagesAction(PeerData *peerData,
 	if (topic) {
 		return;
 	}
-	const auto isGroup = peerData->isChat() || peerData->isMegagroup();
-	if (!isGroup) {
-		return;
-	}
 	if (const auto chat = peerData->asChat()) {
-		if (!chat->amIn() || chat->amCreator() || chat->hasAdminRights()) {
+		if (!chat->amIn()) {
 			return;
 		}
 	} else if (const auto channel = peerData->asChannel()) {
-		if (!channel->isMegagroup() || !channel->amIn() || channel->amCreator() || channel->hasAdminRights()) {
+		if (!channel->isMegagroup() || !channel->amIn()) {
 			return;
 		}
 	} else {

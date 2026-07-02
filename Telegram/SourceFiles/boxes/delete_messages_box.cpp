@@ -42,21 +42,13 @@ DeleteMessagesBox::DeleteMessagesBox(
 	bool suggestModerateActions)
 : _session(&item->history()->session())
 , _ids(1, item->fullId()) {
-	const auto peer = item->history()->peer;
-	const auto channel = peer->asChannel();
 	if (suggestModerateActions) {
 		_moderateBan = item->suggestBanReport();
 		_moderateDeleteAll = item->suggestDeleteAllReport();
-	} else if (item->out()) {
-		const auto chat = peer->asChat();
-		if ((chat && chat->canDeleteMessages()) ||
-			(channel && !channel->isBroadcast() && channel->canDeleteMessages())) {
-			_moderateDeleteAll = true;
+		if (_moderateBan || _moderateDeleteAll) {
+			_moderateFrom = item->from();
+			_moderateInChannel = item->history()->peer->asChannel();
 		}
-	}
-	if ((_moderateBan || _moderateDeleteAll) && channel) {
-		_moderateFrom = item->from();
-		_moderateInChannel = channel;
 	}
 }
 
