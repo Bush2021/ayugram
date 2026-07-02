@@ -66,6 +66,7 @@ void SetupFlexibleRegularScroll(
 		if (pinnedToTop->height() != height) {
 			pinnedToTop->resize(pinnedToTop->width(), height);
 		}
+		scroll->setVerticalBarTopSkip(height - min);
 	};
 	scroll->scrollTopValue(
 	) | rpl::on_next(applyTop, pinnedToTop->lifetime());

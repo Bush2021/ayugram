@@ -770,6 +770,7 @@ protected:
 	[[nodiscard]] int textHeightFor(int textWidth) const;
 	[[nodiscard]] int textRealWidth() const { return _textRealWidth; }
 	void validateText();
+	void invalidateTextSizeCache();
 	void validateTextSkipBlock(bool has, int width, int height);
 	void validateInlineKeyboard(HistoryMessageReplyMarkup *markup);
 
@@ -809,7 +810,6 @@ private:
 
 	void refreshDeletedAnimationTarget();
 	void refreshMedia(Element *replacing);
-	void invalidateTextSizeCache();
 	void setTextWithLinks(
 		const TextWithEntities &text,
 		const std::vector<ClickHandlerPtr> &links = {});

@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_stories_content.h"
 #include "dialogs/ui/dialogs_stories_list.h"
 #include "dialogs/ui/dialogs_suggestions.h"
+#include "dialogs/ui/dialogs_top_bar_suggestion_content.h"
 #include "dialogs/dialogs_inner_widget.h"
 #include "dialogs/dialogs_search_from_controllers.h"
 #include "dialogs/dialogs_top_bar_suggestion.h"
@@ -1195,38 +1196,16 @@ void Widget::setupTopBarSuggestions() {
 		}) | rpl::flatten_latest() | rpl::on_next([=](
 				Ui::SlideWrap<Ui::RpWidget> *raw) {
 			if (raw) {
-				_topBarSuggestionPlaceholder.reset(_innerList->insert(
-					0,
-					object_ptr<Ui::RpWidget>(_innerList)));
-				_topBarSuggestionPlaceholder->paintOn([
-					ph = _topBarSuggestionPlaceholder.get()
-				](QPainter &p) {
-					p.fillRect(ph->rect(), st::dialogsBg);
-				});
 				_topBarSuggestion.reset(raw);
-				_topBarSuggestion->setParent(_scroll);
-				_topBarSuggestion->raise();
-				_topBarSuggestion->heightValue(
-				) | rpl::on_next([=](int h) {
-					if (_topBarSuggestionPlaceholder) {
-						_topBarSuggestionPlaceholder->resize(
-							_topBarSuggestionPlaceholder->width(),
-							h);
-					}
-					_scroll->setBarTopInset(h);
-					_topBarSuggestionHeightChanged.fire_copy(h);
-				}, _topBarSuggestion->entity()->lifetime());
-				const auto pinToScroll = [=] {
-					if (_topBarSuggestion) {
-						_topBarSuggestion->resizeToWidth(_scroll->width());
-						_topBarSuggestion->moveToLeft(0, 0);
-					}
-				};
-				_scroll->sizeValue(
-				) | rpl::to_empty | rpl::on_next(
-					pinToScroll,
-					_topBarSuggestion->entity()->lifetime());
-				pinToScroll();
+				MountTopBarSuggestion({
+					.scroll = _scroll,
+					.innerList = _innerList,
+					.wrap = _topBarSuggestion.get(),
+					.placeholder = &_topBarSuggestionPlaceholder,
+					.heightChanged = [=](int h) {
+						_topBarSuggestionHeightChanged.fire_copy(h);
+					},
+				});
 			} else {
 				_topBarSuggestionPlaceholder = nullptr;
 				_topBarSuggestion = nullptr;

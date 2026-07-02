@@ -26,7 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
-#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/elastic_scroll.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/integration.h"
 #include "ui/rect.h"
@@ -49,6 +49,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Iv::Markdown {
 namespace {
+
+constexpr auto kZoomStep = 10;
 
 #ifndef NDEBUG
 [[nodiscard]] QString PrepareTerminalFailureName(
@@ -250,7 +252,7 @@ private:
 	std::vector<PreparedFootnote> _footnotes;
 	std::unique_ptr<Ui::LayerManager> _footnoteLayerManager;
 	EmbedOverlay *_embedOverlay = nullptr;
-	Ui::ScrollArea *_scroll = nullptr;
+	Ui::ElasticScroll *_scroll = nullptr;
 	Ui::RpWidget *_scrollContent = nullptr;
 	Ui::JumpDownButton *_scrollToTop = nullptr;
 	MarkdownDocumentWidget *_body = nullptr;
@@ -302,8 +304,10 @@ void MarkdownPreviewRoot::setup() {
 	_footnoteLayerManager = std::make_unique<Ui::LayerManager>(not_null{ this });
 	_footnoteLayerManager->setHideByBackgroundClick(true);
 
-	_scroll = Ui::CreateChild<Ui::ScrollArea>(this, st::boxScroll);
-	_scroll->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+	_scroll = Ui::CreateChild<Ui::ElasticScroll>(this, st::boxScroll);
+	using OverscrollType = Ui::ElasticScroll::OverscrollType;
+	_scroll->setOverscrollTypes(OverscrollType::Real, OverscrollType::Real);
+	_scroll->setOverscrollBg(st::windowBg->c);
 	_scrollContent = _scroll->setOwnedWidget(object_ptr<Ui::RpWidget>(_scroll));
 	_body = Ui::CreateChild<MarkdownDocumentWidget>(_scrollContent);
 	_scrollToTop = Ui::CreateChild<Ui::JumpDownButton>(_scroll, st::dialogsToUp);
@@ -368,7 +372,11 @@ void MarkdownPreviewRoot::setup() {
 				: false;
 		});
 		if (_options.delegate) {
-			_body->setZoom(_options.delegate->ivZoom());
+			const auto delegate = _options.delegate;
+			_body->setZoom(delegate->ivZoom());
+			_body->setZoomStepCallback([=](int steps) {
+				delegate->ivSetZoom(delegate->ivZoom() + steps * kZoomStep);
+			});
 		}
 		_body->heightValue(
 		) | rpl::on_next([=](int) {
@@ -397,6 +405,7 @@ void MarkdownPreviewRoot::setup() {
 	}, lifetime());
 
 	style::PaletteChanged() | rpl::on_next([=] {
+		_scroll->setOverscrollBg(st::windowBg->c);
 		if (_body && !_body->isHidden()) {
 			_body->refreshPalette();
 		}
@@ -849,7 +858,7 @@ void MarkdownPreviewRoot::scrollToYAnimated(int top) {
 	if (!_scroll) {
 		return;
 	}
-	const auto scrollTo = _scroll->computeScrollToY(top, -1);
+	const auto scrollTo = std::clamp(top, 0, _scroll->scrollTopMax());
 	_scrollToAnimation.stop();
 	auto scrollTop = _scroll->scrollTop();
 	if (scrollTop == scrollTo) {
@@ -900,9 +909,14 @@ void MarkdownPreviewRoot::updateScrollToTopVisibility() {
 	if (_scrollToAnimation.animating()) {
 		return;
 	}
+	const auto scrollTop = _scroll->scrollTop();
+	const auto scrollTopMax = _scroll->scrollTopMax();
+	const auto nearBottom = (scrollTop + st::historyToDownShownAfter / 2)
+		>= scrollTopMax;
 	startScrollToTopButtonAnimation(
 		!_scroll->isHidden()
-		&& (_scroll->scrollTop() > (st::historyToDownShownAfter / 2)));
+		&& (scrollTop > (st::historyToDownShownAfter / 2))
+		&& !nearBottom);
 }
 
 void MarkdownPreviewRoot::startScrollToTopButtonAnimation(bool shown) {

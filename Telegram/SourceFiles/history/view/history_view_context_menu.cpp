@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/controls/delete_message_context_action.h"
 #include "ui/controls/who_reacted_context_action.h"
+#include "ui/delayed_activation.h"
 #include "ui/dynamic_image.h"
 #include "ui/dynamic_thumbnails.h"
 #include "ui/boxes/edit_factcheck_box.h"
@@ -757,6 +758,9 @@ bool AddEditMessageAction(
 		const auto item = owner->message(itemId);
 		if (!item) {
 			return;
+		}
+		if (item->richPage()) {
+			Ui::PreventDelayedActivation();
 		}
 		list->editMessageRequestNotify(item->fullId());
 	}, &st::menuIconEdit);

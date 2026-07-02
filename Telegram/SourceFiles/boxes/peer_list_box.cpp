@@ -1651,10 +1651,6 @@ void PeerListContent::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
 	const auto clip = e->rect();
-	if (_mode != Mode::Custom) {
-		p.fillRect(clip, _st.item.button.textBg);
-	}
-
 	const auto repaintByStatusAfter = _repaintByStatus.remainingTime();
 	auto repaintAfterMin = repaintByStatusAfter;
 
@@ -1662,8 +1658,27 @@ void PeerListContent::paintEvent(QPaintEvent *e) {
 	const auto now = crl::now();
 	const auto yFrom = clip.y() - rowsTopCached;
 	const auto yTo = clip.y() + clip.height() - rowsTopCached;
-	p.translate(0, rowsTopCached);
 	const auto count = shownRowsCount();
+	if (_mode != Mode::Custom) {
+		auto fill = QRegion(clip);
+		if (count > 0 && !sectionsShown()) {
+			const auto from = floorclamp(yFrom, _rowHeight, 0, count);
+			const auto to = ceilclamp(yTo, _rowHeight, 0, count);
+			for (auto index = from; index != to; ++index) {
+				if (getRow(RowIndex(index))->opacity() == 1.) {
+					fill -= QRect(
+						0,
+						rowsTopCached + index * _rowHeight,
+						width(),
+						_rowHeight);
+				}
+			}
+		}
+		for (const auto &rect : fill) {
+			p.fillRect(rect, _st.item.button.textBg);
+		}
+	}
+	p.translate(0, rowsTopCached);
 	const auto handleRepaintAfter = [&](crl::time repaintAfter) {
 		if (repaintAfter > 0
 			&& (repaintAfterMin < 0

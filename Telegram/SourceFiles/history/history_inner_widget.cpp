@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/delayed_activation.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/effects/message_sending_animation_controller.h"
 #include "ui/effects/reaction_fly_animation.h"
@@ -2987,6 +2988,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					const auto selection = getSelectedTextRange(item);
 					if (!selection.empty()) {
 						clearSelected(true);
+					}
+					if (item->richPage()) {
+						Ui::PreventDelayedActivation();
 					}
 					_widget->editMessage(item, selection);
 				}

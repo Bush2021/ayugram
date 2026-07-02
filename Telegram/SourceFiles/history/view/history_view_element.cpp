@@ -1339,6 +1339,9 @@ void Element::clearSpecialOnlyEmoji() {
 }
 
 void Element::checkSpecialOnlyEmoji() {
+	if (data()->richPage()) {
+		return;
+	}
 	if (history()->session().emojiStickersPack().add(this)) {
 		_flags |= Flag::SpecialOnlyEmoji;
 	}
@@ -1820,7 +1823,8 @@ int Element::textHeightFor(int textWidth) const {
 		if (const auto rich = const_cast<Element*>(this)->richpage()) {
 			const auto articleHeight = rich->article.resizeGetHeight(
 				richPageWidthFor(textWidth));
-			_textHeight = articleHeight
+			_textHeight = st::mediaInBubbleSkip
+				+ articleHeight
 				+ (_text.hasSkipBlock() ? skipBlockHeight() : 0);
 			rich->article.setVisibleTopBottom(0, articleHeight);
 			_textRealWidth = std::clamp(
@@ -2798,6 +2802,9 @@ void Element::refreshReactions() {
 					return;
 				}
 				if (id.paid()) {
+					if (!controller) {
+						return;
+					}
 					Payments::TryAddingPaidReaction(
 						item,
 						weak.get(),

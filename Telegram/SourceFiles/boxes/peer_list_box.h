@@ -12,8 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/unread_badge.h"
 #include "ui/userpic_view.h"
 #include "ui/layers/box_content.h"
+#include "ui/rows_scroll_cache.h"
 #include "base/timer.h"
-#include "boxes/peer_list_scroll_cache.h"
 
 namespace style {
 struct PeerList;
@@ -976,7 +976,7 @@ private:
 	base::Timer _repaintByStatus;
 	base::unique_qptr<Ui::PopupMenu> _contextMenu;
 
-	PeerListRowsScrollCache _rowsScrollCache;
+	Ui::RowsScrollCache _rowsScrollCache;
 
 };
 

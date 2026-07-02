@@ -782,6 +782,8 @@ proxyApplyBox: Box(defaultBox) {
 }
 
 markdownLinkFieldPadding: margins(22px, 0px, 22px, 10px);
+markdownMathCheckboxMargin: margins(22px, 12px, 22px, 10px);
+markdownMathFieldMaxHeight: 140px;
 
 termsContent: FlatLabel(defaultFlatLabel) {
 	minWidth: 285px;

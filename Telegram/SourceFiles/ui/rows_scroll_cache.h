@@ -10,13 +10,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "base/flat_map.h"
 
-class PeerListRowsScrollCache final {
+namespace Ui {
+
+class RowsScrollCache final {
 public:
-	explicit PeerListRowsScrollCache(Fn<void()> stopped);
+	explicit RowsScrollCache(Fn<void()> stopped);
 
 	void markScrolling();
 	[[nodiscard]] bool scrolling() const {
 		return _scrolling;
+	}
+	[[nodiscard]] bool hasFresh(uint64 rowId, QSize physicalSize) const {
+		const auto i = _images.find(rowId);
+		return (i != end(_images)) && (i->second.size() == physicalSize);
 	}
 
 	template <typename PaintToImage>
@@ -26,12 +32,11 @@ public:
 			QSize physicalSize,
 			int ratio,
 			PaintToImage &&paintToImage) {
+		if (_images.size() > kLimit && !_images.contains(rowId)) {
+			_images.clear();
+		}
 		auto &image = _images[rowId];
 		if (image.size() != physicalSize) {
-			if (_images.size() > kLimit) {
-				_images.clear();
-				image = _images[rowId];
-			}
 			image = QImage(physicalSize, QImage::Format_RGB32);
 			image.setDevicePixelRatio(ratio);
 			paintToImage(image);
@@ -40,6 +45,7 @@ public:
 	}
 
 	void invalidate(uint64 rowId);
+	void clear();
 
 private:
 	static constexpr auto kLimit = 256;
@@ -49,3 +55,5 @@ private:
 	bool _scrolling = false;
 
 };
+
+} // namespace Ui

@@ -63,6 +63,7 @@ class Story;
 class SavedSublist;
 struct PaidReactionSend;
 struct SendError;
+struct FileOriginCloudDraft;
 } // namespace Data
 
 namespace HistoryUnreadThings {
@@ -555,6 +556,7 @@ public:
 		const TextWithEntities &summary);
 	void setRichPage(std::shared_ptr<const Iv::RichPage> page);
 	void setFullRichPage(std::shared_ptr<const Iv::RichPage> page);
+	void setRichDraftOrigin(Data::FileOriginCloudDraft origin);
 	void clearFullRichPage();
 	void clearRichPage();
 

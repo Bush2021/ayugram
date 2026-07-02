@@ -491,6 +491,12 @@ ListWidget::ListWidget(
 	setAttribute(Qt::WA_AcceptTouchEvents);
 	setMouseTracking(true);
 	setAccessibleName(tr::lng_sr_message_list(tr::now));
+	if (const auto scroll = _delegate->listScrollArea()) {
+		scroll->lockWheelDirection();
+		scroll->setCrossAxisWheelProcess([=](QPoint delta) {
+			return consumeScrollAction(delta);
+		});
+	}
 	if (_readMetricsTracker) {
 		Core::App().inAppKeyPressed(
 		) | rpl::on_next([=] {
@@ -1814,6 +1820,19 @@ bool ListWidget::canConsumeHorizontalScroll(QPoint position, int delta) const {
 		&& view->canConsumeHorizontalScroll(
 			mapPointToItem(position, view),
 			delta);
+}
+
+bool ListWidget::consumeScrollAction(QPoint delta) {
+	const auto horizontal = (std::abs(delta.x()) > std::abs(delta.y()));
+	if (!horizontal) {
+		return false;
+	}
+	const auto position = mapFromGlobal(_mousePosition);
+	const auto view = lookupItemByY(position.y());
+	return view
+		&& view->consumeHorizontalScroll(
+			mapPointToItem(position, view),
+			delta.x());
 }
 
 auto ListWidget::findViewForPinnedTracking(int top) const

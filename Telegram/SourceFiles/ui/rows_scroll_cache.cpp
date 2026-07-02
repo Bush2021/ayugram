@@ -5,15 +5,16 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include "boxes/peer_list_scroll_cache.h"
+#include "ui/rows_scroll_cache.h"
 
+namespace Ui {
 namespace {
 
 constexpr auto kStopTimeout = crl::time(120);
 
 } // namespace
 
-PeerListRowsScrollCache::PeerListRowsScrollCache(Fn<void()> stopped) {
+RowsScrollCache::RowsScrollCache(Fn<void()> stopped) {
 	_stopTimer.setCallback([=] {
 		_scrolling = false;
 		_images.clear();
@@ -21,13 +22,19 @@ PeerListRowsScrollCache::PeerListRowsScrollCache(Fn<void()> stopped) {
 	});
 }
 
-void PeerListRowsScrollCache::markScrolling() {
+void RowsScrollCache::markScrolling() {
 	_scrolling = true;
 	_stopTimer.callOnce(kStopTimeout);
 }
 
-void PeerListRowsScrollCache::invalidate(uint64 rowId) {
+void RowsScrollCache::invalidate(uint64 rowId) {
 	if (const auto i = _images.find(rowId); i != end(_images)) {
 		_images.erase(i);
 	}
 }
+
+void RowsScrollCache::clear() {
+	_images.clear();
+}
+
+} // namespace Ui

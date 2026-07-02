@@ -1819,7 +1819,7 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolveStarsSettings
 		},
 		{
-			u"^ton/?(^\\?.*)?(#|$)"_q,
+			u"^(ton|grams)/?(^\\?.*)?(#|$)"_q,
 			ResolveTonSettings
 		},
 		{
