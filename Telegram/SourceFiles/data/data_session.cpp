@@ -3091,9 +3091,6 @@ void Session::checkTTLs() {
 
 		auto itemsToProcess = toBeRemoved | ranges::to_vector;
 		for (const auto &item : itemsToProcess) {
-			// remove message from `_ttlMessages` to avoid calling this method infinitely
-			item->applyTTL(0);
-
 			processMessageDelete(item);
 		}
 	} else {
