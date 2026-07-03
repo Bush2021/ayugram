@@ -12,6 +12,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/compose/compose_features.h"
 #include "ui/widgets/fields/input_field.h"
 
+// AyuGram includes
+#include "data/data_peer_id.h"
+
 #ifndef TDESKTOP_DISABLE_SPELLCHECK
 #include "boxes/dictionaries_manager.h"
 #include "spellcheck/spelling_highlighter.h"
