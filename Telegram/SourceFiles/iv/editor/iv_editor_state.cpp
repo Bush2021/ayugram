@@ -67,12 +67,6 @@ struct TextRange {
 constexpr auto kMaxRichTextNodeLength = 16000;
 constexpr auto kMaxCommittedFieldLength = 256 * 1024;
 
-[[nodiscard]] TextWithEntities MakeText(QString text) {
-	auto result = TextWithEntities();
-	result.text = std::move(text);
-	return result;
-}
-
 [[nodiscard]] std::vector<TextWithEntities> SplitFieldText(
 		TextWithEntities text) {
 	auto result = std::vector<TextWithEntities>();
@@ -1313,19 +1307,6 @@ void InsertTableCellBeforeVisualColumn(
 	row->cells.insert(
 		row->cells.begin() + insertAt,
 		std::move(insertedCell));
-}
-
-void InsertTableCellBeforeVisualColumn(
-		TableRow *row,
-		const TableGrid &grid,
-		int rowIndex,
-		int column) {
-	InsertTableCellBeforeVisualColumn(
-		row,
-		grid,
-		rowIndex,
-		column,
-		MakeDefaultTableCell());
 }
 
 [[nodiscard]] bool BlockCanOwnChildContainer(const Block &block) {

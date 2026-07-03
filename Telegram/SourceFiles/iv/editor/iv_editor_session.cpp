@@ -2879,7 +2879,6 @@ private:
 	void handleRichDraftAutosave(Widget::AutosaveEvent event);
 	[[nodiscard]] std::optional<::Data::Draft> prepareRichDraftForAutosave() const;
 	void saveRichDraftNow();
-	void retryRichDraftAutosaveIfNeeded();
 	void startCloseWithDraftSave();
 	void startCloseWithDraftSaveThen(Fn<void()> continuation);
 	void saveRichDraftForClose(uint64 generation);
@@ -3729,12 +3728,6 @@ void ArticleSession::saveRichDraftNow() {
 	_richDraftAutosaveRetryPending = (_session->api().saveDraftToCloud(
 		not_null{ thread },
 		*cloudDraft) == 0);
-}
-
-void ArticleSession::retryRichDraftAutosaveIfNeeded() {
-	if (_richDraftAutosaveRetryPending) {
-		saveRichDraftNow();
-	}
 }
 
 void ArticleSession::startCloseWithDraftSave() {

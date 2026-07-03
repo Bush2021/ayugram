@@ -1387,7 +1387,7 @@ struct InlineFieldTrimResult {
 			st::sendMediaPreviewSize,
 			premium);
 		if (list.error != Ui::PreparedList::Error::NonLocalUrl) {
-			return std::move(list);
+			return list;
 		} else if (!hasImage) {
 			return std::nullopt;
 		}

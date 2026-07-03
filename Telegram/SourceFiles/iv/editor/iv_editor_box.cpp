@@ -228,7 +228,6 @@ private:
 	void hideTooltip();
 	void updateTooltipGeometry();
 	void fillHeadingMenu(not_null<Ui::PopupMenu*> menu);
-	void showHeadingMenu(not_null<Ui::IconButton*> button);
 	void fillBlockStyleMenu(not_null<Ui::PopupMenu*> menu);
 	void showBlockStyleMenu(not_null<Ui::IconButton*> button);
 	void fillTextStyleMenu(not_null<Ui::PopupMenu*> menu);
@@ -739,15 +738,6 @@ void Toolbar::fillHeadingMenu(not_null<Ui::PopupMenu*> menu) {
 			false,
 			starSize);
 	}
-}
-
-void Toolbar::showHeadingMenu(not_null<Ui::IconButton*> button) {
-	if (_menu) {
-		return;
-	}
-	_menu = base::make_unique_q<Ui::PopupMenu>(this, st::popupMenuWithIcons);
-	fillHeadingMenu(not_null<Ui::PopupMenu*>(_menu.get()));
-	_menu->popup(button->mapToGlobal(QPoint(0, button->height())));
 }
 
 void Toolbar::fillBlockStyleMenu(not_null<Ui::PopupMenu*> menu) {
