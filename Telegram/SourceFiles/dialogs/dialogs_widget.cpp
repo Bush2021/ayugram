@@ -176,6 +176,20 @@ base::options::toggle OptionForumHideChatsList({
 	.description = "Don't keep a narrow column of chat list.",
 });
 
+// An invisible, larger hit-area stacked under the main menu toggle so a mouse
+// click near the toggle still opens the menu. It duplicates the toggle's action
+// and carries no label, so it reports no accessible role - that keeps the screen
+// reader's FocusManager from turning it into a second, unnamed Tab stop, while
+// mouse clicks keep working.
+class MenuUnderButton final : public Ui::AbstractButton {
+public:
+	using Ui::AbstractButton::AbstractButton;
+
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::NoRole;
+	}
+};
+
 [[nodiscard]] bool RedirectTextToSearch(const QString &text) {
 	for (const auto &ch : text) {
 		if (ch.unicode() >= 32) {
@@ -415,7 +429,7 @@ Widget::Widget(
 	.toggle = object_ptr<Ui::IconButton>(
 		_searchControls,
 		st::dialogsMenuToggle),
-	.under = object_ptr<Ui::AbstractButton>(_searchControls),
+	.under = object_ptr<MenuUnderButton>(_searchControls),
 })
 , _searchForNarrowLayout(_searchControls, st::dialogsSearchForNarrowFilters)
 , _search(_searchControls, st::dialogsFilter, tr::lng_dlg_filter())
@@ -2260,6 +2274,10 @@ void Widget::setInnerFocus(bool unfocusSearch) {
 			|| _searchHasFocus
 			|| _searchSuggestionsLocked)) {
 		_search->setFocus();
+	} else if (Ui::ScreenReaderModeActive()) {
+		// Focus the chat list itself, so the screen reader announces the list
+		// and its selected chat, instead of the unnamed dialogs container.
+		_inner->setFocus();
 	} else {
 		setFocus();
 	}
