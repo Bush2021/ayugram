@@ -20,10 +20,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/layer_manager.h"
 #include "ui/layers/show.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/dropdown_menu.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/rp_window.h"
 #include "ui/wrap/fade_wrap.h"
+#include "ui/ui_utility.h"
 #include "logs.h"
 
 #include "styles/palette.h"
@@ -48,12 +50,15 @@ namespace Iv::Markdown {
 namespace {
 
 constexpr auto kZoomStep = int(10);
+constexpr auto kZoomDropdownHideDelay = 3 * crl::time(1000);
 
 [[nodiscard]] OpenOptions PrepareOpenOptions(
 		OpenOptions options,
 		not_null<Delegate*> delegate,
-		const QString &title) {
+		const QString &title,
+		Fn<void()> zoomActivated) {
 	options.delegate = delegate;
+	options.zoomActivated = std::move(zoomActivated);
 	Q_UNUSED(title);
 	return options;
 }
@@ -112,11 +117,11 @@ constexpr auto kZoomStep = int(10);
 		: (current ? current : std::make_shared<QVariant>());
 }
 
-void ProcessZoomShortcut(not_null<Delegate*> delegate, QKeyEvent *event) {
+bool ProcessZoomShortcut(not_null<Delegate*> delegate, QKeyEvent *event) {
 	if (!(event->modifiers() & Qt::ControlModifier)) {
-		return;
-	}
-	if (event->key() == Qt::Key_Plus || event->key() == Qt::Key_Equal) {
+		return false;
+	} else if (event->key() == Qt::Key_Plus
+		|| event->key() == Qt::Key_Equal) {
 		event->accept();
 		delegate->ivSetZoom(delegate->ivZoom() + kZoomStep);
 	} else if (event->key() == Qt::Key_Minus) {
@@ -125,7 +130,10 @@ void ProcessZoomShortcut(not_null<Delegate*> delegate, QKeyEvent *event) {
 	} else if (event->key() == Qt::Key_0) {
 		event->accept();
 		delegate->ivSetZoom(0);
+	} else {
+		return false;
 	}
+	return true;
 }
 
 struct OpenTarget {
@@ -274,7 +282,11 @@ Controller::Controller(
 , _document(std::make_shared<PreparedDocument>(std::move(document)))
 , _title(std::move(title))
 , _renderer(nullptr)
-, _options(PrepareOpenOptions(std::move(options), delegate, _title)) {
+, _options(PrepareOpenOptions(
+	std::move(options),
+	delegate,
+	_title,
+	zoomActivatedCallback())) {
 	_clickHandlerContextRef = ResolveClickHandlerContextRef(
 		_clickHandlerContextRef,
 		_options);
@@ -292,7 +304,11 @@ Controller::Controller(
 , _preparedContent(std::move(content))
 , _title(std::move(title))
 , _renderer(renderer ? std::move(renderer) : std::make_shared<MathRenderer>())
-, _options(PrepareOpenOptions(std::move(options), delegate, _title)) {
+, _options(PrepareOpenOptions(
+	std::move(options),
+	delegate,
+	_title,
+	zoomActivatedCallback())) {
 	_clickHandlerContextRef = ResolveClickHandlerContextRef(
 		_clickHandlerContextRef,
 		_options);
@@ -354,7 +370,11 @@ void Controller::setContent(
 	if (preserveScroll) {
 		saveCurrentHistoryScroll(scrollTop);
 	}
-	auto refreshed = PrepareOpenOptions(std::move(options), _delegate, title);
+	auto refreshed = PrepareOpenOptions(
+		std::move(options),
+		_delegate,
+		title,
+		zoomActivatedCallback());
 	if (preserveScroll && historyEnabled(refreshed)) {
 		auto activeIndex = -1;
 		if (_shownHistoryIndex >= 0
@@ -514,7 +534,11 @@ bool Controller::updateExistingPreview(
 
 void Controller::updateOptions(OpenOptions options) {
 	const auto initialFragment = options.initialFragment;
-	auto refreshed = PrepareOpenOptions(std::move(options), _delegate, _title);
+	auto refreshed = PrepareOpenOptions(
+		std::move(options),
+		_delegate,
+		_title,
+		zoomActivatedCallback());
 	if (refreshed.sourceName.isEmpty()) {
 		refreshed.sourceName = _options.sourceName;
 	}
@@ -915,6 +939,7 @@ void Controller::showMenu() {
 	if (!_window || _menu) {
 		return;
 	}
+	hideZoomDropdown();
 	_menu = base::make_unique_q<Ui::PopupMenu>(
 		_window.get(),
 		st::popupMenuWithIcons);
@@ -949,11 +974,77 @@ void Controller::showMenu() {
 	if (hasOpenSource || canShare()) {
 		_menu->addSeparator();
 	}
-	_menu->addAction(CreateZoomMenuAction(_menu, _delegate));
+	_menu->addAction(CreateZoomMenuAction(_menu->menu(), _delegate));
 
 	_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 	_menu->popup(_window->body()->mapToGlobal(
 		QPoint(_window->body()->width(), 0) + st::ivMenuPosition));
+}
+
+void Controller::createZoomDropdown() {
+	_zoomDropdown = base::make_unique_q<Ui::DropdownMenu>(
+		_window->body().get(),
+		st::dropdownMenuWithIcons);
+	_zoomDropdown->addAction(
+		CreateZoomMenuAction(_zoomDropdown->menu(), _delegate));
+	_zoomDropdown->events() | rpl::on_next([=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::Enter) {
+			_zoomDropdownHideTimer.cancel();
+		}
+	}, _zoomDropdown->lifetime());
+	_zoomDropdownHideTimer.setCallback([=] {
+		if (_zoomDropdown) {
+			_zoomDropdown->hideAnimated();
+		}
+	});
+}
+
+void Controller::showZoomDropdown() {
+	if (!_window || _menu) {
+		return;
+	}
+	if (!_zoomDropdown) {
+		createZoomDropdown();
+	}
+	updateZoomDropdownGeometry();
+	_zoomDropdown->raise();
+	_zoomDropdown->showAnimated(Ui::PanelAnimation::Origin::TopRight);
+	if (!_zoomDropdown->underMouse()) {
+		_zoomDropdownHideTimer.callOnce(kZoomDropdownHideDelay);
+	}
+}
+
+void Controller::hideZoomDropdown() {
+	_zoomDropdownHideTimer.cancel();
+	if (_zoomDropdown) {
+		_zoomDropdown->hideFast();
+	}
+}
+
+void Controller::updateZoomDropdownGeometry() {
+	if (!_zoomDropdown || !_window) {
+		return;
+	}
+	_zoomDropdown->resizeToContent();
+	Ui::SendPendingMoveResizeEvents(_zoomDropdown.get());
+	const auto &padding = st::dropdownMenuWithIcons.wrap.padding;
+	const auto visibleHeight = _zoomDropdown->height()
+		- padding.top()
+		- padding.bottom();
+	const auto visibleRight = _window->body()->width()
+		- st::ivMenuToggle.width
+		+ st::ivZoomDropdownPosition.x();
+	const auto visibleTop = ((st::ivSubtitleHeight - visibleHeight) / 2)
+		+ st::ivZoomDropdownPosition.y();
+	_zoomDropdown->move(
+		visibleRight + padding.right() - _zoomDropdown->width(),
+		visibleTop - padding.top());
+}
+
+Fn<void()> Controller::zoomActivatedCallback() {
+	return crl::guard(this, [=] {
+		showZoomDropdown();
+	});
 }
 
 void Controller::createLayerManager() {
@@ -1132,6 +1223,7 @@ void Controller::createWindow() {
 	}, _subtitleWrap->lifetime());
 	window->body()->widthValue() | rpl::on_next([=](int width) {
 		updateTitleGeometry(width);
+		updateZoomDropdownGeometry();
 	}, _subtitle->lifetime());
 	window->setTitle(_title);
 	window->setWindowTitle(_title);
@@ -1185,7 +1277,9 @@ void Controller::createWindow() {
 		}
 		const auto event = static_cast<QKeyEvent*>(e.get());
 		const auto previousAccepted = event->isAccepted();
-		ProcessZoomShortcut(_delegate, event);
+		if (ProcessZoomShortcut(_delegate, event)) {
+			showZoomDropdown();
+		}
 		if (!event->isAccepted()
 			&& (event->modifiers() & Qt::ControlModifier)
 			&& event->key() == Qt::Key_F) {

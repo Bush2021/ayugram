@@ -1269,6 +1269,7 @@ private:
 	[[nodiscard]] Section makeReportOrDeleteReaction();
 	[[nodiscard]] Section makeViewChannel(not_null<ChannelData*> channel);
 	[[nodiscard]] Section makeCommunityLink(not_null<PeerData*> peer);
+	void addCommunityHiddenNote();
 	[[nodiscard]] Section makeTopicsList(not_null<Data::Forum*> forum);
 
 	[[nodiscard]] Section makeDeleteReactionSection(GroupReactionOrigin data);
@@ -2802,11 +2803,25 @@ Section DetailsFiller::makeCommunityLink(not_null<PeerData*> peer) {
 	const auto content = container->add(object_ptr<PeerListContent>(
 		container,
 		controller));
-	AddSkip(container, st::infoProfileSkip);
 	delegate->setContent(content);
 	controller->setDelegate(delegate);
 
-	auto hidden = peer->session().changes().peerFlagsValue(
+	if (!community->wasFullUpdated()) {
+		community->session().api().requestFullPeer(community);
+	}
+
+	raw->toggle(true, anim::type::instant);
+	return Section{
+		.widget = std::move(wrap),
+		.shown = raw->toggledValue(),
+	};
+}
+
+void DetailsFiller::addCommunityHiddenNote() {
+	const auto peer = _peer.get();
+	const auto community = peer->owner().channel(
+		Data::PeerLinkedCommunityId(peer));
+	auto shown = peer->session().changes().peerFlagsValue(
 		community,
 		Data::PeerUpdate::Flag::FullInfo
 	) | rpl::map([=] {
@@ -2818,37 +2833,11 @@ Section DetailsFiller::makeCommunityLink(not_null<PeerData*> peer) {
 		return info->linkedPeersValue() | rpl::map([=] {
 			return info->isHidden(peer);
 		});
-	}) | rpl::flatten_latest() | rpl::start_spawning(container->lifetime());
+	}) | rpl::flatten_latest() | rpl::distinct_until_changed();
 
-	const auto hiddenWrap = container->add(
-		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			container,
-			object_ptr<Ui::VerticalLayout>(container)));
-	Ui::AddDividerText(
-		hiddenWrap->entity(),
-		tr::lng_community_hidden_chat_about());
-	hiddenWrap->toggleOn(rpl::duplicate(hidden), anim::type::instant);
-	hiddenWrap->finishAnimating();
-
-	const auto plainWrap = container->add(
-		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			container,
-			object_ptr<Ui::VerticalLayout>(container)));
-	Ui::AddDivider(plainWrap->entity());
-	plainWrap->toggleOn(
-		std::move(hidden) | rpl::map(!rpl::mappers::_1),
-		anim::type::instant);
-	plainWrap->finishAnimating();
-
-	if (!community->wasFullUpdated()) {
-		community->session().api().requestFullPeer(community);
-	}
-
-	raw->toggle(true, anim::type::instant);
-	return Section{
-		.widget = std::move(wrap),
-		.shown = raw->toggledValue(),
-	};
+	_stack->addTextSeparator(
+		tr::lng_community_hidden_chat_about(tr::marked),
+		std::move(shown));
 }
 
 Section DetailsFiller::makeTopicsList(not_null<Data::Forum*> forum) {
@@ -2899,6 +2888,8 @@ void DetailsFiller::buildSections() {
 	}
 	if (Data::PeerLinkedCommunityId(_peer)) {
 		_stack->add(makeCommunityLink(_peer));
+		addCommunityHiddenNote();
+		_stack->addPlainSeparator();
 	}
 	_stack->add(makeInfo());
 	if (const auto user = _peer->asUser()) {

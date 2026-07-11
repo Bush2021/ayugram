@@ -767,6 +767,11 @@ private:
 		std::shared_ptr<const RichPage> fullPage;
 	};
 
+	struct PendingPhotoEditSource {
+		std::shared_ptr<::Data::PhotoMedia> media;
+		Fn<void(QImage)> done;
+	};
+
 	ArticleSession(
 		not_null<Main::Session*> session,
 		not_null<PeerData*> peer,
@@ -872,6 +877,12 @@ private:
 			: ::Data::FileOrigin();
 	}
 
+	[[nodiscard]] ::Data::FileOrigin photoEditOrigin() const {
+		return (_mode == Mode::Edit)
+			? ::Data::FileOrigin(_articleId)
+			: composeDraftOrigin();
+	}
+
 	[[nodiscard]] bool submitWouldBeEphemeral(
 			const std::optional<TextWithEntities> &simple) const {
 		if (!_composeAction) {
@@ -887,6 +898,24 @@ private:
 			TextUtilities::ConvertEntitiesToTextTags(simple->entities),
 		};
 		return _session->ephemeralMessages().wouldSend(message);
+	}
+
+	[[nodiscard]] bool submitPaymentChecked(
+			const std::optional<TextWithEntities> &simple,
+			Fn<void(int)> resend) {
+		if (_mode != Mode::Compose
+			|| !_composeAction
+			|| _submitOptions.scheduled
+			|| submitWouldBeEphemeral(simple)) {
+			return true;
+		}
+		const auto show = resolveShow();
+		return !show || _sendPayment.check(
+			show,
+			_peer,
+			_submitOptions,
+			1,
+			std::move(resend));
 	}
 
 	[[nodiscard]] bool submitRequested() {
@@ -905,31 +934,23 @@ private:
 			showAttachmentFailedToast();
 			return false;
 		}
+		if (_state->articleEmpty()) {
+			showEmptySubmittedPageToast();
+			return false;
+		}
 		auto simple = SerializeAsSimple(_state->richPage(), _session);
-		if (_mode == Mode::Compose
-			&& _composeAction
-			&& !_submitOptions.scheduled
-			&& !submitWouldBeEphemeral(simple)) {
-			const auto weak = base::make_weak(this);
-			const auto withPaymentApproved = [weak](int approved) {
-				if (const auto strong = weak.get()) {
-					auto options = strong->_submitOptions;
-					options.starsApproved = approved;
-					strong->requestSubmit(std::move(options));
-				}
-			};
-			const auto show = resolveShow();
-			if (show
-				&& !_sendPayment.check(
-					show,
-					_peer,
-					_submitOptions,
-					1,
-					withPaymentApproved)) {
+		const auto weak = base::make_weak(this);
+		const auto withPaymentApproved = [weak](int approved) {
+			if (const auto strong = weak.get()) {
+				auto options = strong->_submitOptions;
+				options.starsApproved = approved;
+				strong->requestSubmit(std::move(options));
+			}
+		};
+		if (simple) {
+			if (!submitPaymentChecked(simple, withPaymentApproved)) {
 				return false;
 			}
-		}
-		if (simple) {
 			return submitSimpleText(std::move(*simple));
 		}
 		if (_mode == Mode::Compose && _composeAction) {
@@ -946,18 +967,13 @@ private:
 				ShowRichMessagesPremiumToast(resolveShow());
 				return false;
 			}
-			const auto weak = base::make_weak(this);
 			OfferRichMessagePremiumChoice(
 				resolveShow(),
 				_session,
 				page,
 				[=] {
 					if (const auto strong = weak.get()) {
-						auto plain = FlattenRichPageToSimpleText(page);
-						if (strong->submitSimpleText(std::move(plain))
-							&& strong->_windowHost) {
-							strong->_windowHost->close();
-						}
+						strong->submitWithoutFormatting(page);
 					}
 				});
 			return false;
@@ -974,6 +990,10 @@ private:
 				== SerializeInputRichMessageStatus::EmptyContent) {
 			_submittedPage = nullptr;
 			showEmptySubmittedPageToast();
+			return false;
+		}
+		if (!submitPaymentChecked(simple, withPaymentApproved)) {
+			_submittedPage = nullptr;
 			return false;
 		}
 		if (!applySubmittedLocalState(page)) {
@@ -1032,6 +1052,27 @@ private:
 			},
 			false);
 		return true;
+	}
+
+	void submitWithoutFormatting(RichPage page) {
+		auto plain = FlattenRichPageToSimpleText(page);
+		const auto weak = base::make_weak(this);
+		const auto withPaymentApproved = [weak, page](int approved) {
+			if (const auto strong = weak.get()) {
+				strong->_submitOptions.starsApproved = approved;
+				if (strong->_composeAction) {
+					strong->_composeAction->options
+						= strong->_submitOptions;
+				}
+				strong->submitWithoutFormatting(page);
+			}
+		};
+		if (!submitPaymentChecked(plain, withPaymentApproved)) {
+			return;
+		}
+		if (submitSimpleText(std::move(plain)) && _windowHost) {
+			_windowHost->close();
+		}
 	}
 
 	[[nodiscard]] bool cancelRequested() {
@@ -1594,8 +1635,9 @@ private:
 					std::move(target));
 			},
 			.requestPhotoEditSource = [session = shared_from_this()](
-					uint64 photoId) {
-				return session->photoEditSource(photoId);
+					uint64 photoId,
+					Fn<void(QImage)> done) {
+				session->photoEditSource(photoId, std::move(done));
 			},
 			.replacePhotoWithList = [session = shared_from_this()](
 					not_null<Widget*> editor,
@@ -1653,19 +1695,21 @@ private:
 		_submitButton = nullptr;
 		_windowHost = nullptr;
 		_editorShow = nullptr;
+		_pendingPhotoEditSources.clear();
+		_photoEditSourceLifetime.destroy();
 		if (!_submittedPage && !_submitApiRequested) {
 			_backgroundHold = nullptr;
-			if (_composeAction && _composeThreadKey) {
-				// Sync the local draft and the chat input field with the
-				// cloud draft saved on close, like an incoming server draft
-				// update: simple-text drafts go back into the message field,
-				// rich drafts show the draft preview. Must happen after the
-				// compose entry is released above, otherwise the field code
-				// still bypasses normal draft handling and skips the update.
-				_composeAction->history->applyCloudDraft(
-					_composeThreadKey->draftKey.topicRootId(),
-					_composeThreadKey->draftKey.monoforumPeerId());
-			}
+			// Sync the local draft and the chat input field with the
+			// cloud draft saved on close, like an incoming server draft
+			// update: simple-text drafts go back into the message field,
+			// rich drafts show the draft preview. Must happen after the
+			// compose entry is released above, otherwise the field code
+			// still bypasses normal draft handling and skips the update.
+			// Skipped when no cloud draft object exists at all: then this
+			// editor never wrote one (blank open, blank close), and syncing
+			// would wipe an unrelated local draft (e.g. reply-only) through
+			// the cloud-to-local clear branch.
+			syncFieldWithCloudDraftAfterClose();
 		}
 		if (const auto continuation = base::take(_onWindowClosedContinuation)) {
 			continuation();
@@ -1729,12 +1773,31 @@ private:
 	// The caller must hold a strong reference (see CloseAll() and the session
 	// clear handler) so that the eventual ~ArticleSession runs after this
 	// returns rather than re-entrantly.
+	//
+	// Runs on passcode lock, account switch and application shutdown, so
+	// it must stay synchronous and must not start network requests: the
+	// current article state is captured into the in-memory cloud draft
+	// and mirrored to the local draft / input field, while the server
+	// save is only scheduled (it fires after unlock and simply never
+	// happens during logout or shutdown).
 	void forceClose() {
 		if (!_windowHost && !_backgroundHold) {
 			return;
 		}
 		cancelRichDraftAutosave();
 		cancelCloseWithDraftSave(_closeDraftSaveGeneration);
+		const auto sync = _composeAction
+			&& _composeThreadKey
+			&& !_submittedPage
+			&& !_submitApiRequested;
+		if (sync && !hasPendingPreparation()) {
+			if (const auto prepared = prepareRichDraftForAutosave()) {
+				_composeAction->history->createCloudDraft(
+					_composeThreadKey->draftKey.topicRootId(),
+					_composeThreadKey->draftKey.monoforumPeerId(),
+					&*prepared);
+			}
+		}
 		releaseComposeThreadWindow();
 		_editor = nullptr;
 		_submitButton = nullptr;
@@ -1743,6 +1806,15 @@ private:
 		_backgroundHold = nullptr;
 		_closeDraftSaveContinuation = nullptr;
 		_onWindowClosedContinuation = nullptr;
+		if (sync) {
+			syncFieldWithCloudDraftAfterClose();
+			const auto history = _composeAction->history;
+			if (const auto thread = history->threadFor(
+					_composeThreadKey->draftKey.topicRootId(),
+					_composeThreadKey->draftKey.monoforumPeerId())) {
+				_session->api().saveDraftToCloudDelayed(not_null{ thread });
+			}
+		}
 	}
 
 	void handleMediaDialogResult(
@@ -1823,19 +1895,72 @@ private:
 			std::move(replaceTarget));
 	}
 
-	[[nodiscard]] QImage photoEditSource(uint64 photoId) {
+	void photoEditSource(uint64 photoId, Fn<void(QImage)> done) {
 		if (const auto i = _originalMediaImages.find(photoId);
 			i != end(_originalMediaImages)) {
-			return i->second;
+			done(i->second);
+			return;
+		}
+		for (const auto &attachment : _attachments) {
+			if ((attachment.blockKind == RichPage::BlockKind::Photo)
+				&& mediaIdMatchesAttachment(photoId, attachment)) {
+				const auto i = _originalMediaImages.find(
+					attachment.localMediaId);
+				if (i != end(_originalMediaImages)) {
+					done(i->second);
+					return;
+				}
+				break;
+			}
 		}
 		const auto photo = _session->data().photo(PhotoId(photoId));
 		const auto media = photo->createMediaView();
-		const auto origin = composeDraftOrigin();
-		media->wanted(::Data::PhotoSize::Large, origin);
+		photo->clearFailed(::Data::PhotoSize::Large);
+		media->wanted(::Data::PhotoSize::Large, photoEditOrigin());
 		if (const auto large = media->image(::Data::PhotoSize::Large)) {
-			return large->original();
+			_pendingPhotoEditSources.remove(photoId);
+			done(large->original());
+			return;
 		}
-		return QImage();
+		const auto i = _pendingPhotoEditSources.find(photoId);
+		if (i != end(_pendingPhotoEditSources)) {
+			i->second.done = std::move(done);
+			return;
+		}
+		_pendingPhotoEditSources.emplace(photoId, PendingPhotoEditSource{
+			.media = media,
+			.done = std::move(done),
+		});
+		if (!_photoEditSourceLifetime) {
+			_session->downloaderTaskFinished(
+			) | rpl::on_next([=] {
+				checkPendingPhotoEditSources();
+			}, _photoEditSourceLifetime);
+		}
+	}
+
+	void checkPendingPhotoEditSources() {
+		auto completed = std::vector<std::pair<Fn<void(QImage)>, QImage>>();
+		for (auto i = begin(_pendingPhotoEditSources)
+			; i != end(_pendingPhotoEditSources);) {
+			const auto &media = i->second.media;
+			if (const auto large = media->image(::Data::PhotoSize::Large)) {
+				completed.emplace_back(
+					std::move(i->second.done),
+					large->original());
+				i = _pendingPhotoEditSources.erase(i);
+			} else if (media->owner()->failed(::Data::PhotoSize::Large)) {
+				i = _pendingPhotoEditSources.erase(i);
+			} else {
+				++i;
+			}
+		}
+		for (auto &[done, image] : completed) {
+			done(std::move(image));
+		}
+		if (_pendingPhotoEditSources.empty()) {
+			_photoEditSourceLifetime.destroy();
+		}
 	}
 
 	[[nodiscard]] MediaUploadState mediaUploadStateForMedia(uint64 mediaId) {
@@ -2930,6 +3055,7 @@ private:
 	void cancelCloseWithDraftSave(uint64 generation);
 	void showCloseDraftSavingBox(uint64 generation);
 	void showCloseDraftSaveFailedBox(uint64 generation, const QString &error);
+	void syncFieldWithCloudDraftAfterClose();
 
 	[[nodiscard]] AttachmentRecord *findAttachment(FullMsgId uploadId) {
 		for (auto &attachment : _attachments) {
@@ -3636,12 +3762,14 @@ private:
 	std::shared_ptr<const RichPage> _submittedPage;
 	std::vector<AttachmentRecord> _attachments;
 	base::flat_map<uint64, QImage> _originalMediaImages;
+	base::flat_map<uint64, PendingPhotoEditSource> _pendingPhotoEditSources;
 	std::deque<QueuedPrepare> _prepareQueue;
 	std::vector<MediaBatch> _mediaBatches;
 	TaskQueue _attachmentPrepareQueue;
 	base::Timer _richDraftAutosaveTimer;
 	base::weak_qptr<Ui::GenericBox> _closeDraftSaveBox;
 	rpl::lifetime _editorAutosaveLifetime;
+	rpl::lifetime _photoEditSourceLifetime;
 	rpl::lifetime _lifetime;
 	uint64 _prepareBatchId = 0;
 	uint64 _rejectedToastBatchId = 0;
@@ -3924,6 +4052,18 @@ void ArticleSession::cancelCloseWithDraftSave(uint64 generation) {
 	++_closeDraftSaveGeneration;
 	if (_closeDraftSaveBox) {
 		_closeDraftSaveBox->closeBox();
+	}
+}
+
+void ArticleSession::syncFieldWithCloudDraftAfterClose() {
+	if (!_composeAction || !_composeThreadKey) {
+		return;
+	}
+	const auto history = _composeAction->history;
+	const auto topicRootId = _composeThreadKey->draftKey.topicRootId();
+	const auto monoforumPeerId = _composeThreadKey->draftKey.monoforumPeerId();
+	if (history->cloudDraft(topicRootId, monoforumPeerId)) {
+		history->applyCloudDraft(topicRootId, monoforumPeerId);
 	}
 }
 

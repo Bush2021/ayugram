@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "data/data_changes.h"
 #include "data/data_channel.h"
+#include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
 #include "history/view/media/history_view_media_generic.h"
@@ -182,6 +183,8 @@ auto GenerateCommunityAddedMedia(
 			not_null<MediaGeneric*> media,
 			Fn<void(std::unique_ptr<MediaGenericPart>)> push) {
 		const auto from = parent->data()->from();
+		const auto peer = parent->data()->history()->peer;
+		const auto fromChatItself = (from == peer);
 
 		const auto open = std::make_shared<LambdaClickHandler>([=](
 				ClickContext context) {
@@ -203,14 +206,23 @@ auto GenerateCommunityAddedMedia(
 			open,
 			true)); // Paint the community stacked-cards effect behind it.
 
-		push(std::make_unique<MediaGenericTextPart>(
-			tr::lng_action_community_added(
+		auto caption = fromChatItself
+			? (peer->isBroadcast()
+				? tr::lng_action_community_added_channel
+				: tr::lng_action_community_added_chat)(
+					tr::now,
+					lt_community,
+					tr::bold(community->name()),
+					tr::rich)
+			: tr::lng_action_community_added(
 				tr::now,
 				lt_from,
 				tr::bold(from->shortName()),
 				lt_community,
 				tr::bold(community->name()),
-				tr::rich),
+				tr::rich);
+		push(std::make_unique<MediaGenericTextPart>(
+			std::move(caption),
 			QMargins(
 				st::msgPadding.left(),
 				0,

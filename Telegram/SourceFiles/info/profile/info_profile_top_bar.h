@@ -10,7 +10,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "info/info_controller.h" // Key
 #include "info/profile/info_profile_badge.h"
+#include "info/profile/tabs/info_profile_tab_top_bar_bindings.h"
 #include "ui/controls/swipe_handler_data.h"
+#include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
 #include "ui/userpic_view.h"
 
@@ -54,8 +56,11 @@ struct FlatLabel;
 } //namespace style
 
 namespace Ui {
+class AnimatedString;
 class FlatLabel;
 class IconButton;
+class InputField;
+class LabelWithNumbers;
 class PopupMenu;
 class RoundButton;
 class StarsRating;
@@ -118,6 +123,9 @@ public:
 	[[nodiscard]] rpl::producer<> backRequest() const;
 
 	void setOnlineCount(rpl::producer<int> &&count);
+	void bindActiveTab(
+		rpl::producer<TabTopBarBindings> bindings,
+		rpl::producer<bool> docked);
 
 	void setRoundEdges(bool value);
 	void setLottieSingleLoop(bool value);
@@ -191,6 +199,21 @@ private:
 	void updateStoryOutline(std::optional<QColor> edgeColor);
 	void paintStoryOutline(QPainter &p, const QRect &geometry);
 	void updateStatusPosition(float64 progressCurrent);
+	void applyTabBindings(TabTopBarBindings &&bindings);
+	void updateTabSwapVisibility();
+	void applyTabSwapProgress(float64 progress);
+	void refreshTabSubtitle();
+	void paintTabSubtitle(QPainter &p);
+	void updateRightButtonsPosition();
+	[[nodiscard]] bool tabSwapActive() const;
+	void setTabSelectedItems(SelectedItems &&items);
+	void createTabSelectionBar();
+	void updateTabSelectionState();
+	void updateTabSelectionGeometry();
+	[[nodiscard]] bool tabSelectionMode() const;
+	void showTabSearch();
+	void hideTabSearch();
+	void updateTabSearchGeometry();
 	[[nodiscard]] int calculateRightButtonsWidth() const;
 	[[nodiscard]] const style::FlatLabel &statusStyle() const;
 	void setupStatusWithRating();
@@ -229,6 +252,31 @@ private:
 
 	object_ptr<Ui::FlatLabel> _title;
 	std::unique_ptr<Ui::StarsRating> _starsRating;
+	std::unique_ptr<Ui::AnimatedString> _tabSubtitle;
+	QString _tabSubtitleText;
+	std::optional<QColor> _tabSubtitleOverride;
+	bool _tabBindingsActive = false;
+	bool _tabSwapShown = false;
+	Ui::Animations::Simple _tabSwapAnimation;
+	rpl::variable<bool> _tabsDocked = false;
+	rpl::lifetime _tabBindingsLifetime;
+
+	object_ptr<Ui::FadeWrap<Ui::RpWidget>> _tabSelectionBar = { nullptr };
+	Ui::IconButton *_tabSelectionCancel = nullptr;
+	Ui::LabelWithNumbers *_tabSelectionText = nullptr;
+	Ui::IconButton *_tabSelectionForward = nullptr;
+	Ui::IconButton *_tabSelectionDelete = nullptr;
+	Ui::IconButton *_tabSelectionStoryInProfile = nullptr;
+	Ui::IconButton *_tabSelectionStoryPin = nullptr;
+	SelectedItems _tabSelectedItems;
+	Fn<void(SelectionAction)> _tabSelectionAction;
+	Fn<void(const Ui::Menu::MenuCallback&)> _tabFillMenu;
+
+	object_ptr<Ui::FadeWrap<Ui::RpWidget>> _tabSearchBar = { nullptr };
+	Ui::InputField *_tabSearchField = nullptr;
+	bool _tabSearchAvailable = false;
+	bool _tabSearchShown = false;
+	Fn<void(QString)> _tabApplySearch;
 	object_ptr<Ui::FlatLabel> _status;
 	std::unique_ptr<StatusLabel> _statusLabel;
 	rpl::variable<int> _statusShift = 0;
@@ -278,6 +326,8 @@ private:
 	Ui::Controls::SwipeBackResult _swipeBackData;
 
 	base::unique_qptr<Ui::IconButton> _topBarButton;
+	base::unique_qptr<Ui::FadeWrap<Ui::IconButton>> _tabMenuToggle;
+	base::unique_qptr<Ui::FadeWrap<Ui::IconButton>> _tabSearchToggle;
 	base::unique_qptr<Ui::PopupMenu> _peerMenu;
 
 	Ui::RpWidget *_actionMore = nullptr;

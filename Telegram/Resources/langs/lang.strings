@@ -1863,6 +1863,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_media_type_audios" = "Voice messages";
 "lng_media_type_links" = "Shared links";
 "lng_media_type_polls" = "Polls";
+"lng_media_type_stories" = "Stories";
+"lng_media_type_posts" = "Posts";
+"lng_media_type_groups" = "Groups";
+"lng_media_type_similar" = "Similar";
+"lng_media_type_gifts" = "Gifts";
+"lng_media_type_saved" = "Saved";
 "lng_polls_search_none" = "No polls found";
 "lng_media_type_rounds" = "Video messages";
 "lng_media_zoom_in" = "Zoom In";
@@ -1896,6 +1902,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_media_selected_link#other" = "{count} shared links";
 "lng_media_selected_poll#one" = "{count} Poll";
 "lng_media_selected_poll#other" = "{count} Polls";
+"lng_media_selected_message#one" = "{count} Message";
+"lng_media_selected_message#other" = "{count} Messages";
 "lng_media_photo_empty" = "No photos here yet";
 "lng_media_gif_empty" = "No GIFs here yet";
 "lng_media_video_empty" = "No videos here yet";
@@ -2773,7 +2781,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_new_creator_pending" = "{user} will become the new main admin in 7 days if {from} does not return.";
 "lng_action_managed_bot_created" = "{from} created a bot {bot}.";
 "lng_action_community_added" = "{from} added this group to the {community} community.";
+"lng_action_community_added_chat" = "This chat was added to the {community} community.";
+"lng_action_community_added_channel" = "This channel was added to the {community} community.";
 "lng_action_community_added_unknown" = "{from} added this group to a community.";
+"lng_action_community_added_unknown_chat" = "This chat was added to a community.";
+"lng_action_community_added_unknown_channel" = "This channel was added to a community.";
 "lng_action_community_removed" = "{from} removed this group from the community.";
 
 "lng_create_bot_title" = "Create Bot";
@@ -6135,7 +6147,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_payments_webview_no_use" = "Unfortunately, you can't use payments with current system configuration.";
 "lng_payments_webview_install_edge" = "Please install {link}.";
-"lng_payments_webview_install_webkit" = "Please install WebKitGTK (webkit2gtk-4.1/webkit2gtk-4.0) using your package manager.";
+"lng_payments_webview_install_webkit" = "Please install WebKitGTK (webkitgtk-6.0/webkit2gtk-4.1/webkit2gtk-4.0) using your package manager.";
 "lng_payments_webview_update_windows" = "Please update your system to Windows 8.1 or later.";
 "lng_payments_sure_close" = "Are you sure you want to close this payment form? The changes you made will be lost.";
 "lng_payments_receipt_label" = "Receipt";
@@ -7394,6 +7406,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_article_media_slideshow" = "Slideshow";
 "lng_article_insert_details" = "Details";
 "lng_article_insert_table" = "Table";
+"lng_article_placeholder_text" = "Text";
+"lng_article_placeholder_header" = "Header";
+"lng_article_placeholder_caption" = "Caption";
+"lng_article_placeholder_cell" = "Cell";
+"lng_article_placeholder_quote" = "Enter quote";
+"lng_article_placeholder_author" = "Add author";
+"lng_article_placeholder_title" = "Title";
 "lng_article_limit_length" = "The article is too long.";
 "lng_article_limit_depth" = "The article is nested too deeply.";
 "lng_article_limit_blocks" = "The article has too many blocks.";

@@ -3046,6 +3046,17 @@ void Widget::applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation) {
 	if (!mutation) {
 		return;
 	}
+	auto savedActiveIndexes = std::vector<std::pair<State::BlockPath, int>>();
+	if (_article) {
+		for (const auto &geo : _article->mediaBlockGeometries()) {
+			if (!geo.grouped) {
+				continue;
+			}
+			if (const auto path = _state->convertBlockPath(geo.block)) {
+				savedActiveIndexes.emplace_back(*path, geo.activeItemIndex);
+			}
+		}
+	}
 	auto live = captureHistoryEntry();
 	for (auto &entry : _history) {
 		mutation(entry.snapshot.richPage);
@@ -3058,6 +3069,9 @@ void Widget::applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation) {
 		PreservingExternalFieldRestore = wasPreservingExternalFieldRestore;
 	});
 	restoreHistoryEntry(live);
+	for (const auto &[path, activeIndex] : savedActiveIndexes) {
+		restoreGroupedActiveIndexForPath(path, activeIndex);
+	}
 	_fieldUndoAvailable = !_field->isHidden()
 		? _field->isUndoAvailable()
 		: false;
@@ -3360,6 +3374,9 @@ void Widget::requestMedia(
 void Widget::replacePreparedBlock(
 		State::ReplaceTarget target,
 		RichPage::Block block) {
+	const auto savedActiveIndex = (target.itemIndex >= 0)
+		? groupedActiveIndexForPath(target.path)
+		: -1;
 	recordMutationTransaction([&] {
 		auto committed = ApplyResult::Unchanged;
 		if (!_field->isHidden()) {
@@ -3384,6 +3401,7 @@ void Widget::replacePreparedBlock(
 		clearTextSelection();
 		clearStructuralSelection();
 		refreshPreparedContent();
+		restoreGroupedActiveIndexForPath(target.path, savedActiveIndex);
 		const auto ordinal = _state->activeTextOrdinal();
 		if (ordinal >= 0 && ordinal < _state->textNodeCount()) {
 			activateTextOrdinal(ordinal, 0);
@@ -5069,7 +5087,11 @@ void Widget::contextMenuEvent(QContextMenuEvent *e) {
 		articlePoint,
 		Ui::Text::StateRequest::Flag::LookupSymbol);
 	const auto editHit = _article->editHitTest(articlePoint);
-	if (showMediaMenuFromHit(editHit, hit, e->globalPos())) {
+	if (showMediaMenuFromHit(
+			editHit,
+			hit,
+			e->globalPos(),
+			MediaClickKind::ContextMenu)) {
 		e->accept();
 		return;
 	}
@@ -5994,7 +6016,7 @@ void Widget::fillTableChangeMenu(
 				return _state->setTableStriped(range, !info.striped);
 			});
 		},
-		nullptr,
+		&st::ivEditorTableStripedIcon,
 		info.striped);
 }
 
@@ -6306,7 +6328,8 @@ void Widget::showStructuralPhotoVideoMenu(QPoint globalPos) {
 bool Widget::showMediaMenuFromHit(
 		const PreparedEditHit &hit,
 		const Markdown::MarkdownArticleHitTestResult &articleHit,
-		QPoint globalPos) {
+		QPoint globalPos,
+		MediaClickKind clickKind) {
 	if (clickHitsStructuralPhotoVideoSelection(hit)) {
 		showStructuralPhotoVideoMenu(globalPos);
 		return true;
@@ -6322,10 +6345,20 @@ bool Widget::showMediaMenuFromHit(
 			== Markdown::MediaActivationKind::None) {
 			return false;
 		}
-		showGroupedMediaMenu(
-			*path,
-			articleHit.mediaActivation.itemIndex,
-			globalPos);
+		const auto itemIndex = articleHit.mediaActivation.itemIndex;
+		if (clickKind == MediaClickKind::Left) {
+			const auto block = BlockFromPath(_state->richPage(), *path);
+			const auto photoItem = block
+				&& (itemIndex >= 0)
+				&& (itemIndex < int(block->mediaItems.size()))
+				&& (block->mediaItems[itemIndex].kind
+					== RichPage::BlockKind::Photo);
+			if (photoItem) {
+				editGroupedItemPhoto(*path, itemIndex);
+				return true;
+			}
+		}
+		showGroupedMediaMenu(*path, itemIndex, globalPos);
 		return true;
 	}
 	return false;
@@ -6437,18 +6470,35 @@ void Widget::editPhotoBlock(State::BlockPath path) {
 	if (!target) {
 		return;
 	}
+	openPhotoEditor(block->photoId, block->spoiler, std::move(*target));
+}
+
+void Widget::openPhotoEditor(
+		uint64 photoId,
+		bool spoiler,
+		State::ReplaceTarget target) {
 	if (!_requestPhotoEditSource) {
 		return;
 	}
-	auto source = _requestPhotoEditSource(block->photoId);
-	if (source.isNull()) {
-		return;
-	}
-	const auto spoiler = block->spoiler;
+	const auto weak = base::make_weak(this);
+	_requestPhotoEditSource(photoId, [=, target = std::move(target)](
+			QImage source) {
+		const auto strong = weak.get();
+		if (!strong || source.isNull()) {
+			return;
+		}
+		strong->showPhotoEditor(std::move(source), spoiler, target);
+	});
+}
+
+void Widget::showPhotoEditor(
+		QImage source,
+		bool spoiler,
+		State::ReplaceTarget target) {
 	const auto previewWidth = st::sendMediaPreviewSize;
 	const auto sourceShared = std::make_shared<QImage>(std::move(source));
 	const auto replaceTarget = std::make_shared<State::ReplaceTarget>(
-		std::move(*target));
+		std::move(target));
 	auto fileImage = std::make_shared<Image>(QImage(*sourceShared));
 	auto editor = base::make_unique_q<::Editor::PhotoEditor>(
 		_outer,
@@ -6489,6 +6539,26 @@ void Widget::editPhotoBlock(State::BlockPath path) {
 			*replaceTarget);
 	});
 	_show->showLayer(std::move(layer), Ui::LayerOption::KeepOther);
+}
+
+void Widget::editGroupedItemPhoto(State::BlockPath path, int itemIndex) {
+	const auto block = BlockFromPath(_state->richPage(), path);
+	if (!block
+		|| block->kind != RichPage::BlockKind::GroupedMedia
+		|| itemIndex < 0
+		|| itemIndex >= int(block->mediaItems.size())) {
+		return;
+	}
+	const auto &item = block->mediaItems[itemIndex];
+	if (item.kind != RichPage::BlockKind::Photo
+		|| mediaUploadStateForGroupedItem(path, itemIndex).uploading) {
+		return;
+	}
+	auto target = _state->replaceTargetForGroupedItem(path, itemIndex);
+	if (!target) {
+		return;
+	}
+	openPhotoEditor(item.photoId, item.spoiler, std::move(*target));
 }
 
 MediaUploadState Widget::mediaUploadStateForBlock(
@@ -7318,7 +7388,11 @@ void Widget::mouseReleaseEvent(QMouseEvent *e) {
 				e->accept();
 				return;
 			}
-			if (showMediaMenuFromHit(editHit, hit, e->globalPos())) {
+			if (showMediaMenuFromHit(
+					editHit,
+					hit,
+					e->globalPos(),
+					MediaClickKind::Left)) {
 				e->accept();
 				return;
 			}
@@ -7444,7 +7518,11 @@ void Widget::mouseReleaseEvent(QMouseEvent *e) {
 	} else if (activateGroupedMediaLinkFromHit(editHit, hit, e->button())) {
 		e->accept();
 		return;
-	} else if (!showMediaMenuFromHit(editHit, hit, e->globalPos())) {
+	} else if (!showMediaMenuFromHit(
+			editHit,
+			hit,
+			e->globalPos(),
+			MediaClickKind::Left)) {
 		focusOrActivateInitial();
 	}
 	e->accept();
@@ -8450,6 +8528,13 @@ Widget::visibleFullHeadingFieldTextSpan() const {
 	}
 	const auto full = ConvertEditorTagsToRichText(
 		_field->getTextWithAppliedMarkdown());
+	if (full.text.isEmpty()) {
+		return TextNodeSpan{
+			.leaf = *leaf,
+			.from = 0,
+			.till = 0,
+		};
+	}
 	const auto cursor = _field->textCursor();
 	if (!cursor.hasSelection()) {
 		return std::nullopt;

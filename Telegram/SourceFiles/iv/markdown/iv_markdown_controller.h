@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/object_ptr.h"
+#include "base/timer.h"
 #include "base/unique_qptr.h"
 #include "base/weak_ptr.h"
 #include "iv/markdown/iv_markdown_document.h"
@@ -20,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QVariant>
 
 namespace Ui {
+class DropdownMenu;
 class FlatLabel;
 class IconButton;
 class LayerManager;
@@ -90,6 +92,11 @@ private:
 		bool preserveScroll);
 	void updateTitleGeometry(int newWidth) const;
 	void showMenu();
+	void createZoomDropdown();
+	void showZoomDropdown();
+	void hideZoomDropdown();
+	void updateZoomDropdownGeometry();
+	[[nodiscard]] Fn<void()> zoomActivatedCallback();
 	void createSearchController();
 	void toggleSearchBar();
 	void openSource();
@@ -157,6 +164,8 @@ private:
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _forward = { nullptr };
 	object_ptr<Ui::FadeShadow> _titleShadow = { nullptr };
 	base::unique_qptr<Ui::PopupMenu> _menu;
+	base::unique_qptr<Ui::DropdownMenu> _zoomDropdown;
+	base::Timer _zoomDropdownHideTimer;
 	Ui::RpWidget *_container = nullptr;
 	std::unique_ptr<Ui::LayerManager> _layerManager;
 	std::shared_ptr<Ui::Show> _show;

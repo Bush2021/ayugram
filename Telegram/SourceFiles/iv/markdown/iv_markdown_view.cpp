@@ -363,6 +363,9 @@ void MarkdownPreviewRoot::setup() {
 			_body->setZoom(delegate->ivZoom());
 			_body->setZoomStepCallback([=](int steps) {
 				delegate->ivSetZoom(delegate->ivZoom() + steps * kZoomStep);
+				if (_options.zoomActivated) {
+					_options.zoomActivated();
+				}
 			});
 		}
 		_body->heightValue(

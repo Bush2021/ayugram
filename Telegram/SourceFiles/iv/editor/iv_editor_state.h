@@ -109,6 +109,7 @@ public:
 		BlockPath path;
 		RichPage::BlockKind kind = RichPage::BlockKind::Unsupported;
 		uint64 mediaId = 0;
+		int itemIndex = -1;
 	};
 
 	enum class LeafKind : uchar {
@@ -497,6 +498,9 @@ public:
 		std::optional<bool> enabled = std::nullopt);
 	[[nodiscard]] std::optional<ReplaceTarget> replaceTargetForBlock(
 		const BlockPath &path) const;
+	[[nodiscard]] std::optional<ReplaceTarget> replaceTargetForGroupedItem(
+		const BlockPath &path,
+		int itemIndex) const;
 	[[nodiscard]] bool replaceBlockWithPreparedBlock(
 		const ReplaceTarget &target,
 		RichPage::Block block);

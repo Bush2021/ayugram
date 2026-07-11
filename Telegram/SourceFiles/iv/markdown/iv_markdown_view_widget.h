@@ -136,6 +136,7 @@ private:
 	void syncArticleVisibleTopBottom();
 	void relayoutCurrentWidth(bool clearSelection);
 	void forceRelayoutCurrentWidth();
+	void retryMissingMediaBlocks();
 	void updateHover(const MarkdownArticleHitTestResult &state);
 	void updateHoverAtCursor();
 	void resetSelection();
@@ -154,6 +155,7 @@ private:
 		Qt::MouseButton button);
 	void applyCursor(style::cursor cursor);
 	[[nodiscard]] double zoomScale() const;
+	[[nodiscard]] int articleLayoutWidth(int widgetWidth) const;
 
 	std::shared_ptr<MarkdownArticle> _article;
 	std::shared_ptr<MarkdownArticle> _retainedArticle;
@@ -192,6 +194,7 @@ private:
 	base::unique_qptr<Ui::PopupMenu> _contextMenu;
 	bool _activeHorizontalScrollDrag = false;
 	bool _articlePainted = false;
+	bool _mediaCreationRetried = false;
 	bool _activeTouchHorizontalScroll = false;
 	std::optional<QPoint> _pendingTouchHorizontalScrollPoint;
 

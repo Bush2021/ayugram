@@ -1973,7 +1973,7 @@ void Widget::updateControlsVisibility(bool fast) {
 		_frozenAccountBar->show();
 	}
 	if (_chatFilters) {
-		_chatFilters->setVisible(!_openedForum && !_openedCommunity);
+		_chatFilters->setVisible(!_openedForum);
 	}
 	updateCommunityOverlaysVisibility();
 	if (_openedFolder || _openedForum || _openedCommunity) {
@@ -2086,7 +2086,10 @@ void Widget::toggleFiltersMenu(bool enabled) {
 			Window::GifPauseReason::Any,
 			controller(),
 			true);
-		raw->show();
+		raw->setVisible(_searchState.query.isEmpty()
+			&& !_openedForum
+			&& !_searchState.community
+			&& !searchInPeer());
 		raw->stackUnder(_scroll);
 		raw->resizeToWidth(width());
 		const auto shadow = Ui::CreateChild<Ui::PlainShadow>(raw);
@@ -2717,7 +2720,7 @@ void Widget::scrollToDefault(bool verytop) {
 			this,
 			QPoint(),
 			QRect(0, top, wideGeometry.width(), skip));
-		if (_chatFilters) {
+		if (_chatFilters && !_chatFilters->isHidden()) {
 			Ui::RenderWidget(
 				p,
 				_chatFilters,
@@ -2755,7 +2758,7 @@ void Widget::stopWidthAnimation() {
 			_frozenAccountBar->setVisible(!_suggestions);
 		}
 		if (_chatFilters) {
-			_chatFilters->setVisible(!_suggestions);
+			_chatFilters->setVisible(!_suggestions && !_openedForum);
 		}
 	}
 	updateStoriesVisibility();
@@ -4202,7 +4205,6 @@ bool Widget::applySearchState(SearchState state) {
 		&& (queryEmptyChanged || inChatChanged || communityChanged)) {
 		_chatFilters->setVisible(_searchState.query.isEmpty()
 			&& !_openedForum
-			&& !_openedCommunity
 			&& !_searchState.community
 			&& !searchInPeer());
 		updateControlsGeometry();
@@ -4656,7 +4658,9 @@ void Widget::updateControlsGeometry() {
 		const auto scrollTop = chatFiltersTop
 			+ ((_chatFilters
 				&& _searchState.query.isEmpty()
-				&& !_openedForum && !searchInPeer())
+				&& !_openedForum
+				&& !_searchState.community
+				&& !searchInPeer())
 				? (_chatFilters->height() * (1. - narrowRatio))
 				: 0);
 		const auto scrollHeight = height() - scrollTop - bottomSkip;

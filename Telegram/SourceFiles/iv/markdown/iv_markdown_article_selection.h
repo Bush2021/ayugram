@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "iv/markdown/iv_markdown_article_layout_blocks.h"
+#include "iv/iv_rich_page.h"
 
 namespace Iv::Markdown {
 
@@ -130,5 +131,9 @@ void CollectAnchors(
 	MarkdownArticleSelection selection,
 	const MarkdownArticleSelectionEndpoints *endpoints,
 	const PreparedEditSelection *structuralSelection = nullptr);
+[[nodiscard]] std::vector<RichPage::Block> RichPageBlocksForSelectedSegments(
+	const RichPage &page,
+	const std::vector<SelectableSegment> &segments,
+	MarkdownArticleSelection selection);
 
 } // namespace Iv::Markdown

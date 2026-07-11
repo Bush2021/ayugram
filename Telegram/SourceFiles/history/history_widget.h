@@ -847,6 +847,7 @@ private:
 	bool _showAndMaybeSendStart = false;
 
 	int _firstLoadRequest = 0; // Not real mtpRequestId.
+	bool _firstLoadFromTheStart = false;
 	int _preloadRequest = 0; // Not real mtpRequestId.
 	int _preloadDownRequest = 0; // Not real mtpRequestId.
 

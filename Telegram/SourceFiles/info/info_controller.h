@@ -275,6 +275,10 @@ public:
 
 	virtual void setSearchEnabledByContent(bool enabled) {
 	}
+	[[nodiscard]] virtual auto searchFieldController() const
+	-> Ui::SearchFieldController* {
+		return nullptr;
+	}
 	virtual rpl::producer<SparseIdsMergedSlice> mediaSource(
 		SparseIdsMergedSlice::UniversalMsgId aroundId,
 		int limitBefore,
@@ -330,7 +334,8 @@ public:
 	void setSection(not_null<ContentMemento*> memento);
 	[[nodiscard]] bool hasBackButton() const;
 
-	Ui::SearchFieldController *searchFieldController() const {
+	auto searchFieldController() const
+	-> Ui::SearchFieldController* override {
 		return _searchFieldController.get();
 	}
 	void setSearchEnabledByContent(bool enabled) override {

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/editor/iv_editor_state.h"
 #include "iv/editor/iv_editor_text_entities.h"
+#include "lang/lang_keys.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
 
@@ -655,6 +656,29 @@ void NormalizeInsertedOrderedListMetadata(std::vector<Block> *blocks) {
 		const ReplaceTarget &target) {
 	const auto mediaId = ReplaceTargetMediaId(block);
 	return (block.kind == target.kind)
+		&& mediaId
+		&& (*mediaId == target.mediaId);
+}
+
+[[nodiscard]] std::optional<uint64> ReplaceTargetMediaId(
+		const RichPage::GroupedMediaItem &item) {
+	switch (item.kind) {
+	case BlockKind::Photo:
+		return item.photoId ? std::make_optional(item.photoId) : std::nullopt;
+	case BlockKind::Video:
+		return item.documentId
+			? std::make_optional(item.documentId)
+			: std::nullopt;
+	default:
+		return std::nullopt;
+	}
+}
+
+[[nodiscard]] bool GroupedItemMatchesReplaceTarget(
+		const RichPage::GroupedMediaItem &item,
+		const ReplaceTarget &target) {
+	const auto mediaId = ReplaceTargetMediaId(item);
+	return (item.kind == target.kind)
 		&& mediaId
 		&& (*mediaId == target.mediaId);
 }
@@ -1772,32 +1796,33 @@ QString State::activePlaceholderText() const {
 		case BlockKind::Paragraph:
 		case BlockKind::Footer:
 		case BlockKind::Code:
-			return u"Text"_q;
+			return tr::lng_article_placeholder_text(tr::now);
 		case BlockKind::Quote:
-			return u"Enter quote"_q;
+			return tr::lng_article_placeholder_quote(tr::now);
 		case BlockKind::Heading:
+			return Markdown::HeadingLevelLabel(owner->headingLevel);
 		case BlockKind::Details:
-			return u"Header"_q;
+			return tr::lng_article_placeholder_header(tr::now);
 		default:
 			return QString();
 		}
 	case LeafKind::BlockCaption:
 		switch (owner->kind) {
 		case BlockKind::Quote:
-			return u"Add author"_q;
+			return tr::lng_article_placeholder_author(tr::now);
 		case BlockKind::Photo:
 		case BlockKind::Video:
 		case BlockKind::Audio:
 		case BlockKind::Map:
 		case BlockKind::GroupedMedia:
-			return u"Caption"_q;
+			return tr::lng_article_placeholder_caption(tr::now);
 		default:
 			return QString();
 		}
 	case LeafKind::ListItemText:
-		return u"Text"_q;
+		return tr::lng_article_placeholder_text(tr::now);
 	case LeafKind::TableCellText:
-		return u"Cell"_q;
+		return tr::lng_article_placeholder_cell(tr::now);
 	case LeafKind::MathFormula:
 		return u"x^2 + y^2"_q;
 	}
@@ -1923,7 +1948,11 @@ State::ApplyResult State::applyFormattingToTextSpans(
 					&before,
 					&selected,
 					&after)) {
-				continue;
+				if (action != TextFormattingAction::PlainText
+					|| span.leaf.kind != LeafKind::BlockText
+					|| !current->text.text.isEmpty()) {
+					continue;
+				}
 			}
 			auto converted = ConvertRichTextToEditorTags(std::move(selected));
 			if (action == TextFormattingAction::PlainText) {
@@ -2068,6 +2097,32 @@ std::optional<State::ReplaceTarget> State::replaceTargetForBlock(
 	};
 }
 
+std::optional<State::ReplaceTarget> State::replaceTargetForGroupedItem(
+		const BlockPath &path,
+		int itemIndex) const {
+	const auto current = block(path);
+	if (!current
+		|| current->kind != BlockKind::GroupedMedia
+		|| itemIndex < 0
+		|| itemIndex >= int(current->mediaItems.size())) {
+		return std::nullopt;
+	}
+	const auto &item = current->mediaItems[itemIndex];
+	if (!IsPhotoVideoBlockKind(item.kind)) {
+		return std::nullopt;
+	}
+	const auto mediaId = ReplaceTargetMediaId(item);
+	if (!mediaId) {
+		return std::nullopt;
+	}
+	return ReplaceTarget{
+		.path = path,
+		.kind = item.kind,
+		.mediaId = *mediaId,
+		.itemIndex = itemIndex,
+	};
+}
+
 bool State::replaceBlockWithPreparedBlock(
 		const ReplaceTarget &target,
 		Block block) {
@@ -2083,6 +2138,27 @@ bool State::replaceBlockWithPreparedBlock(
 			return CheckedMutationResult<bool>{ .result = false };
 		}
 		auto &current = (*blocks)[path.index];
+		if (target.itemIndex >= 0) {
+			if (current.kind != BlockKind::GroupedMedia
+				|| target.itemIndex >= int(current.mediaItems.size())) {
+				return CheckedMutationResult<bool>{ .result = false };
+			}
+			auto &item = current.mediaItems[target.itemIndex];
+			if (!GroupedItemMatchesReplaceTarget(item, target)) {
+				return CheckedMutationResult<bool>{ .result = false };
+			}
+			auto replacement = GroupedItemFromPhotoVideoBlock(block);
+			if (!replacement) {
+				return CheckedMutationResult<bool>{ .result = false };
+			}
+			replacement->spoiler = item.spoiler;
+			item = std::move(*replacement);
+			candidate.rebuild();
+			return CheckedMutationResult<bool>{
+				.apply = true,
+				.result = true,
+			};
+		}
 		if (!BlockMatchesReplaceTarget(current, target)
 			|| !IsReplaceableMediaBlockKind(block.kind)) {
 			return CheckedMutationResult<bool>{ .result = false };

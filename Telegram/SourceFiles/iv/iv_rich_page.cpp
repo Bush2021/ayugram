@@ -157,12 +157,19 @@ enum class OrderedMarkerType {
 	return QString::number(value);
 }
 
+[[nodiscard]] QString OrderedRawMarkerText(const QString &raw) {
+	if (raw.isEmpty() || raw.endsWith('.') || raw.endsWith(')')) {
+		return raw;
+	}
+	return raw + u"."_q;
+}
+
 [[nodiscard]] QString OrderedMarkerText(
 		const OrderedListData &list,
 		const OrderedListItemData &item,
 		int fallbackValue) {
 	if (item.hasRawText()) {
-		return item.rawText();
+		return OrderedRawMarkerText(item.rawText());
 	}
 	const auto type = item.type.has_value() ? item.type : list.type;
 	const auto value = item.value.value_or(fallbackValue);
@@ -1702,8 +1709,7 @@ void AppendSummaryBlocks(
 		const auto type = entity.type();
 		if (type == EntityType::Subscript
 			|| type == EntityType::Superscript
-			|| type == EntityType::Marked
-			|| type == EntityType::CustomEmoji) {
+			|| type == EntityType::Marked) {
 			return false;
 		}
 	}

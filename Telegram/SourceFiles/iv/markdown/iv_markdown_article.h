@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/markdown/iv_markdown_common.h"
 #include "iv/markdown/iv_markdown_media_block.h"
 #include "iv/markdown/iv_markdown_prepare.h"
+#include "iv/iv_rich_page.h"
 
 #include "base/flat_map.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
@@ -207,6 +208,7 @@ struct MarkdownArticlePaintContext final : Ui::ChatPaintContext {
 	int hiddenTextSegmentIndex = -1;
 	int hiddenSegmentIndex = -1;
 	bool debugBlockGeometry = false;
+	double mediaPixelScale = 1.;
 
 	[[nodiscard]] MarkdownArticlePaintContext translated(int x, int y) const {
 		auto result = *this;
@@ -379,6 +381,7 @@ public:
 	void invalidateLayout();
 	[[nodiscard]] int maxWidth() const;
 	[[nodiscard]] int lastLayoutWidth() const;
+	[[nodiscard]] bool hasMissingMediaBlocks() const;
 	[[nodiscard]] int resizeGetHeight(int width);
 	[[nodiscard]] auto countRevealLinesGeometry(int width)
 	-> std::vector<MarkdownArticleRevealLine>;
@@ -467,6 +470,8 @@ public:
 		MarkdownArticleSelection selection,
 		const MarkdownArticleSelectionEndpoints *endpoints,
 		const PreparedEditSelection *structuralSelection = nullptr) const;
+	[[nodiscard]] std::vector<RichPage::Block> richPageSliceForSelection(
+		MarkdownArticleSelection selection) const;
 	[[nodiscard]] bool highlightProcessDone(
 		Spellchecker::HighlightProcessId processId);
 	void invalidatePaletteCache();

@@ -2093,7 +2093,9 @@ void ComposeControls::saveFieldToHistoryLocalDraft() {
 		return;
 	}
 	const auto id = _header->getDraftReply();
-	if (_preview && (id || !_field->empty())) {
+	if (shouldShowRichDraftPreview()) {
+		_history->clearDraft(draftKeyCurrent());
+	} else if (_preview && (id || !_field->empty())) {
 		const auto key = draftKeyCurrent();
 		_history->setDraft(
 			key,
@@ -3096,6 +3098,10 @@ void ComposeControls::applyDraft(FieldHistoryAction fieldHistoryAction) {
 
 	const auto hadFocus = Ui::InFocusChain(_field);
 	if (richDraft) {
+		_textUpdateEvents = 0;
+		clearFieldText(0, fieldHistoryAction);
+		_textUpdateEvents = TextUpdateEvent::SaveDraft
+			| TextUpdateEvent::SendTyping;
 		_header->replyToMessage(richDraft->reply);
 		_header->editMessage({}, {});
 		if (_preview) {

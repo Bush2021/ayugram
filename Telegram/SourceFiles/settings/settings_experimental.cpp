@@ -39,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/compose_controls_common.h"
 #include "history/view/history_view_message.h"
 #include "info/profile/info_profile_actions.h"
+#include "info/profile/tabs/info_profile_tabs_host.h"
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
 #include "mainwidget.h"
@@ -363,6 +364,7 @@ void SetupExperimental(
 	addToggle(Window::kOptionViewProfileInChatsListContextMenu);
 	addToggle(Info::Profile::kOptionShowPeerIdBelowAbout);
 	addToggle(Info::Profile::kOptionShowChannelJoinedBelowAbout);
+	addToggle(Info::Profile::kOptionProfileMediaTabs);
 	addToggle(Ui::kOptionUseSmallMsgBubbleRadius);
 	addToggle(Media::Player::kOptionDisableAutoplayNext);
 	addToggle(Webview::kOptionWebviewDebugEnabled);

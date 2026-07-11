@@ -249,6 +249,7 @@ public:
 	[[nodiscard]] bool loadedAtBottom() const; // last message is in the list
 	void setNotLoadedAtBottom();
 	[[nodiscard]] bool loadedAtTop() const; // nothing was added after loading history back
+	void markLoadedAtTop();
 	[[nodiscard]] bool hasGuestChatBotMessages() const;
 	void setHasGuestChatBotMessages();
 	[[nodiscard]] bool isReadyFor(MsgId msgId); // has messages for showing history at msgId

@@ -131,7 +131,11 @@ void LayerWidget::setupHeightConsumers() {
 			_heightAnimation.start([=] {
 				setContentHeight(_heightAnimation.value(_desiredHeight));
 			}, _contentWrapHeight, _desiredHeight, st::slideDuration);
-			resizeToWidth(width());
+			if (_inResize) {
+				_pendingResize = true;
+			} else {
+				resizeToWidth(width());
+			}
 		}
 	}, lifetime());
 }

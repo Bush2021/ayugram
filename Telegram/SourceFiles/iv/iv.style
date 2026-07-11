@@ -23,6 +23,7 @@ ivMenuToggle: IconButton(defaultIconButton) {
 	ripple: defaultRippleAnimationBgOver;
 }
 ivMenuPosition: point(-2px, 40px);
+ivZoomDropdownPosition: point(-2px, 0px);
 ivBackIcon: icon {{ "box_button_back", menuIconColor }};
 ivBack: IconButton(ivMenuToggle) {
 	width: 60px;
@@ -184,6 +185,12 @@ ivEditorBottomSend: SendButton(historySend) {
 		rippleAreaSize: ivEditorBottomCircleSize;
 		rippleAreaPosition: point(0px, 0px);
 	}
+	stars: RoundButton(defaultActiveButton) {
+		height: ivEditorBottomCircleSize;
+		padding: margins(6px, 0px, 10px, 0px);
+		textTop: 11px;
+		width: -8px;
+	}
 	sendIconFg: windowFgActive;
 }
 ivEditorBottomSaveSend: SendButton(historySend) {
@@ -252,6 +259,7 @@ ivEditorTableAddColumnRightIcon: icon {{ "menu/rich/table_add_column_right-24x24
 ivEditorTableHeaderIcon: icon {{ "menu/rich/table_highlight-24x24", menuIconColor }};
 ivEditorTableHeaderOffIcon: icon {{ "menu/rich/table_highlight_off-24x24", menuIconColor }};
 ivEditorTableBorderlessIcon: icon {{ "menu/rich/table_borderless-24x24", menuIconColor }};
+ivEditorTableStripedIcon: icon {{ "menu/rich/table_striped-24x24", menuIconColor }};
 ivEditorTableAlignLeftIcon: icon {{ "menu/rich/align_left-24x24", menuIconColor }};
 ivEditorTableAlignCenterIcon: icon {{ "menu/rich/align_center-24x24", menuIconColor }};
 ivEditorTableAlignRightIcon: icon {{ "menu/rich/align_right-24x24", menuIconColor }};

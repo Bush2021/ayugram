@@ -2971,6 +2971,15 @@ bool History::loadedAtTop() const {
 	return _loadedAtTop;
 }
 
+void History::markLoadedAtTop() {
+	if (_loadedAtTop) {
+		return;
+	}
+	_loadedAtTop = true;
+	checkLocalMessages();
+	addEdgesToSharedMedia();
+}
+
 bool History::hasGuestChatBotMessages() const {
 	return _flags & Flag::HasGuestChatBotMessages;
 }

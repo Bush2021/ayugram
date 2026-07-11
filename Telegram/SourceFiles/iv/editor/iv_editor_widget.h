@@ -96,7 +96,7 @@ struct WidgetServices {
 		RequestMediaType)> requestMedia;
 	Fn<void(not_null<Widget*>, Ui::PreparedList, PreparedMediaPasteTarget)>
 		applyPreparedMedia;
-	Fn<QImage(uint64 /*photoId*/)> requestPhotoEditSource;
+	Fn<void(uint64 /*photoId*/, Fn<void(QImage)>)> requestPhotoEditSource;
 	Fn<void(not_null<Widget*>, Ui::PreparedList, State::ReplaceTarget)>
 		replacePhotoWithList;
 	Fn<MediaUploadState(uint64 /*mediaId*/)> mediaUploadState;
@@ -276,6 +276,10 @@ private:
 		MediaPixels,
 		UploadRadial,
 		LayoutSwitch,
+	};
+	enum class MediaClickKind : uchar {
+		Left,
+		ContextMenu,
 	};
 	struct PressedMediaControl {
 		MediaControl control = MediaControl::None;
@@ -806,7 +810,8 @@ private:
 	[[nodiscard]] bool showMediaMenuFromHit(
 		const Markdown::PreparedEditHit &hit,
 		const Markdown::MarkdownArticleHitTestResult &articleHit,
-		QPoint globalPos);
+		QPoint globalPos,
+		MediaClickKind clickKind);
 	[[nodiscard]] bool activateGroupedMediaLinkFromHit(
 		const Markdown::PreparedEditHit &hit,
 		const Markdown::MarkdownArticleHitTestResult &articleHit,
@@ -822,6 +827,15 @@ private:
 		Fn<bool()> change);
 	void requestReplaceMedia(State::BlockPath path);
 	void editPhotoBlock(State::BlockPath path);
+	void editGroupedItemPhoto(State::BlockPath path, int itemIndex);
+	void openPhotoEditor(
+		uint64 photoId,
+		bool spoiler,
+		State::ReplaceTarget target);
+	void showPhotoEditor(
+		QImage source,
+		bool spoiler,
+		State::ReplaceTarget target);
 	void paintMediaControls(Painter &p, QPoint topLeft);
 	struct MediaControlLayout {
 		QRect threeDots;
@@ -869,7 +883,7 @@ private:
 		RequestMediaType)> _requestMedia;
 	const Fn<void(not_null<Widget*>, Ui::PreparedList, PreparedMediaPasteTarget)>
 		_applyPreparedMedia;
-	const Fn<QImage(uint64)> _requestPhotoEditSource;
+	const Fn<void(uint64, Fn<void(QImage)>)> _requestPhotoEditSource;
 	const Fn<void(not_null<Widget*>, Ui::PreparedList, State::ReplaceTarget)>
 		_replacePhotoWithList;
 	const Fn<MediaUploadState(uint64)> _mediaUploadState;
