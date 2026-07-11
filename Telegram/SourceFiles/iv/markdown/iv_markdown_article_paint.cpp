@@ -721,7 +721,8 @@ void PaintTextLeaf(
 		int width,
 		style::align align = style::al_left,
 		std::optional<TextSelection> selection = std::nullopt,
-		int elisionLines = 0) {
+		int elisionLines = 0,
+		int segmentIndex = -1) {
 	const auto availableWidth = std::max(width, 1);
 	auto linePostprocess = std::optional<Ui::Text::LinePostprocess>();
 	if (context.reveal && !elisionLines) {
@@ -756,24 +757,83 @@ void PaintTextLeaf(
 	if (!context.clip.isNull()) {
 		p.setClipRect(context.clip, Qt::IntersectClip);
 	}
-	leaf.draw(p, {
-		.position = rect.topLeft(),
-		.availableWidth = availableWidth,
-		.geometry = elisionLines
-			? Ui::Text::SimpleGeometry(availableWidth, elisionLines, 0, true)
-			: TextGeometry(availableWidth),
-		.align = align,
-		.clip = context.clip,
-		.palette = &p.textPalette(),
-		.pre = context.caches.pre,
-		.blockquote = context.caches.blockquote,
-		.colors = context.caches.colors,
-		.spoiler = Ui::Text::DefaultSpoilerCache(),
-		.now = context.now,
-		.selection = selection.value_or(TextSelection()),
-		.elisionLines = elisionLines,
-		.linePostprocess = linePostprocess ? &*linePostprocess : nullptr,
-	});
+	const auto makeContext = [&] {
+		return Ui::Text::PaintContext{
+			.position = rect.topLeft(),
+			.availableWidth = availableWidth,
+			.geometry = (elisionLines
+				? Ui::Text::SimpleGeometry(availableWidth, elisionLines, 0, true)
+				: TextGeometry(availableWidth)),
+			.align = align,
+			.clip = context.clip,
+			.palette = &p.textPalette(),
+			.pre = context.caches.pre,
+			.blockquote = context.caches.blockquote,
+			.colors = context.caches.colors,
+			.spoiler = Ui::Text::DefaultSpoilerCache(),
+			.now = context.now,
+			.elisionLines = elisionLines,
+		};
+	};
+	auto drawContext = makeContext();
+	drawContext.selection = selection.value_or(TextSelection());
+	drawContext.linePostprocess = linePostprocess ? &*linePostprocess : nullptr;
+	leaf.draw(p, drawContext);
+	const auto searchRanges = PaintSearchRangesForSegmentIndex(
+		context.selectionState,
+		context.searchState,
+		segmentIndex);
+	if (!searchRanges.empty()) {
+		const auto makePalette = [&](
+				const style::color &bg,
+				const style::color &fg) {
+			auto result = p.textPalette();
+			result.selectBg = bg;
+			result.selectFg = fg;
+			result.selectLinkFg = fg;
+			result.selectMonoFg = fg;
+			result.selectSpoilerFg = fg;
+			return result;
+		};
+		const auto otherPalette = makePalette(
+			st::searchedTextMatchBg,
+			st::searchedTextMatchFg);
+		const auto currentPalette = makePalette(
+			st::searchedTextCurrentMatchBg,
+			st::searchedTextCurrentMatchFg);
+		const auto paintMatch = [&](
+				TextSelection range,
+				const style::TextPalette &palette) {
+			auto path = QPainterPath();
+			auto request = Ui::Text::HighlightInfoRequest{
+				.range = range,
+				.outPath = &path,
+			};
+			auto composeContext = makeContext();
+			composeContext.highlight = &request;
+			p.save();
+			p.setClipRect(QRect(), Qt::ReplaceClip);
+			leaf.draw(p, composeContext);
+			p.restore();
+			if (path.isEmpty()) {
+				return;
+			}
+			path.setFillRule(Qt::WindingFill);
+			auto matchContext = makeContext();
+			matchContext.palette = &palette;
+			matchContext.selection = range;
+			p.save();
+			p.setClipPath(path, Qt::IntersectClip);
+			leaf.draw(p, matchContext);
+			p.restore();
+		};
+		for (const auto range : searchRanges.other) {
+			paintMatch(range, otherPalette);
+		}
+		if (searchRanges.current) {
+			paintMatch(*searchRanges.current, currentPalette);
+		}
+	}
 	p.restore();
 }
 
@@ -806,7 +866,8 @@ void PaintSelectableTextLeaf(
 		width,
 		align,
 		selection,
-		elisionLines);
+		elisionLines,
+		segmentIndex);
 }
 
 [[nodiscard]] QRect FlowTextViewportRect(const LaidOutBlock &block) {

@@ -270,6 +270,7 @@ public:
 	[[nodiscard]] int activeTextLength() const;
 	[[nodiscard]] std::optional<int> previousEditableOrdinal() const;
 	[[nodiscard]] std::optional<int> nextEditableOrdinal() const;
+	[[nodiscard]] std::optional<int> firstTableCellOrdinalFromActiveTitle() const;
 	[[nodiscard]] BoundaryTarget activeBoundaryTarget(bool forward) const;
 	[[nodiscard]] std::vector<BoundaryTarget> boundarySteps(
 		bool forward) const;
@@ -327,6 +328,20 @@ public:
 	[[nodiscard]] auto structuredClipboardDataForSelection(
 		const Markdown::PreparedEditSelection &selection) const
 	-> std::optional<ClipboardData>;
+	[[nodiscard]] std::shared_ptr<const RichPage> richPageForTableSelection(
+		const Markdown::PreparedEditSelection &selection) const;
+	[[nodiscard]] bool insertPreparedBlocksAfterTableSelection(
+		const Markdown::PreparedEditSelection &selection,
+		std::vector<RichPage::Block> blocks);
+	enum class TableInPlaceApplyResult : uchar {
+		Applied,
+		Unchanged,
+		StructureMismatch,
+		Failed,
+	};
+	[[nodiscard]] TableInPlaceApplyResult replaceTableSelectionCellsInPlace(
+		const Markdown::PreparedEditSelection &selection,
+		const RichPage &page);
 	[[nodiscard]] bool addTableRow(
 		const Markdown::PreparedEditTableCellRange &range,
 		bool after);
@@ -407,6 +422,10 @@ public:
 	[[nodiscard]] ActiveTextBlockActionResult applyActiveTextBlockAction(
 		InsertAction action,
 		ActiveTextInsertContext context);
+	[[nodiscard]] ActiveTextBlockActionResult
+		replaceActiveTextSelectionWithText(
+			TextWithEntities text,
+			ActiveTextInsertContext context);
 	[[nodiscard]] bool insertPreparedBlockAfterActive(RichPage::Block block);
 	[[nodiscard]] bool insertPreparedBlocksAfterActive(
 		std::vector<RichPage::Block> blocks,
@@ -912,7 +931,6 @@ enum class RequestMediaType : uchar {
 
 struct MediaUploadState {
 	bool uploading = false;
-	float64 progress = 0.;
 };
 
 [[nodiscard]] bool CanEditRichPage(const RichPage &page);

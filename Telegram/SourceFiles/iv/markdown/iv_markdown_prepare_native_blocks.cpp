@@ -1028,7 +1028,8 @@ void RefreshPreparedNativeIvPlaceholderCopyText(PreparedBlock *block) {
 	case RichPageBlockKind::Photo:
 	case RichPageBlockKind::Video:
 	case RichPageBlockKind::Audio:
-	case RichPageBlockKind::Map: {
+	case RichPageBlockKind::Map:
+	case RichPageBlockKind::GroupedMedia: {
 		if (!preparedBlock->editLeaf || (*preparedBlock->editLeaf != source)) {
 			return NativeInstantViewLeafUpdateResult::Unsupported;
 		}
@@ -1046,6 +1047,8 @@ void RefreshPreparedNativeIvPlaceholderCopyText(PreparedBlock *block) {
 			preparedBlock->photo.caption = preparedBlock->text;
 		} else if (preparedBlock->kind == PreparedBlockKind::Video) {
 			preparedBlock->video.caption = preparedBlock->text;
+		} else if (preparedBlock->kind == PreparedBlockKind::GroupedMedia) {
+			preparedBlock->groupedMedia.caption = preparedBlock->text;
 		}
 		RefreshPreparedNativeIvMediaCaptionPlaceholder(preparedBlock, state);
 		RefreshPreparedNativeIvPlaceholderCopyText(preparedBlock);
@@ -1148,7 +1151,10 @@ using PrepareCanonicalMediaBlock = bool (*)(
 		return false;
 	}
 	if (result->size() > count) {
-		result->back().editBlock = BlockSource(std::move(path));
+		ApplyBlockCaptionEditSource(&result->back(), std::move(path));
+		if (state->editMode) {
+			ApplyNativeIvEditPlaceholderText(&result->back());
+		}
 	}
 	return true;
 }

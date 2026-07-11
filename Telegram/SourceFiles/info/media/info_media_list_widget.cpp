@@ -54,6 +54,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
 #include "ui/inactive_press.h"
+#include "ui/text/text_utilities.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
@@ -2181,24 +2182,33 @@ void ListWidget::performDrag() {
 		|| dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.get())) {
 		return;
 	}
+	auto mimeData = std::unique_ptr<QMimeData>();
+	auto pixmap = QPixmap();
 	const auto document = reinterpret_cast<DocumentData*>(
 		pressedHandler->property(
 			kDocumentLinkMediaProperty).toULongLong());
-	if (!document) {
-		return;
-	}
-	const auto filepath = document->filepath(true);
-	if (filepath.isEmpty()) {
-		return;
-	}
-	auto mimeData = std::make_unique<QMimeData>();
-	mimeData->setUrls({ QUrl::fromLocalFile(filepath) });
-
-	auto pixmap = QPixmap();
-	if (const auto layout = _provider->lookupLayout(_pressState.item)) {
-		if (const auto file = dynamic_cast<Overview::Layout::Document*>(
-				layout)) {
-			pixmap = Ui::PixmapFromImage(file->dragPreviewImage());
+	if (document) {
+		const auto filepath = document->filepath(true);
+		if (filepath.isEmpty()) {
+			return;
+		}
+		mimeData = std::make_unique<QMimeData>();
+		mimeData->setUrls({ QUrl::fromLocalFile(filepath) });
+		if (const auto layout = _provider->lookupLayout(_pressState.item)) {
+			if (const auto file = dynamic_cast<Overview::Layout::Document*>(
+					layout)) {
+				pixmap = Ui::PixmapFromImage(file->dragPreviewImage());
+			}
+		}
+	} else {
+		const auto text = pressedHandler->dragText();
+		if (text.isEmpty()) {
+			return;
+		}
+		mimeData = TextUtilities::MimeDataFromText(
+			TextForMimeData::Simple(text));
+		if (!mimeData) {
+			return;
 		}
 	}
 

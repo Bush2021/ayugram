@@ -1234,6 +1234,18 @@ Chat ParseChat(const MTPChat &data) {
 		result.input = MTP_inputPeerChannel(
 			MTP_long(result.bareId),
 			data.vaccess_hash());
+	}, [&](const MTPDcommunity &data) {
+		result.bareId = data.vid().v;
+		result.title = ParseString(data.vtitle());
+		result.input = MTP_inputPeerChannel(
+			MTP_long(result.bareId),
+			MTP_long(data.vaccess_hash().value_or_empty()));
+	}, [&](const MTPDcommunityForbidden &data) {
+		result.bareId = data.vid().v;
+		result.title = ParseString(data.vtitle());
+		result.input = MTP_inputPeerChannel(
+			MTP_long(result.bareId),
+			MTP_long(data.vaccess_hash().value_or_empty()));
 	});
 	return result;
 }
@@ -1898,6 +1910,7 @@ ServiceAction ParseServiceAction(
 				}));
 		}, [](const auto &) {});
 		result.content = content;
+	}, [](const MTPDmessageActionChangeCommunity &) {
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;
 }
@@ -2468,6 +2481,10 @@ DialogsInfo ParseDialogsInfo(
 			const auto peerId = single.match([](const MTPDchannel &data) {
 				return peerFromChannel(data.vid());
 			}, [](const MTPDchannelForbidden &data) {
+				return peerFromChannel(data.vid());
+			}, [](const MTPDcommunity &data) {
+				return peerFromChannel(data.vid());
+			}, [](const MTPDcommunityForbidden &data) {
 				return peerFromChannel(data.vid());
 			}, [](const auto &data) {
 				return peerFromChat(data.vid());

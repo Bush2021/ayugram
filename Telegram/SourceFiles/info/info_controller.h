@@ -157,6 +157,8 @@ public:
 		CommonGroups,
 		SimilarPeers,
 		RequestsList,
+		Community,
+		CommunityRequests,
 		ReactionsList,
 		SavedSublists,
 		PeerGifts,
@@ -324,6 +326,7 @@ public:
 	[[nodiscard]] Wrap wrap() const;
 	[[nodiscard]] rpl::producer<Wrap> wrapValue() const;
 	[[nodiscard]] not_null<Ui::RpWidget*> wrapWidget() const;
+	[[nodiscard]] rpl::producer<bool> contentTillBottomValue() const;
 	void setSection(not_null<ContentMemento*> memento);
 	[[nodiscard]] bool hasBackButton() const;
 

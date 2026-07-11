@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_iv.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace Iv::Markdown {
 namespace {
@@ -1217,6 +1218,44 @@ std::optional<TextSelection> PaintTextSelectionForSegmentIndex(
 	return segment
 		? PaintTextSelectionForSegment(*segment, selectionState)
 		: std::nullopt;
+}
+
+PaintSearchSegmentRanges PaintSearchRangesForSegmentIndex(
+		const PaintSelectionState &selectionState,
+		const PaintSearchState &searchState,
+		int index) {
+	auto result = PaintSearchSegmentRanges();
+	if (searchState.empty() || index < 0) {
+		return result;
+	}
+	const auto segment = FindSegment(selectionState.segments, index);
+	if (!segment || !segment->isTextLeaf()) {
+		return result;
+	}
+	const auto length = std::min(
+		SegmentLength(*segment),
+		int(std::numeric_limits<uint16>::max()));
+	const auto &matches = *searchState.matches;
+	for (auto i = 0; i != int(matches.size()); ++i) {
+		const auto &match = matches[i];
+		if (match.segment > index) {
+			break;
+		} else if (match.segment != index) {
+			continue;
+		}
+		const auto from = std::clamp(match.from, 0, length);
+		const auto to = std::clamp(match.to, 0, length);
+		if (from >= to) {
+			continue;
+		}
+		const auto range = TextSelection(uint16(from), uint16(to));
+		if (i == searchState.current) {
+			result.current = range;
+		} else {
+			result.other.push_back(range);
+		}
+	}
+	return result;
 }
 
 bool WholeSegmentSelected(

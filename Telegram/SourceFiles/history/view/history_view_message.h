@@ -356,6 +356,10 @@ private:
 		Painter &p,
 		QRect &trect,
 		const PaintContext &context) const;
+	void paintEphemeralBadge(
+		Painter &p,
+		QRect &trect,
+		const PaintContext &context) const;
 	void paintTopicButton(
 		Painter &p,
 		QRect &trect,

@@ -7,13 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_controller.h"
 #include "base/event_filter.h"
-#include "base/weak_ptr.h"
 #include "core/click_handler_types.h"
 #include "core/credits_amount.h"
 #include "core/file_utilities.h"
+#include "iv/markdown/iv_markdown_article.h"
 #include "iv/markdown/iv_markdown_parse.h"
 #include "iv/markdown/iv_markdown_view.h"
 #include "iv/iv_delegate_impl.h"
+#include "iv/iv_search_controller.h"
 #include "iv/iv_zoom_controls.h"
 #include "lang/lang_keys.h"
 #include "ui/layers/layer_manager.h"
@@ -404,6 +405,9 @@ void Controller::setContent(
 					_preview->setFocus();
 				}
 				updateHistoryButtons();
+				if (_search) {
+					_search->refresh();
+				}
 			}
 			return;
 		}
@@ -1020,6 +1024,61 @@ void Controller::createPreview() {
 
 	_preview->show();
 	updateHistoryButtons();
+	if (_search) {
+		_search->refresh();
+	}
+}
+
+void Controller::createSearchController() {
+	auto host = SearchHost{
+		.ready = [=] { return _preview != nullptr; },
+		.sources = [=] {
+			return MarkdownPreviewSearchSources(_preview.get());
+		},
+		.applyMatches = [=](
+				std::vector<MarkdownArticleSearchMatch> matches,
+				int current) {
+			SetMarkdownPreviewSearchMatches(
+				_preview.get(),
+				std::move(matches),
+				current);
+		},
+		.scrollToSegment = [=](int segmentIndex) {
+			ScrollMarkdownPreviewToSegment(
+				_preview.get(),
+				segmentIndex,
+				0);
+		},
+		.expandDetails = [=](const QString &anchorId) {
+			return ExpandMarkdownPreviewDetails(
+				_preview.get(),
+				anchorId);
+		},
+		.focusContent = [=] {
+			_preview->setFocus();
+		},
+	};
+	_search = std::make_unique<SearchController>(
+		_window->body().get(),
+		_window->body()->widthValue(),
+		std::move(host));
+	_searchBarHeight = _search->barHeightValue();
+	_search->moveBar(0, st::ivSubtitleHeight);
+	_search->raiseBar();
+	_titleShadow->raise();
+}
+
+void Controller::toggleSearchBar() {
+	if (!_window) {
+		return;
+	} else if (_search && _search->shown()) {
+		_search->hide();
+		return;
+	}
+	if (!_search) {
+		createSearchController();
+	}
+	_search->toggle();
 }
 
 void Controller::createWindow() {
@@ -1089,10 +1148,11 @@ void Controller::createWindow() {
 	_container = Ui::CreateChild<Ui::RpWidget>(window->body().get());
 	rpl::combine(
 		window->body()->sizeValue(),
-		_subtitleWrap->heightValue()
-	) | rpl::on_next([=](QSize size, int titleHeight) {
+		_subtitleWrap->heightValue(),
+		_searchBarHeight.value()
+	) | rpl::on_next([=](QSize size, int titleHeight, int barHeight) {
 		_container->setGeometry(QRect(QPoint(), size).marginsRemoved(
-			{ 0, titleHeight, 0, 0 }));
+			{ 0, titleHeight + barHeight, 0, 0 }));
 	}, _container->lifetime());
 	_container->paintRequest() | rpl::on_next([=](QRect clip) {
 		QPainter(_container).fillRect(clip, st::windowBg);
@@ -1111,7 +1171,11 @@ void Controller::createWindow() {
 			const auto event = static_cast<QKeyEvent*>(e.get());
 			if (event->key() == Qt::Key_Escape) {
 				event->accept();
-				close();
+				if (_search && _search->shown()) {
+					_search->hide();
+				} else {
+					close();
+				}
 			}
 		}
 	}, window->lifetime());
@@ -1122,6 +1186,12 @@ void Controller::createWindow() {
 		const auto event = static_cast<QKeyEvent*>(e.get());
 		const auto previousAccepted = event->isAccepted();
 		ProcessZoomShortcut(_delegate, event);
+		if (!event->isAccepted()
+			&& (event->modifiers() & Qt::ControlModifier)
+			&& event->key() == Qt::Key_F) {
+			event->accept();
+			toggleSearchBar();
+		}
 		return event->isAccepted() && !previousAccepted
 			? base::EventFilterResult::Cancel
 			: base::EventFilterResult::Continue;

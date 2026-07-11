@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "ui/ui_utility.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/tooltip.h"
 #include "ui/color_contrast.h"
 #include "ui/integration.h"
 
@@ -269,6 +270,15 @@ void MarkdownDocumentWidget::articleContentChanged() {
 	forceRelayoutCurrentWidth();
 }
 
+void MarkdownDocumentWidget::setSearchMatches(
+		std::vector<MarkdownArticleSearchMatch> matches,
+		int current) {
+	if (_article) {
+		_article->setSearchMatches(std::move(matches), current);
+	}
+	update();
+}
+
 void MarkdownDocumentWidget::setZoom(int value) {
 	value = (value > 0) ? value : 100;
 	if (_zoom == value) {
@@ -316,6 +326,23 @@ int MarkdownDocumentWidget::anchorTop(const QString &anchorId) const {
 	return int(std::floor(top * zoomScale()));
 }
 
+auto MarkdownDocumentWidget::scrollAnchorForTop(int top) const
+-> std::optional<MarkdownArticleScrollAnchor> {
+	if (!_article) {
+		return std::nullopt;
+	}
+	return _article->scrollAnchorForTop(int(std::floor(top / zoomScale())));
+}
+
+int MarkdownDocumentWidget::scrollTopForAnchor(
+		const MarkdownArticleScrollAnchor &anchor) const {
+	const auto top = _article ? _article->scrollTopForAnchor(anchor) : -1;
+	if (top < 0) {
+		return -1;
+	}
+	return int(std::floor(top * zoomScale()));
+}
+
 bool MarkdownDocumentWidget::expandDetailsToAnchor(const QString &anchorId) {
 	if (!_article) {
 		return false;
@@ -330,6 +357,27 @@ bool MarkdownDocumentWidget::expandDetailsToAnchor(const QString &anchorId) {
 		updateHoverAtCursor();
 	}
 	return true;
+}
+
+bool MarkdownDocumentWidget::expandDetailsBlock(const QString &anchorId) {
+	if (!_article) {
+		return false;
+	}
+	const auto result = _article->expandDetailsBlock(anchorId);
+	if (!result.found || !result.changed) {
+		return false;
+	}
+	clearSelection();
+	forceRelayoutCurrentWidth();
+	updateHoverAtCursor();
+	return true;
+}
+
+QRect MarkdownDocumentWidget::segmentRect(int segmentIndex) const {
+	const auto rect = _article
+		? _article->segmentRect(segmentIndex)
+		: QRect();
+	return rect.isEmpty() ? QRect() : articleRectToWidget(rect);
 }
 
 bool MarkdownDocumentWidget::toggleDetails(const QString &anchorId) {
@@ -806,6 +854,7 @@ bool MarkdownDocumentWidget::eventHook(QEvent *e) {
 
 void MarkdownDocumentWidget::leaveEventHook(QEvent *e) {
 	ClickHandler::clearActive(this);
+	Ui::Tooltip::Hide();
 	applyCursor((_dragAction == Selecting)
 		? style::cur_text
 		: style::cur_default);
@@ -822,6 +871,21 @@ void MarkdownDocumentWidget::clickHandlerPressedChanged(
 		const ClickHandlerPtr &,
 		bool) {
 	update();
+}
+
+QString MarkdownDocumentWidget::tooltipText() const {
+	if (const auto lnk = ClickHandler::getActive()) {
+		return lnk->tooltip();
+	}
+	return QString();
+}
+
+QPoint MarkdownDocumentWidget::tooltipPos() const {
+	return QCursor::pos();
+}
+
+bool MarkdownDocumentWidget::tooltipWindowActive() const {
+	return Ui::AppInFocus() && Ui::InFocusChain(window());
 }
 
 ClickHandlerPtr MarkdownDocumentWidget::linkAt(QPoint point) const {
@@ -1021,6 +1085,12 @@ void MarkdownDocumentWidget::forceRelayoutCurrentWidth() {
 void MarkdownDocumentWidget::updateHover(
 		const MarkdownArticleHitTestResult &state) {
 	const auto changed = ClickHandler::setActive(state.state.link, this);
+	if (changed) {
+		Ui::Tooltip::Hide();
+	}
+	if (state.state.link && _dragAction == NoDrag) {
+		Ui::Tooltip::Show(1000, this);
+	}
 	auto cursor = style::cur_default;
 	if (_dragAction == NoDrag) {
 		if (state.codeHeaderCopy

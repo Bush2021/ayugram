@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/object_ptr.h"
 #include "base/unique_qptr.h"
+#include "base/weak_ptr.h"
 #include "iv/markdown/iv_markdown_document.h"
 #include "iv/markdown/iv_markdown_prepare.h"
 #include "ui/effects/animations.h"
@@ -29,9 +30,13 @@ template <typename Widget>
 class FadeWrapScaled;
 } // namespace Ui
 
+namespace Iv {
+class SearchController;
+} // namespace Iv
+
 namespace Iv::Markdown {
 
-class Controller final {
+class Controller final : public base::has_weak_ptr {
 public:
 	Controller(
 		not_null<Delegate*> delegate,
@@ -85,6 +90,8 @@ private:
 		bool preserveScroll);
 	void updateTitleGeometry(int newWidth) const;
 	void showMenu();
+	void createSearchController();
+	void toggleSearchBar();
 	void openSource();
 	[[nodiscard]] ViewerKind viewerKind() const;
 	[[nodiscard]] QString subtitleText() const;
@@ -154,6 +161,8 @@ private:
 	std::unique_ptr<Ui::LayerManager> _layerManager;
 	std::shared_ptr<Ui::Show> _show;
 	std::unique_ptr<Ui::RpWidget> _preview;
+	std::unique_ptr<SearchController> _search;
+	rpl::variable<int> _searchBarHeight = 0;
 	std::vector<HistoryEntry> _history;
 	int _historyIndex = -1;
 	int _shownHistoryIndex = -1;

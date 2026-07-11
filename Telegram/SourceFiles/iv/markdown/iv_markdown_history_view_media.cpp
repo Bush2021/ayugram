@@ -206,6 +206,39 @@ struct IvHistoryViewHit {
 	return result;
 }
 
+[[nodiscard]] MediaActivation SpoileredGroupedItemActivation(
+		int itemIndex,
+		const base::flat_map<
+			uint64,
+			std::shared_ptr<PhotoRuntime>> &photos,
+		const base::flat_map<
+			uint64,
+			std::shared_ptr<DocumentRuntime>> &documents,
+		const base::flat_map<uint64, int> &indices,
+		const base::flat_set<uint64> &spoilered) {
+	auto result = MediaActivation();
+	for (const auto &[id, index] : indices) {
+		if (index != itemIndex || !spoilered.contains(id)) {
+			continue;
+		}
+		const auto i = photos.find(id);
+		if (i != end(photos)) {
+			result.kind = MediaActivationKind::Photo;
+			result.photo = i->second;
+			result.itemIndex = itemIndex;
+		} else {
+			const auto j = documents.find(id);
+			if (j != end(documents)) {
+				result.kind = MediaActivationKind::Document;
+				result.document = j->second;
+				result.itemIndex = itemIndex;
+			}
+		}
+		break;
+	}
+	return result;
+}
+
 [[nodiscard]] not_null<HistoryItem*> CreateIvHostMessage(
 		not_null<History*> history,
 		QString pageUrl) {
@@ -256,6 +289,8 @@ public:
 	[[nodiscard]] std::vector<QRect> itemRects() const override;
 
 private:
+	[[nodiscard]] bool alive() const;
+
 	[[nodiscard]] IvHistoryViewHit resolveHit(QPoint point) const;
 
 	[[nodiscard]] IvHistoryViewHit resolveLocalHit(QPoint point) const;
@@ -337,8 +372,12 @@ bool IvHistoryViewBlock::supported() const {
 	return _supported;
 }
 
+bool IvHistoryViewBlock::alive() const {
+	return _host->itemAlive();
+}
+
 int IvHistoryViewBlock::resizeGetHeight(int width) {
-	if (!_media) {
+	if (!_media || !alive()) {
 		return 0;
 	}
 	_requestedWidth = std::max(width, 1);
@@ -346,7 +385,7 @@ int IvHistoryViewBlock::resizeGetHeight(int width) {
 }
 
 void IvHistoryViewBlock::setGeometry(QRect geometry) {
-	if (!_media) {
+	if (!_media || !alive()) {
 		_geometry = geometry;
 		return;
 	}
@@ -369,7 +408,7 @@ int IvHistoryViewBlock::firstLineBaseline() const {
 void IvHistoryViewBlock::paint(
 		Painter &p,
 		const MarkdownArticlePaintContext &context) const {
-	if (!_media || _geometry.isEmpty()) {
+	if (!_media || _geometry.isEmpty() || !alive()) {
 		return;
 	}
 	const auto visible = context.clip.intersected(_geometry);
@@ -399,10 +438,13 @@ MediaBlockSelectionData IvHistoryViewBlock::selectionData() const {
 }
 
 bool IvHistoryViewBlock::hasHeavyPart() const {
-	return _media && _media->hasHeavyPart();
+	return alive() && _media && _media->hasHeavyPart();
 }
 
 void IvHistoryViewBlock::unloadHeavyPart() {
+	if (!alive()) {
+		return;
+	}
 	const auto had = hasHeavyPart();
 	if (_media) {
 		_media->unloadHeavyPart();
@@ -413,12 +455,15 @@ void IvHistoryViewBlock::unloadHeavyPart() {
 }
 
 void IvHistoryViewBlock::hideSpoilers() {
-	if (_media) {
+	if (_media && alive()) {
 		_media->hideSpoilers();
 	}
 }
 
 std::vector<QRect> IvHistoryViewBlock::itemRects() const {
+	if (!alive()) {
+		return {};
+	}
 	const auto grouped = dynamic_cast<HistoryView::GroupedMedia*>(
 		_media.get());
 	if (!grouped) {
@@ -436,7 +481,7 @@ std::vector<QRect> IvHistoryViewBlock::itemRects() const {
 
 IvHistoryViewHit IvHistoryViewBlock::resolveHit(QPoint point) const {
 	auto result = IvHistoryViewHit();
-	if (!_supported || !_media || !_geometry.contains(point)) {
+	if (!_supported || !_media || !alive() || !_geometry.contains(point)) {
 		return result;
 	}
 	return resolveLocalHit(point - _geometry.topLeft());
@@ -500,6 +545,29 @@ IvHistoryViewHit IvHistoryViewBlock::classifyHandler(
 			result.activation.kind = MediaActivationKind::Document;
 			result.activation.document = _documentRuntime;
 			return result;
+		}
+		if (_kind == IvHistoryViewMediaKind::GroupedMedia) {
+			const auto grouped = dynamic_cast<HistoryView::GroupedMedia*>(
+				_media.get());
+			if (grouped) {
+				const auto count = int(_groupedItemIndices.size());
+				for (auto i = 0; i != count; ++i) {
+					if (!grouped->groupItemRect(i).contains(localPoint)) {
+						continue;
+					}
+					auto activation = SpoileredGroupedItemActivation(
+						i,
+						_groupedPhotoRuntimes,
+						_groupedDocumentRuntimes,
+						_groupedItemIndices,
+						_groupedSpoileredIds);
+					if (activation.kind != MediaActivationKind::None) {
+						result.activation = std::move(activation);
+						return result;
+					}
+					break;
+				}
+			}
 		}
 	}
 	if (IsSupportedInteractionHandler(handler)) {
@@ -586,6 +654,9 @@ bool IvHistoryViewBlock::supportsHitClassification() {
 }
 
 void IvHistoryViewBlock::hostUpdated() {
+	if (!alive()) {
+		return;
+	}
 	const auto current = host();
 	if (_registeredBridgeHost == current) {
 		return;
@@ -640,6 +711,8 @@ public:
 	void setActiveItemIndex(int index) override;
 
 private:
+	[[nodiscard]] bool alive() const;
+
 	[[nodiscard]] HistoryView::Media *activeMedia() const;
 
 	[[nodiscard]] int frameHeight(int width) const;
@@ -684,6 +757,7 @@ private:
 	int _requestedWidth = 0;
 	bool _supported = false;
 	MediaBlockHost *_registeredBridgeHost = nullptr;
+	mutable SlideshowDotsBackdrop _dotsBackdrop;
 
 };
 
@@ -729,8 +803,12 @@ bool IvHistoryViewSlideshowBlock::supported() const {
 	return _supported;
 }
 
+bool IvHistoryViewSlideshowBlock::alive() const {
+	return _host->itemAlive();
+}
+
 HistoryView::Media *IvHistoryViewSlideshowBlock::activeMedia() const {
-	return (_activeIndex >= 0 && _activeIndex < int(_slides.size()))
+	return (alive() && _activeIndex >= 0 && _activeIndex < int(_slides.size()))
 		? _slides[_activeIndex].get()
 		: nullptr;
 }
@@ -755,7 +833,7 @@ int IvHistoryViewSlideshowBlock::resizeGetHeight(int width) {
 }
 
 void IvHistoryViewSlideshowBlock::applyForcedSize() {
-	if (_geometry.isEmpty()) {
+	if (_geometry.isEmpty() || !alive()) {
 		return;
 	}
 	const auto runtime = _host->view()->Get<
@@ -769,6 +847,10 @@ void IvHistoryViewSlideshowBlock::applyForcedSize() {
 }
 
 void IvHistoryViewSlideshowBlock::setGeometry(QRect geometry) {
+	if (!alive()) {
+		_geometry = geometry;
+		return;
+	}
 	const auto width = std::max(geometry.width(), 1);
 	const auto height = resizeGetHeight(width);
 	_geometry = QRect(geometry.topLeft(), QSize(width, height));
@@ -804,12 +886,15 @@ MediaBlockSelectionData IvHistoryViewSlideshowBlock::selectionData() const {
 }
 
 bool IvHistoryViewSlideshowBlock::hasHeavyPart() const {
-	return ranges::any_of(_slides, [](const auto &media) {
+	return alive() && ranges::any_of(_slides, [](const auto &media) {
 		return media && media->hasHeavyPart();
 	});
 }
 
 void IvHistoryViewSlideshowBlock::unloadHeavyPart() {
+	if (!alive()) {
+		return;
+	}
 	const auto had = hasHeavyPart();
 	for (const auto &media : _slides) {
 		if (media) {
@@ -822,6 +907,9 @@ void IvHistoryViewSlideshowBlock::unloadHeavyPart() {
 }
 
 void IvHistoryViewSlideshowBlock::hideSpoilers() {
+	if (!alive()) {
+		return;
+	}
 	for (const auto &media : _slides) {
 		if (media) {
 			media->hideSpoilers();
@@ -830,7 +918,7 @@ void IvHistoryViewSlideshowBlock::hideSpoilers() {
 }
 
 std::vector<QRect> IvHistoryViewSlideshowBlock::itemRects() const {
-	if (_geometry.isEmpty() || _slides.empty()) {
+	if (!alive() || _geometry.isEmpty() || _slides.empty()) {
 		return {};
 	}
 	return { _geometry };
@@ -897,6 +985,18 @@ IvHistoryViewHit IvHistoryViewSlideshowBlock::classifyState(
 	const auto &handler = state.link;
 	if (!handler) {
 		return result;
+	}
+	if (std::dynamic_pointer_cast<LambdaClickHandler>(handler)) {
+		auto activation = SpoileredGroupedItemActivation(
+			index,
+			_groupedPhotoRuntimes,
+			_groupedDocumentRuntimes,
+			_groupedItemIndices,
+			_groupedSpoileredIds);
+		if (activation.kind != MediaActivationKind::None) {
+			result.activation = std::move(activation);
+			return result;
+		}
 	}
 	if (IsSupportedInteractionHandler(handler)) {
 		result.link = handler;
@@ -1006,6 +1106,16 @@ void IvHistoryViewSlideshowBlock::paint(
 				active ? st.navButtonBgOver : st.navButtonBg,
 				active ? st.navNextIconOver : st.navNextIcon);
 		}
+		PaintSlideshowDots(
+			p,
+			ComputeSlideshowDots(
+				_geometry,
+				int(_slides.size()),
+				_activeIndex,
+				st),
+			_activeIndex,
+			st,
+			_dotsBackdrop);
 	}
 	p.restore();
 }
@@ -1033,6 +1143,9 @@ MediaActivation IvHistoryViewSlideshowBlock::activationAt(
 }
 
 void IvHistoryViewSlideshowBlock::hostUpdated() {
+	if (!alive()) {
+		return;
+	}
 	const auto current = host();
 	if (_registeredBridgeHost == current) {
 		return;
@@ -1058,6 +1171,9 @@ struct IvHistoryViewMediaHost::State {
 		not_null<HistoryItem*> item);
 	explicit State(not_null<HistoryView::Element*> view);
 
+	void watchItemLifetime();
+	void handleItemDeath();
+
 	const not_null<::Data::Session*> session;
 	const QString pageUrl;
 	const std::unique_ptr<IvHistoryViewDelegate> delegate;
@@ -1069,6 +1185,10 @@ struct IvHistoryViewMediaHost::State {
 	MediaBlockHost *bridgeHost = nullptr;
 	int bridgeHostReferences = 0;
 	rpl::lifetime bridgeLifetime;
+	const FullMsgId itemId;
+	bool itemDead = false;
+	bool itemTornDown = false;
+	rpl::lifetime itemDeathLifetime;
 };
 
 IvHistoryViewMediaHost::State::State(
@@ -1087,9 +1207,11 @@ IvHistoryViewMediaHost::State::State(
 	}))
 , item(CreateIvHostMessage(history, this->pageUrl))
 , owned(delegate.get(), item)
-, view(static_cast<HistoryView::Message*>(owned.get())) {
+, view(static_cast<HistoryView::Message*>(owned.get()))
+, itemId(item->fullId()) {
 	static_cast<HistoryView::Message*>(view)->setInstantViewMediaRuntime(
 		this->pageUrl);
+	watchItemLifetime();
 }
 
 IvHistoryViewMediaHost::State::State(
@@ -1106,9 +1228,11 @@ IvHistoryViewMediaHost::State::State(
 	}))
 , item(item)
 , realView(this->item->createView(delegate.get()))
-, view(static_cast<HistoryView::Message*>(realView.get())) {
+, view(static_cast<HistoryView::Message*>(realView.get()))
+, itemId(this->item->fullId()) {
 	static_cast<HistoryView::Message*>(view)->setInstantViewMediaRuntime(
 		this->pageUrl);
+	watchItemLifetime();
 }
 
 IvHistoryViewMediaHost::State::State(
@@ -1116,7 +1240,30 @@ IvHistoryViewMediaHost::State::State(
 : session(&view->history()->owner())
 , item(view->data())
 , view(view.get())
-, needsViewRequestBridge(false) {
+, needsViewRequestBridge(false)
+, itemId(this->item->fullId()) {
+	watchItemLifetime();
+}
+
+void IvHistoryViewMediaHost::State::watchItemLifetime() {
+	session->itemRemoved(
+		itemId
+	) | rpl::on_next([this](not_null<const HistoryItem*>) {
+		handleItemDeath();
+	}, itemDeathLifetime);
+}
+
+void IvHistoryViewMediaHost::State::handleItemDeath() {
+	if (itemTornDown) {
+		return;
+	}
+	itemTornDown = true;
+	itemDead = true;
+	itemDeathLifetime.destroy();
+	bridgeLifetime.destroy();
+	view = nullptr;
+	realView = nullptr;
+	owned = {};
 }
 
 IvHistoryViewMediaHost::IvHistoryViewMediaHost(
@@ -1148,6 +1295,10 @@ not_null<::Data::Session*> IvHistoryViewMediaHost::session() const {
 
 not_null<HistoryItem*> IvHistoryViewMediaHost::item() const {
 	return _state->item;
+}
+
+bool IvHistoryViewMediaHost::itemAlive() const {
+	return !_state->itemDead;
 }
 
 not_null<HistoryView::Element*> IvHistoryViewMediaHost::view() const {

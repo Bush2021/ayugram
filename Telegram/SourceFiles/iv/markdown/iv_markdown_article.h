@@ -133,6 +133,27 @@ struct PaintSelectionState {
 	}
 };
 
+struct MarkdownArticleSearchMatch {
+	int segment = -1;
+	int from = 0;
+	int to = 0;
+};
+
+struct MarkdownArticleSearchSource {
+	QString text;
+	QString hiddenText;
+	QString detailsAnchorId;
+};
+
+struct PaintSearchState {
+	const std::vector<MarkdownArticleSearchMatch> *matches = nullptr;
+	int current = -1;
+
+	[[nodiscard]] bool empty() const {
+		return !matches || matches->empty();
+	}
+};
+
 struct MarkdownArticleThinkingPaintCache {
 	QImage mask;
 	QImage gradient;
@@ -181,6 +202,7 @@ struct MarkdownArticlePaintContext final : Ui::ChatPaintContext {
 
 	MarkdownArticlePaintCaches caches;
 	PaintSelectionState selectionState;
+	PaintSearchState searchState;
 	MarkdownArticleRevealPaintState *reveal = nullptr;
 	int hiddenTextSegmentIndex = -1;
 	int hiddenSegmentIndex = -1;
@@ -301,6 +323,11 @@ struct MarkdownArticleAnchorExpansion {
 	bool changed = false;
 };
 
+struct MarkdownArticleScrollAnchor {
+	int segmentIndex = -1;
+	double fraction = 0.;
+};
+
 struct MarkdownArticleMediaGeometry {
 	PreparedEditBlockSource block;
 	QRect mediaRect;
@@ -328,6 +355,11 @@ public:
 		Fn<void(QRect)> repaintRect,
 		Fn<bool(const ClickContext&)> spoilerLinkFilter = nullptr);
 	void setContent(MarkdownArticleContent content);
+	void setSearchMatches(
+		std::vector<MarkdownArticleSearchMatch> matches,
+		int current);
+	[[nodiscard]] auto searchSources() const
+	-> std::vector<MarkdownArticleSearchSource>;
 	void updatePreparedLeaf(
 		const PreparedEditLeafSource &source,
 		const MarkdownArticleContent &prepared);
@@ -378,7 +410,13 @@ public:
 	[[nodiscard]] bool updateHorizontalScroll(QPoint point);
 	void endHorizontalScroll();
 	[[nodiscard]] int anchorTop(const QString &anchorId) const;
+	[[nodiscard]] auto scrollAnchorForTop(int top) const
+	-> std::optional<MarkdownArticleScrollAnchor>;
+	[[nodiscard]] int scrollTopForAnchor(
+		const MarkdownArticleScrollAnchor &anchor) const;
 	[[nodiscard]] MarkdownArticleAnchorExpansion expandDetailsToAnchor(
+		const QString &anchorId);
+	[[nodiscard]] MarkdownArticleAnchorExpansion expandDetailsBlock(
 		const QString &anchorId);
 	[[nodiscard]] bool toggleDetails(const QString &anchorId);
 	[[nodiscard]] bool segmentIsText(int index) const;

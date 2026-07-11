@@ -54,6 +54,15 @@ struct SegmentSpan {
 	}
 };
 
+struct PaintSearchSegmentRanges {
+	std::vector<TextSelection> other;
+	std::optional<TextSelection> current;
+
+	[[nodiscard]] bool empty() const {
+		return other.empty() && !current;
+	}
+};
+
 void CollectSelectableSegments(
 	std::vector<LaidOutBlock> *blocks,
 	std::vector<SelectableSegment> *segments);
@@ -87,6 +96,10 @@ void CollectAnchors(
 	const PaintSelectionState &selectionState);
 [[nodiscard]] std::optional<TextSelection> PaintTextSelectionForSegmentIndex(
 	const PaintSelectionState &selectionState,
+	int index);
+[[nodiscard]] PaintSearchSegmentRanges PaintSearchRangesForSegmentIndex(
+	const PaintSelectionState &selectionState,
+	const PaintSearchState &searchState,
 	int index);
 [[nodiscard]] bool WholeSegmentSelected(
 	const SelectableSegment &segment,

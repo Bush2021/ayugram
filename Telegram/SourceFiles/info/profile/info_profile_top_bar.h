@@ -81,6 +81,7 @@ namespace Info::Profile {
 
 class Badge;
 class StatusLabel;
+class TopBarActionButton;
 
 struct TopBarActionButtonStyle;
 
@@ -90,6 +91,7 @@ public:
 		Profile,
 		Stories,
 		Preview,
+		Community,
 	};
 
 	struct Descriptor {
@@ -100,6 +102,7 @@ public:
 		PeerData *peer = nullptr;
 		rpl::producer<bool> backToggles;
 		rpl::producer<> showFinished;
+		rpl::producer<TextWithEntities> customStatus;
 	};
 
 	struct AnimatedPatternPoint {
@@ -154,6 +157,9 @@ private:
 	void setupBirthdayEffect();
 	void startUploadOverlay();
 	void setupActions(not_null<Window::SessionController*> controller);
+	void searchInCommunity(not_null<Window::SessionController*> controller);
+	void finalizeActions(
+		const std::vector<not_null<TopBarActionButton*>> &buttons);
 	void setupButtons(
 		not_null<Window::SessionController*> controller,
 		Source source);
@@ -188,6 +194,7 @@ private:
 	[[nodiscard]] int calculateRightButtonsWidth() const;
 	[[nodiscard]] const style::FlatLabel &statusStyle() const;
 	void setupStatusWithRating();
+	void bindStatus();
 	[[nodiscard]] TopBarActionButtonStyle mapActionStyle(
 		std::optional<QColor> c) const;
 
@@ -225,6 +232,7 @@ private:
 	object_ptr<Ui::FlatLabel> _status;
 	std::unique_ptr<StatusLabel> _statusLabel;
 	rpl::variable<int> _statusShift = 0;
+	rpl::producer<TextWithEntities> _customStatus;
 	object_ptr<Ui::FadeWrap<Ui::RoundButton>> _showLastSeen = { nullptr };
 	object_ptr<Ui::RoundButton> _forumButton = { nullptr };
 
@@ -252,6 +260,8 @@ private:
 	Ui::PeerUserpicView _userpicView;
 	InMemoryKey _userpicUniqueKey;
 	QImage _cachedUserpic;
+	Ui::CommunityUserpicEffect _communityUserpicEffect;
+	bool _communityEffect = false;
 	QImage _monoforumMask;
 	std::unique_ptr<Ui::VideoUserpicPlayer> _videoUserpicPlayer;
 	std::unique_ptr<TopicIconView> _topicIconView;

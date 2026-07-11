@@ -28,6 +28,7 @@ struct LanguageId;
 
 namespace Data {
 struct Draft;
+class CommunityInfo;
 class Forum;
 class Session;
 class Folder;
@@ -449,6 +450,13 @@ public:
 		HistoryItem *folderDialogItem = nullptr);
 	void clearFolder();
 
+	[[nodiscard]] Data::CommunityInfo *communityListInfo() const {
+		return _communityInfo;
+	}
+	void updateCommunityRegistration();
+	void communityChatsListDateChanged(TimeId wasDate);
+	[[nodiscard]] bool isLinkedCommunityMember() const;
+
 	// Interface for Data::Histories.
 	void setInboxReadTill(MsgId upTo);
 	std::optional<int> countStillUnreadLocal(MsgId readTillId) const;
@@ -653,6 +661,7 @@ private:
 	bool _loadedAtBottom = true;
 
 	std::optional<Data::Folder*> _folder;
+	Data::CommunityInfo *_communityInfo = nullptr;
 
 	std::optional<MsgId> _inboxReadBefore;
 	std::optional<MsgId> _outboxReadBefore;

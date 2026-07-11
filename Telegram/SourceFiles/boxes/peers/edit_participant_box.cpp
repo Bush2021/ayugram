@@ -415,8 +415,11 @@ EditAdminBox::EditAdminBox(
 ChatAdminRightsInfo EditAdminBox::defaultRights() const {
 	using Flag = ChatAdminRight;
 
+	const auto channel = peer()->asChannel();
 	return peer()->isChat()
 		? peer()->asChat()->defaultAdminRights(user())
+		: (channel && channel->isCommunity())
+		? ChatAdminRightsInfo{ Flag::BanUsers }
 		: peer()->isMegagroup()
 		? ChatAdminRightsInfo{ (Flag::ChangeInfo
 			| Flag::DeleteMessages
@@ -581,6 +584,7 @@ void EditAdminBox::prepare() {
 	const auto options = Data::AdminRightsSetOptions{
 		.isGroup = isGroup,
 		.isForum = peer()->isForum(),
+		.isCommunity = (channel && channel->isCommunity()),
 		.anyoneCanAddMembers = anyoneCanAddMembers,
 		.canProcessJoinRequests = canProcessJoinRequests,
 	};
@@ -825,7 +829,7 @@ bool EditAdminBox::canTransferOwnership() const {
 	} else if (const auto chat = peer()->asChat()) {
 		return chat->amCreator();
 	} else if (const auto channel = peer()->asChannel()) {
-		return channel->amCreator();
+		return channel->amCreator() && !channel->isCommunity();
 	}
 	Unexpected("Chat type in EditAdminBox::canTransferOwnership.");
 }

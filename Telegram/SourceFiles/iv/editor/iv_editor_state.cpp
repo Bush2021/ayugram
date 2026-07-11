@@ -96,6 +96,40 @@ constexpr auto kMaxCommittedFieldLength = 256 * 1024;
 	return before;
 }
 
+[[nodiscard]] bool BlockConversionExpandsToActiveLine(InsertBlockType type) {
+	switch (type) {
+	case InsertBlockType::Heading:
+	case InsertBlockType::Blockquote:
+	case InsertBlockType::Pullquote:
+	case InsertBlockType::Code:
+		return true;
+	default:
+		return false;
+	}
+}
+
+void ExpandInsertContextToActiveLine(State::ActiveTextInsertContext &context) {
+	if (!context.selected.text.isEmpty()) {
+		return;
+	}
+	const auto lineStart = context.before.text.lastIndexOf('\n');
+	const auto lineEnd = context.after.text.indexOf('\n');
+	auto lineHead = Ui::Text::Mid(context.before, lineStart + 1);
+	auto lineTail = (lineEnd >= 0)
+		? Ui::Text::Mid(context.after, 0, lineEnd)
+		: context.after;
+	auto newBefore = (lineStart >= 0)
+		? Ui::Text::Mid(context.before, 0, lineStart)
+		: TextWithEntities();
+	auto newAfter = (lineEnd >= 0)
+		? Ui::Text::Mid(context.after, lineEnd + 1)
+		: TextWithEntities();
+	lineHead.append(std::move(lineTail));
+	context.before = std::move(newBefore);
+	context.selected = std::move(lineHead);
+	context.after = std::move(newAfter);
+}
+
 [[nodiscard]] bool RangeInsideText(
 		const QString &text,
 		int offset,
@@ -1336,6 +1370,7 @@ void InsertTableCellBeforeVisualColumn(
 	case BlockKind::Video:
 	case BlockKind::Audio:
 	case BlockKind::Map:
+	case BlockKind::GroupedMedia:
 		return true;
 	default:
 		return false;
@@ -1754,6 +1789,7 @@ QString State::activePlaceholderText() const {
 		case BlockKind::Video:
 		case BlockKind::Audio:
 		case BlockKind::Map:
+		case BlockKind::GroupedMedia:
 			return u"Caption"_q;
 		default:
 			return QString();
@@ -2907,6 +2943,264 @@ auto State::structuredClipboardDataForSelection(
 		return std::nullopt;
 	}
 	return std::nullopt;
+}
+
+std::shared_ptr<const RichPage> State::richPageForTableSelection(
+		const Markdown::PreparedEditSelection &selection) const {
+	auto blockPath = BlockPath();
+	auto rowFrom = 0;
+	auto rowTill = 0;
+	auto columnFrom = -1;
+	auto columnTill = -1;
+	if (selection.kind == PreparedEditSelectionKind::TableCells) {
+		const auto range = validateTableCellRange(selection.tableCells);
+		if (!range) {
+			return nullptr;
+		}
+		blockPath = range->block;
+		rowFrom = range->rowFrom;
+		rowTill = range->rowTill;
+		columnFrom = range->columnFrom;
+		columnTill = range->columnTill;
+	} else if (selection.kind == PreparedEditSelectionKind::TableRows) {
+		const auto range = validateTableRowRange(selection.tableRows);
+		if (!range) {
+			return nullptr;
+		}
+		blockPath = range->block;
+		rowFrom = range->from;
+		rowTill = range->till;
+	} else {
+		return nullptr;
+	}
+	const auto owner = block(blockPath);
+	if (!owner || owner->kind != BlockKind::Table) {
+		return nullptr;
+	}
+	const auto grid = BuildTableGrid(*owner, tableRenderLimits());
+	if (columnFrom < 0 || columnTill < 0) {
+		columnFrom = 0;
+		columnTill = grid.columnCount;
+	}
+	if (rowFrom < 0
+		|| rowTill <= rowFrom
+		|| columnFrom < 0
+		|| columnTill <= columnFrom) {
+		return nullptr;
+	}
+	const auto rectangle = StructuralTableCellRange{
+		.rowFrom = rowFrom,
+		.rowTill = rowTill,
+		.columnFrom = columnFrom,
+		.columnTill = columnTill,
+	};
+	const auto references = SelectedTableGridCells(grid, rectangle);
+	if (references.empty()) {
+		return nullptr;
+	}
+
+	auto page = std::make_shared<RichPage>();
+	if (references.size() == 1
+		&& (rowTill - rowFrom == 1)
+		&& (columnTill - columnFrom == 1)) {
+		const auto &reference = references.front();
+		const auto &row = owner->tableRows[reference.rowIndex];
+		auto paragraph = MakeParagraphBlock();
+		paragraph.text = row.cells[reference.cellIndex].text;
+		page->blocks.push_back(std::move(paragraph));
+		return page;
+	}
+
+	auto table = Block();
+	table.kind = BlockKind::Table;
+	table.bordered = owner->bordered;
+	table.striped = owner->striped;
+	table.tableRows.resize(rowTill - rowFrom);
+	for (const auto &reference : references) {
+		auto cell = owner->tableRows[reference.rowIndex]
+			.cells[reference.cellIndex];
+		const auto clampedRowFrom = std::max(reference.rowFrom, rowFrom);
+		const auto clampedRowTill = std::min(reference.rowTill, rowTill);
+		const auto clampedColumnFrom = std::max(reference.columnFrom, columnFrom);
+		const auto clampedColumnTill = std::min(reference.columnTill, columnTill);
+		cell.rowspan = std::max(clampedRowTill - clampedRowFrom, 1);
+		cell.colspan = std::max(clampedColumnTill - clampedColumnFrom, 1);
+		table.tableRows[clampedRowFrom - rowFrom].cells.push_back(
+			std::move(cell));
+	}
+	page->blocks.push_back(std::move(table));
+	return page;
+}
+
+bool State::insertPreparedBlocksAfterTableSelection(
+		const Markdown::PreparedEditSelection &selection,
+		std::vector<RichPage::Block> blocks) {
+	if (blocks.empty()) {
+		return false;
+	}
+	auto blockPath = std::optional<Markdown::PreparedEditBlockPath>();
+	if (selection.kind == PreparedEditSelectionKind::TableCells) {
+		if (selection.tableCells.empty()) {
+			return false;
+		}
+		blockPath = selection.tableCells.block;
+	} else if (selection.kind == PreparedEditSelectionKind::TableRows) {
+		if (selection.tableRows.empty()) {
+			return false;
+		}
+		blockPath = selection.tableRows.block;
+	} else {
+		return false;
+	}
+	const auto path = *blockPath;
+	return applyCheckedMutation(false, [
+			blocks = std::move(blocks),
+			path](State &candidate) mutable {
+		const auto container = candidate.convertBlockContainerPath(
+			path.container);
+		if (!container || !candidate.blockContainer(*container)) {
+			return CheckedMutationResult<bool>{ .result = false };
+		}
+		candidate.normalizeInsertedBlockAnchors(blocks);
+		auto insertAt = path.index + 1;
+		if (!candidate.insertPreparedBlocksAtExplicitPosition(
+				std::move(blocks),
+				*container,
+				&insertAt)) {
+			return CheckedMutationResult<bool>{ .result = false };
+		}
+		candidate.rebuild();
+		return CheckedMutationResult<bool>{ .apply = true, .result = true };
+	});
+}
+
+State::TableInPlaceApplyResult State::replaceTableSelectionCellsInPlace(
+		const Markdown::PreparedEditSelection &selection,
+		const RichPage &page) {
+	if (page.blocks.size() != 1
+		|| page.blocks.front().kind != BlockKind::Table) {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	const auto source = richPageForTableSelection(selection);
+	if (!source
+		|| source->blocks.size() != 1
+		|| source->blocks.front().kind != BlockKind::Table) {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	const auto &sourceTable = source->blocks.front();
+	const auto &resultTable = page.blocks.front();
+	if (sourceTable.tableRows.size() != resultTable.tableRows.size()) {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	auto texts = std::vector<RichText>();
+	auto unchanged = true;
+	for (auto row = 0, rows = int(sourceTable.tableRows.size());
+			row != rows;
+			++row) {
+		const auto &sourceCells = sourceTable.tableRows[row].cells;
+		const auto &resultCells = resultTable.tableRows[row].cells;
+		if (sourceCells.size() != resultCells.size()) {
+			return TableInPlaceApplyResult::StructureMismatch;
+		}
+		for (auto index = 0, count = int(sourceCells.size());
+				index != count;
+				++index) {
+			const auto &sourceCell = sourceCells[index];
+			const auto &resultCell = resultCells[index];
+			if (NormalizeTableSpan(sourceCell.colspan)
+					!= NormalizeTableSpan(resultCell.colspan)
+				|| NormalizeTableSpan(sourceCell.rowspan)
+					!= NormalizeTableSpan(resultCell.rowspan)) {
+				return TableInPlaceApplyResult::StructureMismatch;
+			}
+			if (sourceCell.text != resultCell.text) {
+				unchanged = false;
+			}
+			texts.push_back(resultCell.text);
+		}
+	}
+	if (unchanged) {
+		return TableInPlaceApplyResult::Unchanged;
+	}
+	auto preparedPath = Markdown::PreparedEditBlockPath();
+	auto blockPath = BlockPath();
+	auto rowFrom = 0;
+	auto rowTill = 0;
+	auto columnFrom = -1;
+	auto columnTill = -1;
+	if (selection.kind == PreparedEditSelectionKind::TableCells) {
+		const auto range = validateTableCellRange(selection.tableCells);
+		if (!range) {
+			return TableInPlaceApplyResult::StructureMismatch;
+		}
+		preparedPath = selection.tableCells.block;
+		blockPath = range->block;
+		rowFrom = range->rowFrom;
+		rowTill = range->rowTill;
+		columnFrom = range->columnFrom;
+		columnTill = range->columnTill;
+	} else if (selection.kind == PreparedEditSelectionKind::TableRows) {
+		const auto range = validateTableRowRange(selection.tableRows);
+		if (!range) {
+			return TableInPlaceApplyResult::StructureMismatch;
+		}
+		preparedPath = selection.tableRows.block;
+		blockPath = range->block;
+		rowFrom = range->from;
+		rowTill = range->till;
+	} else {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	const auto owner = block(blockPath);
+	if (!owner || owner->kind != BlockKind::Table) {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	const auto grid = BuildTableGrid(*owner, tableRenderLimits());
+	if (columnFrom < 0 || columnTill < 0) {
+		columnFrom = 0;
+		columnTill = grid.columnCount;
+	}
+	if (rowFrom < 0
+		|| rowTill <= rowFrom
+		|| columnFrom < 0
+		|| columnTill <= columnFrom) {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	const auto rectangle = StructuralTableCellRange{
+		.rowFrom = rowFrom,
+		.rowTill = rowTill,
+		.columnFrom = columnFrom,
+		.columnTill = columnTill,
+	};
+	const auto references = SelectedTableGridCells(grid, rectangle);
+	if (references.size() != texts.size()) {
+		return TableInPlaceApplyResult::StructureMismatch;
+	}
+	const auto applied = applyCheckedMutation(false, [&](State &candidate) {
+		const auto path = candidate.convertBlockPath(preparedPath);
+		if (!path) {
+			return CheckedMutationResult<bool>{ .result = false };
+		}
+		const auto table = candidate.block(*path);
+		if (!table || table->kind != BlockKind::Table) {
+			return CheckedMutationResult<bool>{ .result = false };
+		}
+		for (auto i = 0, count = int(references.size()); i != count; ++i) {
+			const auto cell = candidate.tableCell(
+				*path,
+				references[i].rowIndex,
+				references[i].cellIndex);
+			if (!cell) {
+				return CheckedMutationResult<bool>{ .result = false };
+			}
+			cell->text = std::move(texts[i]);
+		}
+		candidate.rebuild();
+		return CheckedMutationResult<bool>{ .apply = true, .result = true };
+	});
+	return applied
+		? TableInPlaceApplyResult::Applied
+		: TableInPlaceApplyResult::Failed;
 }
 
 bool State::addTableRow(
@@ -5579,6 +5873,7 @@ std::optional<int> State::submitActiveSingleLineFieldUnchecked() {
 		case BlockKind::Video:
 		case BlockKind::Audio:
 		case BlockKind::Map:
+		case BlockKind::GroupedMedia:
 			return paragraphAfterBlock();
 		default:
 			return std::nullopt;
@@ -7431,6 +7726,7 @@ State::ActiveTextBlockActionResult State::applyActiveTextBlockAction(
 			&& candidate.unwrapActiveCodeBlockUnchecked(context, &target)) {
 			return changed();
 		}
+		ExpandInsertContextToActiveLine(context);
 		auto blocks = std::vector<Block>();
 		blocks.push_back(candidate.makeBlock(action));
 		const auto applied = candidate.insertBlocksAfterActiveUnchecked(
@@ -7459,11 +7755,60 @@ State::ActiveTextBlockActionResult State::applyActiveTextBlockAction(
 	});
 }
 
+State::ActiveTextBlockActionResult State::replaceActiveTextSelectionWithText(
+		TextWithEntities text,
+		ActiveTextInsertContext context) {
+	return applyCheckedMutation(ActiveTextBlockActionResult{
+		.result = ApplyResult::Failed,
+	}, [text = std::move(text), context = std::move(context)](
+			State &candidate) mutable {
+		const auto failed = [&] {
+			return CheckedMutationResult<ActiveTextBlockActionResult>{
+				.result = ActiveTextBlockActionResult{
+					.result = ApplyResult::Failed,
+				},
+			};
+		};
+		if (text.text.isEmpty()) {
+			return failed();
+		}
+		const auto descriptor = candidate.textNode(
+			candidate._activeTextOrdinal);
+		if (!descriptor || (descriptor->leaf.kind == LeafKind::MathFormula)) {
+			return failed();
+		}
+		const auto selectionFrom = int(context.before.text.size());
+		const auto selectionTo = selectionFrom + int(text.text.size());
+		const auto applied = candidate.applyActiveTextUnchecked(JoinText(
+			std::move(context.before),
+			std::move(text),
+			std::move(context.after)));
+		if (applied == ApplyResult::Failed) {
+			return failed();
+		}
+		const auto updated = candidate.textNode(candidate._activeTextOrdinal);
+		return CheckedMutationResult<ActiveTextBlockActionResult>{
+			.apply = true,
+			.result = {
+				.result = ApplyResult::Changed,
+				.destinationLeaf = (updated
+					? updated->leaf
+					: descriptor->leaf),
+				.selectionFrom = selectionFrom,
+				.selectionTo = selectionTo,
+			},
+		};
+	});
+}
+
 bool State::insertBlockAfterActive(
 		InsertAction action,
 		std::optional<ActiveTextInsertContext> context) {
 	return applyCheckedMutation(false, [action, context = std::move(context)](
 			State &candidate) mutable {
+		if (context && BlockConversionExpandsToActiveLine(action.type)) {
+			ExpandInsertContextToActiveLine(*context);
+		}
 		auto blocks = std::vector<Block>();
 		blocks.push_back(candidate.makeBlock(action));
 		if (action.type == InsertBlockType::Divider) {
@@ -8186,6 +8531,7 @@ void State::rebuildTextNodes(
 		case BlockKind::Video:
 		case BlockKind::Audio:
 		case BlockKind::Map:
+		case BlockKind::GroupedMedia:
 			appendBlockTextNode(path, LeafKind::BlockCaption);
 			break;
 		case BlockKind::Math:
@@ -8406,6 +8752,29 @@ std::optional<int> State::adjacentEditableOrdinal(bool forward) const {
 		: std::nullopt;
 }
 
+std::optional<int> State::firstTableCellOrdinalFromActiveTitle() const {
+	const auto descriptor = textNode(_activeTextOrdinal);
+	if (!descriptor) {
+		return std::nullopt;
+	}
+	const auto leaf = descriptor->leaf;
+	if (leaf.kind != LeafKind::BlockText) {
+		return std::nullopt;
+	}
+	const auto owner = block(leaf.block);
+	if (!owner || owner->kind != BlockKind::Table) {
+		return std::nullopt;
+	}
+	for (auto i = 0, count = textNodeCount(); i != count; ++i) {
+		const auto &candidate = _textNodes[i].leaf;
+		if (candidate.block == leaf.block
+			&& candidate.kind == LeafKind::TableCellText) {
+			return i;
+		}
+	}
+	return std::nullopt;
+}
+
 void State::collectBoundarySteps(
 		const std::vector<Block> &blocks,
 		const BlockContainerPath &container,
@@ -8513,6 +8882,7 @@ void State::collectBoundarySteps(
 		case BlockKind::Video:
 		case BlockKind::Audio:
 		case BlockKind::Map:
+		case BlockKind::GroupedMedia:
 			appendBoundaryTextStep({
 				.kind = LeafKind::BlockCaption,
 				.block = path,

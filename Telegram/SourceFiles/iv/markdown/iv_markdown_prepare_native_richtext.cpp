@@ -639,6 +639,8 @@ bool PrepareNativeIvGroupedMediaBlock(
 	block.anchorId = data.anchorId.isEmpty() ? std::move(anchorId) : data.anchorId;
 	block.anchorIds = std::move(preparedCaption.anchorIds);
 	block.supplementary = true;
+	block.forceTextSegment = state->editMode;
+	ApplyEmptyMediaCaptionPlaceholder(&block, state);
 	block.groupedMedia.caption = block.text;
 	result->push_back(std::move(block));
 	return true;
