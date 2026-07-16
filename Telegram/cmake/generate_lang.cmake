@@ -39,13 +39,28 @@ function(generate_lang target_name lang_file src_loc)
         ${src_loc}/*.mm
     )
 
+    # Xcode resolves precompiled headers through its SharedPrecompiledHeaders
+    # cache, which is keyed on the full command line of each translation unit.
+    # A per-source LANG_KEYS_SUBSET define makes every command line unique, so
+    # the shared prefix header gets precompiled once per source file and fills
+    # up the disk. Other generators precompile once per target and pass the
+    # result with -include, so the define is free there. Without the define the
+    # generated lang header falls back to the full keys header, which only
+    # costs compile time.
+    set(use_subset_defines TRUE)
+    if (CMAKE_GENERATOR STREQUAL "Xcode")
+        set(use_subset_defines FALSE)
+    endif()
+
     set(subset_headers "")
     foreach (entry ${lang_sources})
         if (entry MATCHES "\\.(cpp|mm)$")
             file(RELATIVE_PATH relative ${src_loc} ${entry})
             list(APPEND subset_headers ${gen_dst}/lang_subsets/${relative}.h)
-            set_property(SOURCE ${entry} APPEND PROPERTY COMPILE_DEFINITIONS
-                "LANG_KEYS_SUBSET=\"lang_subsets/${relative}.h\"")
+            if (use_subset_defines)
+                set_property(SOURCE ${entry} APPEND PROPERTY COMPILE_DEFINITIONS
+                    "LANG_KEYS_SUBSET=\"lang_subsets/${relative}.h\"")
+            endif()
         endif()
     endforeach()
 
