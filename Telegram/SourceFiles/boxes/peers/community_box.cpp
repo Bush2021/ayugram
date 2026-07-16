@@ -175,7 +175,11 @@ void ShowCommunityChatJoinConfirm(
 	const auto joinable = channel
 		&& (!community->isHidden(peer) || channel->amCreator());
 	if (!joinable) {
-		show->showToast(tr::lng_community_hidden_not_accessible(tr::now));
+		show->showToast(peer->isUser()
+			? tr::lng_community_hidden_not_accessible_bot(tr::now)
+			: peer->isBroadcast()
+			? tr::lng_community_hidden_not_accessible_channel(tr::now)
+			: tr::lng_community_hidden_not_accessible(tr::now));
 		return;
 	}
 	const auto join = [=](Fn<void()> close) {

@@ -32,6 +32,7 @@ public:
 		not_null<AbstractController*> parent,
 		not_null<Data::SavedSublist*> sublist)
 	: AbstractController(parent->parentController())
+	, _parent(parent)
 	, _key(sublist) {
 	}
 
@@ -44,8 +45,12 @@ public:
 	::Info::Section section() const override {
 		return ::Info::Section(::Info::Section::Type::SavedSublists);
 	}
+	style::color listBackground() const override {
+		return _parent->listBackground();
+	}
 
 private:
+	const not_null<AbstractController*> _parent;
 	const Key _key;
 
 };
@@ -184,7 +189,7 @@ MediaTabDescriptor MakeSavedTabDescriptor(not_null<PeerData*> peer) {
 	using namespace rpl::mappers;
 	return {
 		.id = u"saved"_q,
-		.title = tr::lng_media_type_saved(),
+		.title = tr::lng_media_type_saved(tr::marked),
 		.shown = SavedSublistCountValue(peer) | rpl::map(_1 > 0),
 		.factory = [](MediaTabContext context) {
 			return std::make_unique<SavedTabAdapter>(std::move(context));

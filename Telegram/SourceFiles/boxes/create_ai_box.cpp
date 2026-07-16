@@ -424,6 +424,10 @@ void CreateAiBox(not_null<Ui::GenericBox*> box, CreateAiBoxArgs &&args) {
 	});
 	state->prompt = prompt;
 
+	box->setShowFinishedCallback([=] {
+		prompt->setFocusFast();
+	});
+
 	const auto promptPad = st::aiToneFieldPadding;
 	const auto promptLineHeight = st::aiTonePromptField.style.font->height;
 	const auto promptMaxLines = 7;

@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "lang/lang_keys.h"
 #include "info/info_controller.h"
+#include "base/event_filter.h"
 #include "styles/style_info.h"
 
 #include <QtWidgets/QApplication>
@@ -188,6 +189,24 @@ Widget::Widget(
 			_pinnedToBottom->heightValue(),
 			heightValue()
 		) | rpl::on_next(processHeight, _pinnedToBottom->lifetime());
+	}
+
+	if (const auto host = _inner->tabsHost()) {
+		const auto wheels = lifetime().make_state<rpl::event_stream<>>();
+		base::install_event_filter(scroll()->viewport(), [=](
+				not_null<QEvent*> e) {
+			if (e->type() == QEvent::Wheel) {
+				wheels->fire({});
+			}
+			return base::EventFilterResult::Continue;
+		});
+		host->trackVerticalScroll(rpl::merge(
+			scroll()->scrollTopChanges() | rpl::to_empty,
+			wheels->events()));
+		scroll()->scrollTopValue(
+		) | rpl::on_next([=](int scrollTop) {
+			host->setScrolledToTop(scrollTop <= 0);
+		}, lifetime());
 	}
 
 	setupTabsStripFloat();

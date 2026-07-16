@@ -198,6 +198,7 @@ private:
 	void setupStoryOutline(const QRect &geometry = QRect());
 	void updateStoryOutline(std::optional<QColor> edgeColor);
 	void paintStoryOutline(QPainter &p, const QRect &geometry);
+	void updateTitlePosition(float64 progressCurrent);
 	void updateStatusPosition(float64 progressCurrent);
 	void applyTabBindings(TabTopBarBindings &&bindings);
 	void updateTabSwapVisibility();

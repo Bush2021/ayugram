@@ -9,10 +9,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/object_ptr.h"
 #include "base/flat_map.h"
+#include "base/unique_qptr.h"
 #include "info/profile/tabs/info_profile_tab_content.h"
 #include "ui/rp_widget.h"
 
 namespace Ui {
+class PopupMenu;
 class RpWidget;
 class SlideAnimation;
 struct ScrollToRequest;
@@ -37,15 +39,20 @@ public:
 	~TabsHost();
 
 	[[nodiscard]] rpl::producer<MediaTabContent*> activeTabValue() const;
-	[[nodiscard]] rpl::producer<TabTopBarBindings> activeTabBindings() const;
+	[[nodiscard]] rpl::producer<TabTopBarBindings> activeTabBindings();
 	[[nodiscard]] rpl::producer<Ui::ScrollToRequest> scrollToRequests() const;
 
 	[[nodiscard]] not_null<Ui::RpWidget*> stripWidget() const;
 	void returnStrip();
+	void trackVerticalScroll(rpl::producer<> scrolls);
 	void setVisibleRegion(int top, int bottom);
+	void setScrolledToTop(bool scrolledToTop);
 
 	[[nodiscard]] QString activeId() const {
 		return _activeId;
+	}
+	[[nodiscard]] bool searching() const {
+		return _searching;
 	}
 	void activateTab(const QString &id, bool animated = true);
 	void restoreActiveTab(const QString &id);
@@ -60,6 +67,20 @@ protected:
 private:
 	void wireStripTitles();
 	void wireTabsVisibility();
+	void wireMainTab();
+	bool refreshOrder();
+	[[nodiscard]] int displayPosition(int index) const;
+	[[nodiscard]] int firstVisibleIndex() const;
+	[[nodiscard]] bool canSetMainTab(Data::ProfileTab tab) const;
+	[[nodiscard]] Fn<void()> openInWindowFor(
+		const MediaTabDescriptor &tab) const;
+	void showTabMenu(const QString &id);
+	void setMainTab(Data::ProfileTab tab);
+	[[nodiscard]] QString mediaTabShownId(Storage::SharedMediaType type) const;
+	[[nodiscard]] auto activeMediaType() const
+		-> std::optional<Storage::SharedMediaType>;
+	[[nodiscard]] QString mediaSplitCounterpart() const;
+	[[nodiscard]] bool mediaSplitSwitching() const;
 	void syncStripTitles();
 	void ensureActiveVisible();
 	void pushViewportToActive();
@@ -67,6 +88,7 @@ private:
 	void scheduleHeightSync();
 	void syncBodyNow();
 	void syncHeightNow();
+	void scrollToBodyTop();
 	[[nodiscard]] QRect bodyVisibleRect() const;
 	void startSlideAnimation(
 		QPixmap wasCache,
@@ -75,11 +97,14 @@ private:
 
 	const MediaTabContext _context;
 	std::vector<MediaTabDescriptor> _tabs;
-	std::vector<QString> _stripTitles;
+	std::vector<TextWithEntities> _stripTitles;
 	std::vector<bool> _tabsShown;
+	std::vector<int> _order;
+	int _mainTabIndex = -1;
 
 	TabsStrip *_strip = nullptr;
 	base::weak_qptr<TabsStrip> _stripWeak;
+	base::unique_qptr<Ui::PopupMenu> _menu;
 	Ui::RpWidget *_body = nullptr;
 	int _stripHeight = 0;
 	int _visibleTop = 0;
@@ -96,6 +121,8 @@ private:
 	bool _userChosenTab = false;
 	bool _bodySyncQueued = false;
 	bool _heightSyncQueued = false;
+	bool _scrolledToTop = true;
+	bool _searching = false;
 	int _keepMinHeight = 0;
 	rpl::variable<MediaTabContent*> _activeTab = nullptr;
 

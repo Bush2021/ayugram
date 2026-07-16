@@ -1841,7 +1841,9 @@ void Controller::fillCommunitySection() {
 		Ui::AddSkip(container);
 		Ui::AddDividerText(container, isBot
 			? tr::lng_community_add_about_bot()
-			: tr::lng_community_add_about());
+			: _isGroup
+			? tr::lng_community_add_about()
+			: tr::lng_community_add_about_channel());
 	}
 }
 

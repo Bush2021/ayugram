@@ -43,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/stories/media_stories_stealth.h"
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
+#include "lang/lang_numbers_animation.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
@@ -165,6 +166,7 @@ ListWidget::ListWidget(
 : RpWidget(parent)
 , _controller(controller)
 , _provider(MakeProvider(_controller))
+, _rowsScrollCache([=] { update(); })
 , _dateBadge(std::make_unique<DateBadge>(
 	_provider->type(),
 	[=] { scrollDateCheck(); },
@@ -188,12 +190,18 @@ void ListWidget::start() {
 
 	_controller->setSearchEnabledByContent(false);
 
+	style::PaletteChanged(
+	) | rpl::on_next([=] {
+		_rowsScrollCache.clear();
+	}, lifetime());
+
 	_provider->layoutRemoved(
 	) | rpl::on_next([=](not_null<BaseLayout*> layout) {
 		if (_overLayout == layout) {
 			_overLayout = nullptr;
 		}
 		_heavyLayouts.remove(layout);
+		_rowsScrollCache.invalidate(GetLayoutCacheKey(layout));
 	}, lifetime());
 
 	_provider->refreshed(
@@ -251,6 +259,7 @@ void ListWidget::subscribeToSession(
 		rpl::lifetime &lifetime) {
 	session->downloaderTaskFinished(
 	) | rpl::on_next([=] {
+		_rowsScrollCache.clear();
 		update();
 	}, lifetime);
 
@@ -403,6 +412,7 @@ void ListWidget::restart() {
 	_overLayout = nullptr;
 	_sections.clear();
 	_heavyLayouts.clear();
+	_rowsScrollCache.clear();
 
 	_provider->restart();
 
@@ -472,6 +482,16 @@ auto ListWidget::collectSelectedItems() const -> SelectedItems {
 		return convert(item.first, item.second);
 	};
 	auto items = SelectedItems(_provider->type());
+	if (_provider->type() == Type::PhotoVideo
+		&& !_controller->storiesPeer()) {
+		items.title = [](int count) {
+			return tr::lng_media_selected_media(
+				tr::now,
+				lt_count,
+				count,
+				Ui::StringWithNumbers::FromString);
+		};
+	}
 	if (hasSelectedItems()) {
 		items.list.reserve(_selected.size());
 		std::transform(
@@ -550,6 +570,7 @@ void ListWidget::itemLayoutChanged(
 
 void ListWidget::repaintItem(const HistoryItem *item) {
 	if (const auto found = findItemByItem(item)) {
+		_rowsScrollCache.invalidate(GetLayoutCacheKey(found->layout));
 		repaintItem(found->geometry);
 	}
 }
@@ -813,6 +834,9 @@ auto ListWidget::foundItemInSection(
 void ListWidget::visibleTopBottomUpdated(
 		int visibleTop,
 		int visibleBottom) {
+	if (_visibleTop != visibleTop || _visibleBottom != visibleBottom) {
+		_rowsScrollCache.markScrolling();
+	}
 	_visibleTop = visibleTop;
 	_visibleBottom = visibleBottom;
 
@@ -1049,6 +1073,9 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 		&_dragSelected,
 		_dragSelectAction
 	};
+	context.scrollCache = &_rowsScrollCache;
+	context.hoveredItem = _overLayout;
+	context.bg = _controller->listBackground();
 	if (_mouseAction == MouseAction::Reordering && _reorderState.item) {
 		context.draggedItem = _reorderState.item;
 	}

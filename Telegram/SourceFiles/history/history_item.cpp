@@ -75,6 +75,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "payments/payments_non_panel_process.h" // ProcessNonPanelPaymentFormFactory.
 #include "platform/platform_notifications_manager.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
+#include "styles/style_dialogs.h"
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -4711,10 +4712,14 @@ ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
 		// Don't show small media for service messages (chat photo changed).
 		// Because larger version is shown exactly to the left of the small.
 		//auto media = _media ? _media->toPreview(options) : ItemPreview();
+		auto text = Ui::Text::Colorized(notificationText());
+		if (_media && _media->gift()) {
+			text = Ui::Text::Colorized(
+				Ui::Text::IconEmoji(&st::dialogsMiniGiftIcon)
+			).append(std::move(text));
+		}
 		return {
-			.text = Ui::Text::Colorized(notificationText()),
-			//.images = std::move(media.images),
-			//.loadingContext = std::move(media.loadingContext),
+			.text = std::move(text),
 		};
 	}
 
@@ -7608,6 +7613,12 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 					fromLinkText(),
 					tr::marked);
 			}
+		} else if (fromChatItself) {
+			result.text = (_history->peer->isBroadcast()
+				? tr::lng_action_community_removed_channel
+				: tr::lng_action_community_removed_chat)(
+					tr::now,
+					tr::marked);
 		} else {
 			result.links.push_back(fromLink());
 			result.text = tr::lng_action_community_removed(

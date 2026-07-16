@@ -124,8 +124,10 @@ struct PeerUpdate {
 		GroupCall           = (1ULL << 55),
 		ManagedBot          = (1ULL << 56),
 
+		MainProfileTab      = (1ULL << 57),
+
 		// For iteration
-		LastUsedBit         = (1ULL << 56),
+		LastUsedBit         = (1ULL << 57),
 	};
 	using Flags = base::flags<Flag>;
 	friend inline constexpr auto is_flag_type(Flag) { return true; }

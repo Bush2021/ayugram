@@ -1425,6 +1425,7 @@ void ApplyChannelUpdate(
 	channel->setKickedCount(update.vkicked_count().value_or_empty());
 	channel->setSlowmodeSeconds(update.vslowmode_seconds().value_or_empty());
 	channel->setPeerGiftsCount(update.vstargifts_count().value_or_empty());
+	channel->setMainProfileTab(Data::ParseProfileTab(update.vmain_tab()));
 	if (const auto next = update.vslowmode_next_send_date()) {
 		channel->growSlowmodeLastMessage(
 			next->v - channel->slowmodeSeconds());

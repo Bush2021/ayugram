@@ -95,6 +95,7 @@ object_ptr<Ui::RpWidget> CreateTabSkeleton(
 		switch (type) {
 		case Type::Photo:
 		case Type::Video:
+		case Type::PhotoVideo:
 		case Type::GIF:
 			PaintGridSkeleton(p, width, height);
 			break;

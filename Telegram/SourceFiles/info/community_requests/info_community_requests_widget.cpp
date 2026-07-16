@@ -234,6 +234,7 @@ void MessageGroupOwnerBox(
 		style::al_top);
 
 	const auto bot = chat->isUser();
+	const auto broadcast = chat->isBroadcast();
 	if (!bot) {
 		Ui::AddSkip(content, st::boostTextSkip);
 		const auto channel = chat->asChannel();
@@ -243,7 +244,9 @@ void MessageGroupOwnerBox(
 		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
-				tr::lng_chat_status_members(tr::now, lt_count, count),
+				(broadcast
+					? tr::lng_chat_status_subscribers
+					: tr::lng_chat_status_members)(tr::now, lt_count, count),
 				st::showOrLabel),
 			st::boxRowPadding,
 			style::al_top);
@@ -254,6 +257,8 @@ void MessageGroupOwnerBox(
 		.append(' ')
 		.append((bot
 			? tr::lng_community_request_invite_only_bot
+			: broadcast
+			? tr::lng_community_request_invite_only_channel
 			: tr::lng_community_request_invite_only)(tr::now));
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
@@ -270,6 +275,8 @@ void MessageGroupOwnerBox(
 			content,
 			(bot
 				? tr::lng_community_request_message_owner_bot()
+				: broadcast
+				? tr::lng_community_request_message_owner_channel()
 				: tr::lng_community_request_message_owner()),
 			st::defaultActiveButton),
 		st::boxRowPadding,

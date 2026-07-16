@@ -103,6 +103,7 @@ constexpr auto kMaxCommittedFieldLength = 256 * 1024;
 	case InsertBlockType::Blockquote:
 	case InsertBlockType::Pullquote:
 	case InsertBlockType::Code:
+	case InsertBlockType::Footer:
 		return true;
 	default:
 		return false;
@@ -1793,16 +1794,14 @@ QString State::activePlaceholderText() const {
 	switch (descriptor->leaf.kind) {
 	case LeafKind::BlockText:
 		switch (owner->kind) {
-		case BlockKind::Paragraph:
-		case BlockKind::Footer:
-		case BlockKind::Code:
-			return tr::lng_article_placeholder_text(tr::now);
 		case BlockKind::Quote:
 			return tr::lng_article_placeholder_quote(tr::now);
 		case BlockKind::Heading:
 			return Markdown::HeadingLevelLabel(owner->headingLevel);
+		case BlockKind::Footer:
+			return tr::lng_article_insert_footer(tr::now);
 		case BlockKind::Details:
-			return tr::lng_article_placeholder_header(tr::now);
+			return tr::lng_article_table_header(tr::now);
 		default:
 			return QString();
 		}
@@ -1815,14 +1814,19 @@ QString State::activePlaceholderText() const {
 		case BlockKind::Audio:
 		case BlockKind::Map:
 		case BlockKind::GroupedMedia:
-			return tr::lng_article_placeholder_caption(tr::now);
+			return tr::lng_photo_caption(tr::now);
 		default:
 			return QString();
 		}
-	case LeafKind::ListItemText:
-		return tr::lng_article_placeholder_text(tr::now);
-	case LeafKind::TableCellText:
-		return tr::lng_article_placeholder_cell(tr::now);
+	case LeafKind::TableCellText: {
+		const auto cell = tableCell(
+			descriptor->leaf.block,
+			descriptor->leaf.tableRowIndex,
+			descriptor->leaf.tableCellIndex);
+		return (cell && cell->header)
+			? tr::lng_article_table_header(tr::now)
+			: tr::lng_article_placeholder_cell(tr::now);
+	}
 	case LeafKind::MathFormula:
 		return u"x^2 + y^2"_q;
 	}
@@ -1971,16 +1975,18 @@ State::ApplyResult State::applyFormattingToTextSpans(
 					RemoveTagFromSelection(&converted.text.tags, *tag);
 				}
 			}
-			auto demotedHeading = false;
+			auto demoted = false;
 			if (action == TextFormattingAction::PlainText
 				&& span.leaf.kind == LeafKind::BlockText
 				&& before.text.isEmpty()
 				&& after.text.isEmpty()) {
 				if (const auto owner = candidate.block(span.leaf.block);
-					owner && owner->kind == BlockKind::Heading) {
+					owner
+					&& (owner->kind == BlockKind::Heading
+						|| owner->kind == BlockKind::Footer)) {
 					owner->kind = BlockKind::Paragraph;
 					owner->headingLevel = 0;
-					demotedHeading = true;
+					demoted = true;
 				}
 			}
 			auto updated = JoinText(
@@ -1991,7 +1997,7 @@ State::ApplyResult State::applyFormattingToTextSpans(
 				current->text = std::move(updated);
 				changed = true;
 			}
-			if (demotedHeading) {
+			if (demoted) {
 				changed = true;
 			}
 		}
@@ -3872,7 +3878,8 @@ bool State::isActiveTopLevelParagraphOrHeading() const {
 	const auto owner = block(descriptor->leaf.block);
 	return owner
 		&& ((owner->kind == BlockKind::Paragraph)
-			|| (owner->kind == BlockKind::Heading));
+			|| (owner->kind == BlockKind::Heading)
+			|| (owner->kind == BlockKind::Footer));
 }
 
 bool State::activeSurfaceAllowsSeparateLineFormula() const {
@@ -5832,9 +5839,11 @@ std::optional<int> State::moveActiveSpecialBlockDown() {
 	});
 }
 
-std::optional<int> State::submitActiveSingleLineField() {
-	return applyCheckedMutation(std::optional<int>(), [](State &candidate) {
-		const auto result = candidate.submitActiveSingleLineFieldUnchecked();
+std::optional<int> State::submitActiveSingleLineField(
+		const ActiveEnterContext &context) {
+	return applyCheckedMutation(std::optional<int>(), [=](State &candidate) {
+		const auto result = candidate.submitActiveSingleLineFieldUnchecked(
+			context);
 		return CheckedMutationResult<std::optional<int>>{
 			.apply = result.has_value(),
 			.result = result,
@@ -5917,7 +5926,8 @@ std::optional<int> State::moveActiveSpecialBlockDownUnchecked() {
 	return activateRebuiltLeaf(*target);
 }
 
-std::optional<int> State::submitActiveSingleLineFieldUnchecked() {
+std::optional<int> State::submitActiveSingleLineFieldUnchecked(
+		const ActiveEnterContext &context) {
 	const auto descriptor = textNode(_activeTextOrdinal);
 	if (!descriptor) {
 		return std::nullopt;
@@ -5942,6 +5952,22 @@ std::optional<int> State::submitActiveSingleLineFieldUnchecked() {
 		}
 		return std::nullopt;
 	};
+	const auto paragraphBeforeBlock = [&]() -> std::optional<int> {
+		const auto blocks = blockContainer(leaf.block.container);
+		if (!blocks
+			|| leaf.block.index < 0
+			|| leaf.block.index >= int(blocks->size())) {
+			return std::nullopt;
+		}
+		clearTemporaryDownParagraph();
+		blocks->insert(
+			blocks->begin() + leaf.block.index,
+			MakeParagraphBlock());
+		auto shifted = leaf;
+		++shifted.block.index;
+		rebuild();
+		return activateRebuiltLeaf(shifted);
+	};
 	if (leaf.kind == LeafKind::BlockCaption) {
 		switch (owner->kind) {
 		case BlockKind::Quote:
@@ -5950,12 +5976,25 @@ std::optional<int> State::submitActiveSingleLineFieldUnchecked() {
 		case BlockKind::Audio:
 		case BlockKind::Map:
 		case BlockKind::GroupedMedia:
+			if (context.position == EnterPosition::Middle) {
+				return std::nullopt;
+			} else if (context.position == EnterPosition::Beginning) {
+				return paragraphBeforeBlock();
+			}
 			return paragraphAfterBlock();
 		default:
 			return std::nullopt;
 		}
 	}
 	if (leaf.kind == LeafKind::BlockText) {
+		if (owner->kind == BlockKind::Details
+			|| owner->kind == BlockKind::Table) {
+			if (context.position == EnterPosition::Middle) {
+				return std::nullopt;
+			} else if (context.position == EnterPosition::Beginning) {
+				return paragraphBeforeBlock();
+			}
+		}
 		if (owner->kind == BlockKind::Details) {
 			const auto bodyContainer = BlockChildrenContainer(leaf.block);
 			auto target = std::optional<LeafPath>();
@@ -6214,9 +6253,11 @@ State::BoundaryTarget State::removeTemporaryDownParagraphAndMoveUnchecked() {
 	return materialized;
 }
 
-std::optional<int> State::handleActiveHeadingEnter() {
-	return applyCheckedMutation(std::optional<int>(), [](State &candidate) {
-		const auto result = candidate.handleActiveHeadingEnterUnchecked();
+std::optional<int> State::handleActiveHeadingEnter(
+		const ActiveEnterContext &context) {
+	return applyCheckedMutation(std::optional<int>(), [=](State &candidate) {
+		const auto result = candidate.handleActiveHeadingEnterUnchecked(
+			context);
 		return CheckedMutationResult<std::optional<int>>{
 			.apply = result.has_value(),
 			.result = result,
@@ -6224,7 +6265,48 @@ std::optional<int> State::handleActiveHeadingEnter() {
 	});
 }
 
-std::optional<int> State::handleActiveHeadingEnterUnchecked() {
+std::optional<int> State::handleActiveHeadingEnterUnchecked(
+		const ActiveEnterContext &context) {
+	return handleActiveBlockEnterUnchecked(BlockKind::Heading, context);
+}
+
+std::optional<int> State::handleActiveFooterEnter(
+		const ActiveEnterContext &context) {
+	return applyCheckedMutation(std::optional<int>(), [=](State &candidate) {
+		const auto result = candidate.handleActiveFooterEnterUnchecked(
+			context);
+		return CheckedMutationResult<std::optional<int>>{
+			.apply = result.has_value(),
+			.result = result,
+		};
+	});
+}
+
+std::optional<int> State::handleActiveFooterEnterUnchecked(
+		const ActiveEnterContext &context) {
+	return handleActiveBlockEnterUnchecked(BlockKind::Footer, context);
+}
+
+std::optional<int> State::handleActiveParagraphEnter(
+		const ActiveEnterContext &context) {
+	return applyCheckedMutation(std::optional<int>(), [=](State &candidate) {
+		const auto result = candidate.handleActiveParagraphEnterUnchecked(
+			context);
+		return CheckedMutationResult<std::optional<int>>{
+			.apply = result.has_value(),
+			.result = result,
+		};
+	});
+}
+
+std::optional<int> State::handleActiveParagraphEnterUnchecked(
+		const ActiveEnterContext &context) {
+	return handleActiveBlockEnterUnchecked(BlockKind::Paragraph, context);
+}
+
+std::optional<int> State::handleActiveBlockEnterUnchecked(
+		BlockKind kind,
+		const ActiveEnterContext &context) {
 	const auto descriptor = textNode(_activeTextOrdinal);
 	if (!descriptor || descriptor->leaf.kind != LeafKind::BlockText) {
 		return std::nullopt;
@@ -6234,19 +6316,52 @@ std::optional<int> State::handleActiveHeadingEnterUnchecked() {
 	if (!blocks
 		|| path.index < 0
 		|| path.index >= int(blocks->size())
-		|| (*blocks)[path.index].kind != BlockKind::Heading) {
+		|| (*blocks)[path.index].kind != kind) {
 		return std::nullopt;
 	}
-	const auto insertAt = path.index + 1;
+	return handleEnterAtBlockUnchecked(path.container, path.index, context);
+}
+
+std::optional<int> State::handleEnterAtBlockUnchecked(
+		const BlockContainerPath &container,
+		int index,
+		const ActiveEnterContext &context) {
+	const auto blocks = blockContainer(container);
+	if (!blocks || index < 0 || index >= int(blocks->size())) {
+		return std::nullopt;
+	}
+	if (context.position == EnterPosition::Beginning) {
+		clearTemporaryDownParagraph();
+		blocks->insert(blocks->begin() + index, MakeParagraphBlock());
+		const auto target = LeafPath{
+			.kind = LeafKind::BlockText,
+			.block = {
+				.container = container,
+				.index = index + 1,
+			},
+		};
+		rebuild();
+		return activateRebuiltLeaf(target);
+	}
+	const auto insertAt = index + 1;
 	if (insertAt < 0 || insertAt > int(blocks->size())) {
 		return std::nullopt;
 	}
+	auto &owner = (*blocks)[index];
+	const auto split = (context.position == EnterPosition::Middle)
+		&& (context.head.text.size() + context.tail.text.size()
+			== owner.text.text.text.size());
 	clearTemporaryDownParagraph();
-	blocks->insert(blocks->begin() + insertAt, MakeParagraphBlock());
+	auto paragraph = MakeParagraphBlock();
+	if (split) {
+		owner.text.text = context.head;
+		paragraph.text.text = context.tail;
+	}
+	blocks->insert(blocks->begin() + insertAt, std::move(paragraph));
 	const auto target = LeafPath{
 		.kind = LeafKind::BlockText,
 		.block = {
-			.container = path.container,
+			.container = container,
 			.index = insertAt,
 		},
 	};
@@ -6254,9 +6369,11 @@ std::optional<int> State::handleActiveHeadingEnterUnchecked() {
 	return activateRebuiltLeaf(target);
 }
 
-std::optional<int> State::handleActiveListEnter() {
-	return applyCheckedMutation(std::optional<int>(), [](State &candidate) {
-		const auto result = candidate.handleActiveListEnterUnchecked();
+std::optional<int> State::handleActiveListEnter(
+		const ActiveEnterContext &context) {
+	return applyCheckedMutation(std::optional<int>(), [=](State &candidate) {
+		const auto result = candidate.handleActiveListEnterUnchecked(
+			context);
 		return CheckedMutationResult<std::optional<int>>{
 			.apply = result.has_value(),
 			.result = result,
@@ -6264,7 +6381,16 @@ std::optional<int> State::handleActiveListEnter() {
 	});
 }
 
-std::optional<int> State::handleActiveListEnterUnchecked() {
+std::optional<int> State::handleActiveListEnterUnchecked(
+		const ActiveEnterContext &context) {
+	const auto descriptor = textNode(_activeTextOrdinal);
+	if (!descriptor) {
+		return std::nullopt;
+	}
+	const auto blocksForm = (descriptor->leaf.kind == LeafKind::BlockText);
+	const auto paragraphIndex = blocksForm
+		? descriptor->leaf.block.index
+		: 0;
 	const auto surface = normalizeActiveListItemSurface();
 	if (!surface) {
 		return std::nullopt;
@@ -6273,6 +6399,12 @@ std::optional<int> State::handleActiveListEnterUnchecked() {
 	const auto item = listItem(surface->path, surface->itemIndex);
 	if (!owner || owner->kind != BlockKind::List || !item) {
 		return std::nullopt;
+	}
+	if (context.position != EnterPosition::End) {
+		return handleEnterAtBlockUnchecked(
+			ListItemChildrenContainer(surface->path, surface->itemIndex),
+			paragraphIndex,
+			context);
 	}
 	auto target = std::optional<LeafPath>();
 	const auto trailingEmpty = (surface->itemIndex + 1
@@ -6324,6 +6456,41 @@ std::optional<int> State::handleActiveListEnterUnchecked() {
 	}
 	rebuild();
 	return activateRebuiltLeaf(*target);
+}
+
+std::optional<int> State::handleActiveQuoteEnter(
+		const ActiveEnterContext &context) {
+	return applyCheckedMutation(std::optional<int>(), [=](State &candidate) {
+		const auto result = candidate.handleActiveQuoteEnterUnchecked(
+			context);
+		return CheckedMutationResult<std::optional<int>>{
+			.apply = result.has_value(),
+			.result = result,
+		};
+	});
+}
+
+std::optional<int> State::handleActiveQuoteEnterUnchecked(
+		const ActiveEnterContext &context) {
+	if (context.position == EnterPosition::End) {
+		return std::nullopt;
+	}
+	const auto descriptor = textNode(_activeTextOrdinal);
+	if (!descriptor || descriptor->leaf.kind != LeafKind::BlockText) {
+		return std::nullopt;
+	}
+	const auto owner = block(descriptor->leaf.block);
+	if (!owner
+		|| owner->kind != BlockKind::Quote
+		|| owner->pullquote
+		|| !owner->blocks.empty()) {
+		return std::nullopt;
+	}
+	const auto container = BlockChildrenContainer(descriptor->leaf.block);
+	if (!normalizeTextOnlyQuoteSurface(container, true)) {
+		return std::nullopt;
+	}
+	return handleEnterAtBlockUnchecked(container, 0, context);
 }
 
 bool State::pasteClipboardListItemsAfterActive(
@@ -6688,8 +6855,10 @@ std::vector<Block> State::takeListItemBlocksForUnwrap(ListItem *item) {
 }
 
 void State::adoptLeadingParagraphListItemText(ListItem *item) const {
+	// List items hold either inline text or a list of blocks, never both,
+	// so adopt the paragraph text only if it is the single item block.
 	if (!item
-		|| item->blocks.empty()
+		|| (item->blocks.size() != 1)
 		|| item->blocks.front().kind != BlockKind::Paragraph) {
 		return;
 	}
@@ -6817,6 +6986,7 @@ bool State::replaceStructuralSelectionWithBlock(
 			switch (type) {
 			case InsertBlockType::Heading:
 			case InsertBlockType::Code:
+			case InsertBlockType::Footer:
 				return true;
 			default:
 				return false;
@@ -6840,7 +7010,8 @@ bool State::replaceStructuralSelectionWithBlock(
 		const auto owner = candidate.block(leaf.block);
 		if (!owner
 			|| ((owner->kind != BlockKind::Paragraph)
-				&& (owner->kind != BlockKind::Heading))
+				&& (owner->kind != BlockKind::Heading)
+				&& (owner->kind != BlockKind::Footer))
 			|| (candidate.textNodeOrdinal(leaf) < 0)) {
 			return std::nullopt;
 		}
@@ -7721,7 +7892,8 @@ bool State::insertBlocksAfterActiveWithContextUnchecked(
 			owner
 			&& context.before.text.isEmpty()
 			&& ((owner->kind == BlockKind::Paragraph)
-				|| (owner->kind == BlockKind::Heading))) {
+				|| (owner->kind == BlockKind::Heading)
+				|| (owner->kind == BlockKind::Footer))) {
 			removeSource = true;
 			container = target->leaf.block.container;
 			insertAt = target->leaf.block.index;

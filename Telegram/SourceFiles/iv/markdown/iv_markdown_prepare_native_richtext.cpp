@@ -354,7 +354,7 @@ void ApplyEmptyMediaCaptionPlaceholder(
 	if (!state->editMode || !block->text.text.isEmpty()) {
 		return;
 	}
-	block->editPlaceholderText = tr::lng_article_placeholder_caption(tr::now);
+	block->editPlaceholderText = tr::lng_photo_caption(tr::now);
 }
 
 } // namespace

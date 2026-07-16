@@ -1258,6 +1258,7 @@ void EnableQTextEditLineMetrics(style::Markdown &style) {
 	EnableQTextEditLineMetrics(style.heading4);
 	EnableQTextEditLineMetrics(style.heading5);
 	EnableQTextEditLineMetrics(style.heading6);
+	EnableQTextEditLineMetrics(style.footer);
 	EnableQTextEditLineMetrics(style.quoteAuthorStyle);
 	EnableQTextEditLineMetrics(style.code);
 	EnableQTextEditLineMetrics(style.displayMath.fallbackStyle);
@@ -1381,6 +1382,29 @@ struct InlineFieldTrimResult {
 		delta += replacement.editorLength - replacement.richLength;
 	}
 	return offset - delta;
+}
+
+[[nodiscard]] bool HasRealEnterContent(const QString &text) {
+	for (const auto &ch : text) {
+		if (ch == QChar('\n') || !ch.isSpace()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+[[nodiscard]] State::ActiveEnterContext MakeActiveEnterContext(
+		std::optional<State::ActiveTextInsertContext> context) {
+	if (!context || !HasRealEnterContent(context->after.text)) {
+		return {};
+	} else if (!HasRealEnterContent(context->before.text)) {
+		return { .position = State::EnterPosition::Beginning };
+	}
+	return {
+		.position = State::EnterPosition::Middle,
+		.head = std::move(context->before),
+		.tail = std::move(context->after),
+	};
 }
 
 [[nodiscard]] auto ClipboardPasteInsertContext(
@@ -4158,7 +4182,7 @@ bool Widget::fieldMonospaceShortcutUsesCodeBlock() const {
 		&& _field
 		&& _field->isVisible()
 		&& (_field->selectionMarkdownTagForToggle(
-			Ui::InputField::kTagCode) == Ui::InputField::kTagPre);
+			Ui::InputField::kTagCode) != Ui::InputField::kTagCode);
 }
 
 bool Widget::structuralMonospaceShortcutTargetsCodeBlock() const {
@@ -4723,12 +4747,12 @@ void Widget::applyToolbarFormatAction(ToolbarFormatAction action) {
 		if (inlineToolbarModeActive() && escapeActiveBlockBodyFromToolbar()) {
 			return;
 		}
-		if (const auto fullHeadingSpan = visibleFullHeadingFieldTextSpan()) {
+		if (const auto fullSpan = visibleFullDemotableFieldTextSpan()) {
 			const auto full = ConvertEditorTagsToRichText(
 				_field->getTextWithAppliedMarkdown());
 			const auto cursor = _field->textCursor();
 			const auto length = int(full.text.size());
-			const auto restoreLeaf = fullHeadingSpan->leaf;
+			const auto restoreLeaf = fullSpan->leaf;
 			const auto restoreAnchorOffset = std::clamp(
 				richOffsetForFieldOffset(full, cursor.anchor()),
 				0,
@@ -4750,7 +4774,7 @@ void Widget::applyToolbarFormatAction(ToolbarFormatAction action) {
 				hideInlineField();
 				clearInlineFieldEditSession();
 				const auto result = _state->applyFormattingToTextSpans(
-					{ *fullHeadingSpan },
+					{ *fullSpan },
 					TextFormattingAction::PlainText);
 				if (result == ApplyResult::Failed) {
 					return MutationTransactionResult{
@@ -7726,8 +7750,12 @@ Widget::InlineFieldStyleKey Widget::inlineFieldStyleKey(
 void Widget::ensureInlineFieldForSegment(int segmentIndex) {
 	_revivedRetainedField = false;
 	refreshInlineFieldTextColorOverride();
-	const auto data = normalizedInlineFieldStyle(
-		inlineFieldStyleForSegment(segmentIndex));
+	auto leafStyle = inlineFieldStyleForSegment(segmentIndex);
+	if (!leafStyle.valid()) {
+		ensureArticleLayoutForInlineField(widthNoMargins());
+		leafStyle = inlineFieldStyleForSegment(segmentIndex);
+	}
+	const auto data = normalizedInlineFieldStyle(leafStyle);
 	const auto key = inlineFieldStyleKey(data);
 	const auto mode = _state->activeFieldMode();
 	const auto leaf = _state->activeLeafPath();
@@ -7748,6 +7776,8 @@ void Widget::ensureInlineFieldForSegment(int segmentIndex) {
 				*leaf,
 				mode,
 				key)) {
+			const auto wasHidden = _field->isHidden();
+			const auto hadFocus = _field->hasFocus();
 			_field = std::move(revived);
 			_activeFieldStyleKey = key;
 			_fieldMode = mode;
@@ -7757,6 +7787,13 @@ void Widget::ensureInlineFieldForSegment(int segmentIndex) {
 			_fieldRedoAvailable = _field->isRedoAvailable();
 			_revivedRetainedField = true;
 			clearFieldUndoRedoNoopState();
+			if (!wasHidden) {
+				_field->show();
+				_field->raise();
+				if (hadFocus) {
+					_field->setFocusFast();
+				}
+			}
 			return;
 		}
 	}
@@ -8511,7 +8548,7 @@ Widget::activatePreparedMediaPasteTarget(PreparedMediaPasteTarget target) {
 }
 
 std::optional<State::TextNodeSpan>
-Widget::visibleFullHeadingFieldTextSpan() const {
+Widget::visibleFullDemotableFieldTextSpan() const {
 	if (_settingField
 		|| _field->isHidden()
 		|| (_activeSegmentIndex < 0)
@@ -8523,23 +8560,22 @@ Widget::visibleFullHeadingFieldTextSpan() const {
 		return std::nullopt;
 	}
 	const auto owner = BlockFromPath(_state->richPage(), leaf->block);
-	if (!owner || (owner->kind != RichPage::BlockKind::Heading)) {
+	if (!owner
+		|| ((owner->kind != RichPage::BlockKind::Heading)
+			&& (owner->kind != RichPage::BlockKind::Footer))) {
 		return std::nullopt;
 	}
 	const auto full = ConvertEditorTagsToRichText(
 		_field->getTextWithAppliedMarkdown());
-	if (full.text.isEmpty()) {
+	const auto length = int(full.text.size());
+	const auto cursor = _field->textCursor();
+	if (!cursor.hasSelection()) {
 		return TextNodeSpan{
 			.leaf = *leaf,
 			.from = 0,
-			.till = 0,
+			.till = length,
 		};
 	}
-	const auto cursor = _field->textCursor();
-	if (!cursor.hasSelection()) {
-		return std::nullopt;
-	}
-	const auto length = int(full.text.size());
 	auto from = richOffsetForFieldOffset(full, cursor.selectionStart());
 	auto till = richOffsetForFieldOffset(full, cursor.selectionEnd());
 	from = std::clamp(from, 0, length);
@@ -9535,6 +9571,8 @@ bool Widget::handleFieldKey(QKeyEvent *e) {
 			return false;
 		}
 		recordMutationTransaction([&] {
+			const auto enter = MakeActiveEnterContext(
+				activeTextInsertContext());
 			const auto committed = commitInlineField();
 			// At the very start of the very first text node of a block that
 			// is not a top-level paragraph or heading (a table, a list, ...)
@@ -9561,14 +9599,8 @@ bool Widget::handleFieldKey(QKeyEvent *e) {
 					.committed = committed,
 					.changed = true,
 				};
-			} else if (const auto target = _state->handleActiveListEnter()) {
-				refreshPreparedContentAndActivate(*target, 0);
-				handled = true;
-				return MutationTransactionResult{
-					.committed = committed,
-					.changed = true,
-				};
-			} else if (const auto target = _state->handleActiveHeadingEnter()) {
+			} else if (const auto target
+				= _state->handleActiveListEnter(enter)) {
 				refreshPreparedContentAndActivate(*target, 0);
 				handled = true;
 				return MutationTransactionResult{
@@ -9576,7 +9608,39 @@ bool Widget::handleFieldKey(QKeyEvent *e) {
 					.changed = true,
 				};
 			} else if (const auto target
-				= _state->submitActiveSingleLineField()) {
+				= _state->handleActiveHeadingEnter(enter)) {
+				refreshPreparedContentAndActivate(*target, 0);
+				handled = true;
+				return MutationTransactionResult{
+					.committed = committed,
+					.changed = true,
+				};
+			} else if (const auto target
+				= _state->handleActiveFooterEnter(enter)) {
+				refreshPreparedContentAndActivate(*target, 0);
+				handled = true;
+				return MutationTransactionResult{
+					.committed = committed,
+					.changed = true,
+				};
+			} else if (const auto target
+				= _state->handleActiveParagraphEnter(enter)) {
+				refreshPreparedContentAndActivate(*target, 0);
+				handled = true;
+				return MutationTransactionResult{
+					.committed = committed,
+					.changed = true,
+				};
+			} else if (const auto target
+				= _state->handleActiveQuoteEnter(enter)) {
+				refreshPreparedContentAndActivate(*target, 0);
+				handled = true;
+				return MutationTransactionResult{
+					.committed = committed,
+					.changed = true,
+				};
+			} else if (const auto target
+				= _state->submitActiveSingleLineField(enter)) {
 				refreshPreparedContentAndActivate(*target, 0);
 				handled = true;
 				return MutationTransactionResult{

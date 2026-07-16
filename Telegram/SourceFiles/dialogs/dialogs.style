@@ -618,7 +618,51 @@ dialogsMiniReplyIcon: IconEmoji {
 }
 
 dialogsMiniPollIcon: IconEmoji {
-	icon: icon {{ "dialogs/dialogs_chatlist_poll-17x17", dialogsTextFg }};
+	icon: icon {{ "dialogs/dialogs_chatlist_poll-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniGiftIcon: IconEmoji {
+	icon: icon {{ "profile/gift-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniTodoListIcon: IconEmoji {
+	icon: icon {{ "settings/premium/checklist-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniAudioIcon: IconEmoji {
+	icon: icon {{ "menu/rich/audio-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniVoiceIcon: IconEmoji {
+	icon: icon {{ "info/info_media_voice-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniLocationIcon: IconEmoji {
+	icon: icon {{ "menu/rich/location-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniContactIcon: IconEmoji {
+	icon: icon {{ "menu/profile-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniInvoiceIcon: IconEmoji {
+	icon: icon {{ "payments/payment_card-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniCallIcon: IconEmoji {
+	icon: icon {{ "profile/call-18x18", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+dialogsMiniStoryIcon: IconEmoji {
+	icon: icon {{ "mini_reply_story", dialogsTextFg }};
+	padding: margins(0px, 2px, 3px, 0px);
+}
+dialogsMiniGiveawayIcon: IconEmoji {
+	icon: icon {{ "boosts/mini_giveaway", dialogsTextFg }};
+	padding: margins(0px, 2px, 3px, 0px);
+}
+dialogsMiniFileIcon: IconEmoji {
+	icon: icon {{ "local_storage/documents-18x18", dialogsTextFg }};
 	padding: margins(0px, 1px, 3px, 0px);
 }
 

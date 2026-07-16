@@ -110,12 +110,13 @@ private:
 
 } // namespace
 
-MediaTabDescriptor MakeMembersTabDescriptor(not_null<PeerData*> peer) {
-	using namespace rpl::mappers;
+MediaTabDescriptor MakeMembersTabDescriptor(
+		not_null<PeerData*> peer,
+		rpl::producer<bool> shown) {
 	return {
 		.id = u"members"_q,
-		.title = tr::lng_profile_participants_section(),
-		.shown = MembersCountValue(peer) | rpl::map(_1 > 0),
+		.title = tr::lng_profile_participants_section(tr::marked),
+		.shown = std::move(shown),
 		.factory = [](MediaTabContext context) {
 			return std::make_unique<MembersTabAdapter>(std::move(context));
 		},

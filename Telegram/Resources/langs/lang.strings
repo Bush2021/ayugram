@@ -1688,6 +1688,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_posts#other" = "{count} posts";
 "lng_profile_photos#one" = "{count} photo";
 "lng_profile_photos#other" = "{count} photos";
+"lng_profile_media#one" = "{count} media";
+"lng_profile_media#other" = "{count} media";
 "lng_profile_gifs#one" = "{count} GIF";
 "lng_profile_gifs#other" = "{count} GIFs";
 "lng_profile_polls#one" = "{count} poll";
@@ -1855,6 +1857,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_action_short_live_stream" = "Live stream";
 "lng_profile_action_short_video_chat" = "Video chat";
 
+"lng_media_type_media" = "Media";
 "lng_media_type_photos" = "Photos";
 "lng_media_type_gifs" = "GIFs";
 "lng_media_type_videos" = "Videos";
@@ -1869,6 +1872,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_media_type_similar" = "Similar";
 "lng_media_type_gifts" = "Gifts";
 "lng_media_type_saved" = "Saved";
+"lng_profile_tab_set_as_main" = "Set as Main Tab";
 "lng_polls_search_none" = "No polls found";
 "lng_media_type_rounds" = "Video messages";
 "lng_media_zoom_in" = "Zoom In";
@@ -1886,6 +1890,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_profile_export_chat" = "Export chat history";
 "lng_profile_export_topic" = "Export topic history";
 "lng_profile_gift_premium" = "Gift Premium";
+"lng_media_selected_media#one" = "{count} Media";
+"lng_media_selected_media#other" = "{count} Media";
 "lng_media_selected_photo#one" = "{count} Photo";
 "lng_media_selected_photo#other" = "{count} Photos";
 "lng_media_selected_gif#one" = "{count} GIF";
@@ -2219,6 +2225,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_community_remove_done" = "Removed from the community.";
 "lng_community_remove_sure" = "Remove {group} from the community?";
 "lng_community_add_about" = "Make your group part of a community with multiple related chats.";
+"lng_community_add_about_channel" = "Make your channel part of a community with multiple related chats.";
 "lng_community_add_about_bot" = "Make your bot part of a community with multiple related chats.";
 "lng_community_create" = "Create Community";
 "lng_community_existing" = "Add to an existing community";
@@ -2229,6 +2236,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_community_create_name" = "Community Name";
 "lng_community_created" = "Community created.";
 "lng_community_create_hidden" = "Hidden group";
+"lng_community_create_hidden_channel" = "Hidden channel";
+"lng_community_create_hidden_bot" = "Hidden bot";
 "lng_community_visibility_title" = "Chat visibility";
 "lng_community_visibility_visible" = "Visible";
 "lng_community_visibility_visible_about" = "Anyone in the community will be able to see this chat.";
@@ -2237,6 +2246,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_community_visibility_note" = "You won't be able to change this later.";
 "lng_community_add_to" = "Add to Community";
 "lng_community_add_confirm" = "If this group is approved by a community admin, its members will be able to join or request to join other chats in the community.";
+"lng_community_add_confirm_channel" = "If this channel is approved by a community admin, its subscribers will be able to join or request to join other chats in the community.";
 "lng_community_add_confirm_bot" = "If this bot is approved by a community admin, community members will be able to see and use it.";
 "lng_community_add_confirm_add" = "Add";
 "lng_community_add_done" = "Group added to the community.";
@@ -2280,8 +2290,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_community_request_add" = "Add";
 "lng_community_request_decline" = "Decline";
 "lng_community_request_invite_only" = "This group is invite-only. Only its members can view it.";
+"lng_community_request_invite_only_channel" = "This channel is invite-only. Only its subscribers can view it.";
 "lng_community_request_invite_only_bot" = "This bot is invite-only. Only invited members can use it.";
 "lng_community_request_message_owner" = "Message Group Owner";
+"lng_community_request_message_owner_channel" = "Message Channel Owner";
 "lng_community_request_message_owner_bot" = "Message Bot Owner";
 "lng_community_requests_add_all" = "Add All";
 "lng_community_requests_decline_all" = "Decline All";
@@ -2311,13 +2323,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_community_hidden_status" = "Hidden";
 "lng_community_hidden_chat_title" = "Hidden Chat";
 "lng_community_hidden_not_accessible" = "You can't join or view this group until an admin invites you.";
+"lng_community_hidden_not_accessible_channel" = "You can't join or view this channel until an admin invites you.";
+"lng_community_hidden_not_accessible_bot" = "You can't use this bot until an admin invites you.";
 "lng_community_join_sure" = "Do you want to join {group}?";
 "lng_community_admin_title" = "You are a community admin";
 "lng_community_admin_about" = "You can now edit {community} info and use other admin tools.";
 "lng_community_admin_continue" = "Continue";
 "lng_community_admin_decline" = "No, thanks";
 "lng_community_admin_dismiss_title" = "Dismiss yourself as community admin";
-"lng_community_admin_dismiss_text" = "You'll lose access to community admin tools, but keep your group admin rights.";
+"lng_community_admin_dismiss_text" = "You'll lose access to community admin tools, but keep your admin rights in your own chats.";
 "lng_community_removed_list_about" = "Users removed from the community will be shown here.";
 "lng_community_chat_view_channel" = "View Channel";
 "lng_community_chat_view_group" = "View Group";
@@ -2787,6 +2801,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_action_community_added_unknown_chat" = "This chat was added to a community.";
 "lng_action_community_added_unknown_channel" = "This channel was added to a community.";
 "lng_action_community_removed" = "{from} removed this group from the community.";
+"lng_action_community_removed_chat" = "This chat was removed from the community.";
+"lng_action_community_removed_channel" = "This channel was removed from the community.";
 
 "lng_create_bot_title" = "Create Bot";
 "lng_create_bot_subtitle" = "{bot} would like to create and manage a chatbot on your behalf.";
@@ -3538,6 +3554,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_credits_small_balance_for_search" = "Buy **Stars** to search through public posts.";
 "lng_credits_small_balance_fallback" = "Buy **Stars** to unlock content and services on Telegram.";
 "lng_credits_purchase_blocked" = "Sorry, you can't purchase this item with Telegram Stars.";
+"lng_credits_topup_disabled" = "Sorry, you don't have enough Telegram Stars on your balance.";
 "lng_credits_enough" = "You have enough stars at the moment. {link}";
 "lng_credits_enough_link" = "Buy anyway";
 
@@ -7378,6 +7395,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_article_insert_blockquote" = "Blockquote";
 "lng_article_insert_code" = "Code Block";
 "lng_article_insert_math" = "Math";
+"lng_article_insert_footer" = "Footer";
 "lng_article_insert_divider" = "Divider";
 "lng_article_insert_ordered_list" = "Ordered List";
 "lng_article_insert_bullet_list" = "Bullet List";
@@ -7406,9 +7424,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_article_media_slideshow" = "Slideshow";
 "lng_article_insert_details" = "Details";
 "lng_article_insert_table" = "Table";
-"lng_article_placeholder_text" = "Text";
-"lng_article_placeholder_header" = "Header";
-"lng_article_placeholder_caption" = "Caption";
 "lng_article_placeholder_cell" = "Cell";
 "lng_article_placeholder_quote" = "Enter quote";
 "lng_article_placeholder_author" = "Add author";

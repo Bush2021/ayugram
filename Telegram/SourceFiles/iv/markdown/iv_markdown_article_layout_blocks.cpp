@@ -1585,10 +1585,14 @@ bool IsAnchorOnlyBlock(const PreparedBlock &block) {
 QString ListMarkerText(const PreparedBlock &block) {
 	if (block.listKind == ListKind::Ordered) {
 		if (!block.orderedMarkerText.isEmpty()) {
-			return block.orderedMarkerText;
+			return FormatPreparedOrderedRawMarkerText(
+				block.orderedMarkerText,
+				block.listDelimiter);
 		}
 		if (!block.articleOrderedMarkerText.isEmpty()) {
-			return block.articleOrderedMarkerText;
+			return FormatPreparedOrderedRawMarkerText(
+				block.articleOrderedMarkerText,
+				block.listDelimiter);
 		}
 		const auto delimiter = (block.listDelimiter == ListDelimiter::Parenthesis)
 			? u")"_q
@@ -2426,6 +2430,8 @@ const style::TextStyle &TextStyleFor(
 		return st.code;
 	} else if (block.quoteAuthor) {
 		return st.quoteAuthorStyle;
+	} else if (block.footer) {
+		return st.footer;
 	} else if (block.kind != PreparedBlockKind::Heading) {
 		return st.body;
 	}
@@ -2848,6 +2854,7 @@ LaidOutBlock LayoutFlowBlock(
 	block.supplementary = prepared.supplementary;
 	block.pullquote = prepared.pullquote;
 	block.quoteAuthor = prepared.quoteAuthor;
+	block.footer = prepared.footer;
 	block.flowTextAlign = CellAlign(prepared.flowAlignment);
 	const auto &textStyle = TextStyleFor(prepared, st);
 	const auto &placeholderStyle = EditPlaceholderTextStyleFor(prepared, st);

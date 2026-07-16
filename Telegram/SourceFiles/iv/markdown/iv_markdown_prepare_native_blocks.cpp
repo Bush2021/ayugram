@@ -339,18 +339,6 @@ bool AppendPreparedQuoteParagraph(
 	return FormatPreparedOrderedMarkerBody(value, type) + suffix;
 }
 
-[[nodiscard]] QString FormatPreparedOrderedRawMarkerText(
-		const QString &raw,
-		ListDelimiter delimiter) {
-	if (raw.isEmpty() || raw.endsWith('.') || raw.endsWith(')')) {
-		return raw;
-	}
-	const auto suffix = (delimiter == ListDelimiter::Parenthesis)
-		? u")"_q
-		: u"."_q;
-	return raw + suffix;
-}
-
 class NativeIvOrderedMarkerFormatter {
 public:
 	NativeIvOrderedMarkerFormatter(
@@ -662,22 +650,20 @@ void ApplyBlockCaptionEditSource(
 		int headingLevel) {
 	switch (leafKind) {
 	case PreparedEditLeafKind::BlockCaption:
-		return tr::lng_article_placeholder_caption(tr::now);
+		return tr::lng_photo_caption(tr::now);
 	case PreparedEditLeafKind::TableCellText:
 		return tr::lng_article_placeholder_cell(tr::now);
 	case PreparedEditLeafKind::MathFormula:
 		return u"x^2 + y^2"_q;
-	case PreparedEditLeafKind::ListItemText:
-		return tr::lng_article_placeholder_text(tr::now);
 	case PreparedEditLeafKind::BlockText:
 		if (kind == PreparedBlockKind::Table) {
 			return tr::lng_article_placeholder_title(tr::now);
 		} else if (kind == PreparedBlockKind::Heading) {
 			return HeadingLevelLabel(headingLevel);
+		} else if (kind == PreparedBlockKind::Details) {
+			return tr::lng_article_table_header(tr::now);
 		}
-		return (kind == PreparedBlockKind::Details)
-			? tr::lng_article_placeholder_header(tr::now)
-			: tr::lng_article_placeholder_text(tr::now);
+		return QString();
 	}
 	return QString();
 }
@@ -688,6 +674,10 @@ void ApplyNativeIvEditPlaceholderText(PreparedBlock *block) {
 	} else if (block->quoteAuthor
 		&& (block->editLeaf->kind == PreparedEditLeafKind::BlockCaption)) {
 		block->editPlaceholderText = tr::lng_article_placeholder_author(tr::now);
+		return;
+	} else if (block->footer
+		&& (block->editLeaf->kind == PreparedEditLeafKind::BlockText)) {
+		block->editPlaceholderText = tr::lng_article_insert_footer(tr::now);
 		return;
 	}
 	block->editPlaceholderText = NativeIvEditPlaceholderText(
@@ -717,10 +707,12 @@ void ApplyNativeIvEditPlaceholderText(PreparedTableCell *cell) {
 	if (!cell->editLeaf) {
 		return;
 	}
-	cell->editPlaceholderText = NativeIvEditPlaceholderText(
-		PreparedBlockKind::Table,
-		cell->editLeaf->kind,
-		0);
+	cell->editPlaceholderText = cell->header
+		? tr::lng_article_table_header(tr::now)
+		: NativeIvEditPlaceholderText(
+			PreparedBlockKind::Table,
+			cell->editLeaf->kind,
+			0);
 }
 
 [[nodiscard]] const std::vector<RichPageBlock> *ResolveCanonicalNativeIvContainer(
@@ -1257,7 +1249,8 @@ void ClearPreparedEditSources(std::vector<PreparedBlock> *blocks) {
 		QString anchorId,
 		std::optional<PreparedEditBlockPath> path,
 		NativeIvPrepareState *state,
-		bool allowEmpty = false) {
+		bool allowEmpty = false,
+		bool footer = false) {
 	auto prepared = PreparedIvRichText();
 	const auto context = NativeIvRichTextContextForTextSize(
 		NativeIvFlowTextSize(kind, headingLevel, state->dimensions),
@@ -1287,8 +1280,11 @@ void ClearPreparedEditSources(std::vector<PreparedBlock> *blocks) {
 		false,
 		std::move(editBlock),
 		std::move(editLeaf));
-	if (appended && state->editMode && (result->size() > count)) {
-		ApplyNativeIvEditPlaceholderText(&result->back());
+	if (appended && (result->size() > count)) {
+		result->back().footer = footer;
+		if (state->editMode) {
+			ApplyNativeIvEditPlaceholderText(&result->back());
+		}
 	}
 	return appended;
 }
@@ -1826,7 +1822,9 @@ void ClearPreparedEditSources(std::vector<PreparedBlock> *blocks) {
 			block.text,
 			block.anchorId,
 			path,
-			state);
+			state,
+			false,
+			(block.kind == RichPageBlockKind::Footer));
 	case RichPageBlockKind::Thinking:
 		return AppendNativeIvFlowBlock(
 			result,
@@ -2051,6 +2049,18 @@ void ClearPreparedEditSources(std::vector<PreparedBlock> *blocks) {
 }
 
 } // namespace
+
+QString FormatPreparedOrderedRawMarkerText(
+		const QString &raw,
+		ListDelimiter delimiter) {
+	if (raw.isEmpty() || raw.endsWith('.') || raw.endsWith(')')) {
+		return raw;
+	}
+	const auto suffix = (delimiter == ListDelimiter::Parenthesis)
+		? u")"_q
+		: u"."_q;
+	return raw + suffix;
+}
 
 bool PrepareNativeIvBlocks(
 		const Iv::RichPage &page,

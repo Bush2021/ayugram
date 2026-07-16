@@ -39,6 +39,7 @@ public:
 		not_null<AbstractController*> parent,
 		not_null<PeerData*> peer)
 	: AbstractController(parent->parentController())
+	, _parent(parent)
 	, _key(Stories::Tag(peer)) {
 	}
 
@@ -51,8 +52,12 @@ public:
 	::Info::Section section() const override {
 		return ::Info::Section(::Info::Section::Type::Stories);
 	}
+	style::color listBackground() const override {
+		return _parent->listBackground();
+	}
 
 private:
+	const not_null<AbstractController*> _parent;
 	const Key _key;
 
 };
@@ -148,12 +153,13 @@ MediaTabDescriptor MakeStoriesTabDescriptor(not_null<PeerData*> peer) {
 	return {
 		.id = u"stories"_q,
 		.title = (peer->isChannel()
-			? tr::lng_media_type_posts()
-			: tr::lng_media_type_stories()),
+			? tr::lng_media_type_posts(tr::marked)
+			: tr::lng_media_type_stories(tr::marked)),
 		.shown = StoriesCountValue(peer) | rpl::map(_1 > 0),
 		.factory = [](MediaTabContext context) {
 			return std::make_unique<StoriesTabAdapter>(std::move(context));
 		},
+		.profileTab = Data::ProfileTab::Posts,
 	};
 }
 

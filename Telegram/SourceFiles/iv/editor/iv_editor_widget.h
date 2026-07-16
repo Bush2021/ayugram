@@ -510,7 +510,7 @@ private:
 		std::optional<State::ActiveTextInsertContext> context,
 		bool useStructuralSelection = true);
 	[[nodiscard]] std::optional<State::TextNodeSpan>
-	visibleFullHeadingFieldTextSpan() const;
+	visibleFullDemotableFieldTextSpan() const;
 	[[nodiscard]] std::optional<MathEditRequest> activeMathEditRequest() const;
 	[[nodiscard]] MathEditRequest newDisplayMathRequest() const;
 	[[nodiscard]] int richOffsetForFieldOffset(
