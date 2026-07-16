@@ -70,5 +70,12 @@ function(generate_lang target_name lang_file src_loc)
     )
     add_custom_target(${target_name}_lang_subsets DEPENDS ${subsets_timestamp})
     init_target_folder(${target_name}_lang_subsets "(gen)")
+
+    # The subsets command reads ${gen_keys}, which the lang command declares as
+    # a BYPRODUCT. CMake only pulls a producing command into a consuming target
+    # for files listed as its OUTPUT, so without this the Visual Studio
+    # generator may run the subsets command before the keys header exists.
+    add_dependencies(${target_name}_lang_subsets ${target_name}_lang)
+
     add_dependencies(${target_name} ${target_name}_lang_subsets)
 endfunction()
