@@ -52,6 +52,14 @@ constexpr auto kReleaseHideDuration = crl::time(250);
 constexpr auto kPanelDuration = crl::time(320);
 constexpr auto kBounceDuration = crl::time(400);
 
+[[nodiscard]] int PullThreshold() {
+	// The pull sides stretch with a soft linear stiffness that reaches
+	// a given height in about half the finger travel of the log curve
+	// used before, so a doubled threshold keeps a comparable gesture
+	// length and avoids accidental triggers.
+	return st::historyPullNextThreshold * 2;
+}
+
 [[nodiscard]] History *FindInList(
 		not_null<Dialogs::MainList*> list,
 		not_null<History*> current) {
@@ -618,7 +626,7 @@ PullToNextChannel::PullToNextChannel(
 	}, _lifetime);
 
 	_dwellTimer.setCallback([=] {
-		if (_pulling && _pull >= float64(st::historyPullNextThreshold)) {
+		if (_pulling && _pull >= float64(PullThreshold())) {
 			_reached = true;
 			_peakPull = _pull;
 			base::Platform::Haptic();
@@ -640,6 +648,11 @@ void PullToNextChannel::setHistory(History *history) {
 	}
 	_history = history;
 	reset();
+	updatePullCurve();
+}
+
+void PullToNextChannel::updatePullCurve() {
+	_scroll->setOverscrollPullDistances(0, active() ? PullThreshold() : 0);
 }
 
 bool PullToNextChannel::active() const {
@@ -665,8 +678,9 @@ void PullToNextChannel::handleOverscroll(
 		Ui::ElasticScrollPosition position,
 		Ui::ElasticScrollMovement movement) {
 	using Phase = Ui::ElasticScrollMovement;
+	updatePullCurve();
 	const auto pull = std::max(position.overscroll, 0);
-	const auto threshold = st::historyPullNextThreshold;
+	const auto threshold = PullThreshold();
 	if (!_pulling) {
 		if (movement != Phase::Progress || pull <= 0 || !active()) {
 			return;
@@ -765,7 +779,7 @@ void PullToNextChannel::startExpand(bool ready) {
 
 void PullToNextChannel::pushIndicator() {
 	const auto card = float64(st::historyPullNextExpand);
-	const auto threshold = float64(st::historyPullNextThreshold);
+	const auto threshold = float64(PullThreshold());
 	const auto expand = _expand.value(_expandTo ? 1. : 0.);
 	const auto effective = std::min(
 		float64(st::historyPullNextMaxHeight),

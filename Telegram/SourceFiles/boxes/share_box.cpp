@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/share_box.h"
 
 #include "api/api_premium.h"
+#include "base/call_delayed.h"
 #include "base/random.h"
 #include "lang/lang_keys.h"
 #include "base/qthelp_url.h"
@@ -1680,6 +1681,29 @@ ChatHelpers::ForwardedMessagePhraseArgs CreateForwardedMessagePhraseArgs(
 	};
 }
 
+void ShowForwardedMessageToast(
+		std::shared_ptr<Ui::Show> show,
+		not_null<Main::Session*> session,
+		ChatHelpers::ForwardedMessagePhraseArgs args) {
+	const auto phrase = rpl::variable<TextWithEntities>(
+		ChatHelpers::ForwardedMessagePhrase(args)).current();
+	if (phrase.empty()) {
+		return;
+	}
+	const auto icon = ChatHelpers::ForwardedMessagePhraseIcon(args);
+	base::call_delayed(st::boxDuration, session, [=] {
+		if (!show->valid()) {
+			return;
+		}
+		show->showToast({
+			.text = phrase,
+			.filter = ChatHelpers::ForwardedToSavedMessagesFilter(session),
+			.iconLottie = icon,
+			.iconLottieSize = st::toastLottieIconSize,
+		});
+	});
+}
+
 ShareBox::CountMessagesCallback ShareBox::DefaultForwardCountMessages(
 		not_null<History*> history,
 		MessageIdsList msgIds) {
@@ -1901,19 +1925,11 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 				state->requests.remove(requestKey);
 				if (state->requests.empty()) {
 					if (show->valid()) {
-						auto phrase = rpl::variable<
-							TextWithEntities>(
-							ChatHelpers::ForwardedMessagePhrase(
-								donePhraseArgs)).current();
-						if (!phrase.empty()) {
-							show->showToast({
-								.text = std::move(phrase),
-								.filter = ChatHelpers
-									::ForwardedToSavedMessagesFilter(
-										&history->session()),
-							});
-						}
 						show->hideLayer();
+						ShowForwardedMessageToast(
+							show,
+							&history->session(),
+							donePhraseArgs);
 					}
 				}
 			};
@@ -1959,18 +1975,11 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		}
 		if (state->requests.empty()) {
 			if (show->valid()) {
-				auto phrase = rpl::variable<TextWithEntities>(
-					ChatHelpers::ForwardedMessagePhrase(
-						donePhraseArgs)).current();
-				if (!phrase.empty()) {
-					show->showToast({
-						.text = std::move(phrase),
-						.filter = ChatHelpers
-							::ForwardedToSavedMessagesFilter(
-								&history->session()),
-					});
-				}
 				show->hideLayer();
+				ShowForwardedMessageToast(
+					show,
+					&history->session(),
+					donePhraseArgs);
 			}
 		}
 	};
@@ -2124,6 +2133,9 @@ void FastShareMessageToSelf(
 					.text = std::move(phrase),
 					.filter = ChatHelpers::ForwardedToSavedMessagesFilter(
 						&show->session()),
+					.iconLottie = ChatHelpers::ForwardedMessagePhraseIcon(
+						donePhraseArgs),
+					.iconLottieSize = st::toastLottieIconSize,
 				});
 			}
 		});

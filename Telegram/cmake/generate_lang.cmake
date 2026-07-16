@@ -33,7 +33,7 @@ function(generate_lang target_name lang_file src_loc)
     )
     generate_target(${target_name} lang ${gen_timestamp} "${gen_files}" ${gen_dst})
 
-    if (NOT CMAKE_GENERATOR STREQUAL "Xcode")
+    if (CMAKE_GENERATOR STREQUAL "Ninja")
         file(GLOB_RECURSE lang_sources CONFIGURE_DEPENDS
             ${src_loc}/*.cpp
             ${src_loc}/*.h

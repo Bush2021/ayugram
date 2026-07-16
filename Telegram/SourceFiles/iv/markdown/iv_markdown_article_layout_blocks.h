@@ -157,6 +157,7 @@ struct LaidOutBlock {
 	style::align formulaAlign = style::al_left;
 	bool collapsed = false;
 	bool detailsOpen = false;
+	bool rtl = false;
 	bool overflowed = false;
 	bool tableBordered = true;
 	bool tableStriped = false;
@@ -282,6 +283,7 @@ struct CachedTextLeafSourceSignature {
 	int minResizeWidth = 1;
 	size_t styleKey = 0;
 	bool dependsOnMediaRuntime = false;
+	bool rtl = false;
 
 	friend inline bool operator==(
 		const CachedTextLeafSourceSignature &a,
@@ -317,6 +319,7 @@ struct LayoutContext {
 	bool tightList = false;
 	bool useArticleBands = false;
 	bool editMode = false;
+	bool rtl = false;
 	bool hideEmptyQuoteAuthor = false;
 	bool allowAsyncSyntaxHighlighting = true;
 	CodeBlockSyntaxHighlightTracker *syntaxHighlightTracker = nullptr;
@@ -475,7 +478,8 @@ void CopyCachedTextLeafs(
 	const std::vector<PreparedBlock> &preparedBlocks,
 	std::vector<LaidOutBlock> *blocks,
 	const style::Markdown &st,
-	CachedTextLeafPool *pool);
+	CachedTextLeafPool *pool,
+	bool rtl);
 void BuildOrReuseMarkedTextLeaf(
 	Ui::Text::String *leaf,
 	CachedTextLeafSlot slot,
