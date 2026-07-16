@@ -348,6 +348,10 @@ private:
 	const LayoutContext *_previous = nullptr;
 };
 
+[[nodiscard]] bool TextNeedsRetainedLeaf(const QString &text);
+[[nodiscard]] bool MissingRetainedLeaf(
+	const QString &text,
+	const Ui::Text::String &leaf);
 [[nodiscard]] bool IsAnchorOnlyBlock(const PreparedBlock &block);
 [[nodiscard]] bool IsFlowKind(PreparedBlockKind kind);
 [[nodiscard]] QString ListMarkerText(const PreparedBlock &block);

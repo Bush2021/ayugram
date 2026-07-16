@@ -1500,7 +1500,6 @@ public:
 	explicit Impl(ShowWindowDescriptor descriptor);
 	~Impl();
 	void close();
-	void activateClose();
 
 private:
 	void setupWindow(ShowWindowDescriptor &&descriptor);
@@ -1576,14 +1575,10 @@ void WindowHost::Impl::close() {
 	finishClose();
 }
 
-void WindowHost::Impl::activateClose() {
-	if (confirmCancel()) {
-		finishClose();
-	}
-}
-
 void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
-	const auto title = tr::lng_article_editor_title(tr::now);
+	const auto title = descriptor.title.isEmpty()
+		? tr::lng_article_editor_title(tr::now)
+		: descriptor.title;
 
 	if (!descriptor.state) {
 		descriptor.state = std::make_shared<State>();
@@ -1601,7 +1596,6 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 		descriptor.showCreated(_show);
 	}
 	window->setTitle(title);
-	window->setWindowTitle(title);
 	window->setMinimumSize(st::ivEditorWindowMinSize);
 	window->setGeometry(DefaultWindowGeometry());
 
@@ -1684,7 +1678,9 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 		},
 		descriptor.session);
 	window->setMinimumWidth(minimalWindowWidth());
-	if (descriptor.discarded) {
+	const auto save = (descriptor.submitType
+		== ShowWindowDescriptor::SubmitType::Save);
+	if (descriptor.discarded && !save) {
 		_discard = object_ptr<ToolbarPill>(
 			_bottom.data(),
 			st::ivEditorPillShadow);
@@ -1698,7 +1694,7 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 			discard();
 		});
 	}
-	if (descriptor.submitType == ShowWindowDescriptor::SubmitType::Save) {
+	if (save) {
 		_cancel = object_ptr<ToolbarPill>(
 			_bottom.data(),
 			st::ivEditorPillShadow);
@@ -1809,8 +1805,6 @@ void WindowHost::Impl::setupWindow(ShowWindowDescriptor &&descriptor) {
 		});
 		setupBottomAiStar(button, session);
 	}
-	const auto save = (descriptor.submitType
-		== ShowWindowDescriptor::SubmitType::Save);
 	_send = object_ptr<Ui::SendButton>(
 		_bottom.data(),
 		save ? st::ivEditorBottomSaveSend : st::ivEditorBottomSend);
@@ -2419,10 +2413,6 @@ WindowHost::~WindowHost() = default;
 
 void WindowHost::close() {
 	_impl->close();
-}
-
-void WindowHost::activateClose() {
-	_impl->activateClose();
 }
 
 std::unique_ptr<WindowHost> ShowWindow(ShowWindowDescriptor descriptor) {

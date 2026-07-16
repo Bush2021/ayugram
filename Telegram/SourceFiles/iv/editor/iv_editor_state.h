@@ -277,6 +277,7 @@ public:
 		bool forward) const;
 	[[nodiscard]] bool isActiveTopLevelParagraph() const;
 	[[nodiscard]] bool isActiveTopLevelParagraphOrHeading() const;
+	[[nodiscard]] bool hasActiveListItemSurface() const;
 	[[nodiscard]] bool activeSurfaceAllowsSeparateLineFormula() const;
 	[[nodiscard]] bool activeLeafUsesQuoteCaptionColor() const;
 	[[nodiscard]] bool activeLeafUsesQuotePlaceholderColor() const;
@@ -753,6 +754,10 @@ private:
 	[[nodiscard]] bool joinActiveParagraphBoundaryUnchecked(
 		bool forward,
 		ActiveTextSelectionTarget *target);
+	[[nodiscard]] bool canJoinActiveTextBlockBoundary(bool forward) const;
+	[[nodiscard]] bool canJoinActiveListItemBoundary() const;
+	[[nodiscard]] bool joinActiveListItemBoundaryUnchecked(
+		ActiveTextSelectionTarget *target);
 	[[nodiscard]] auto normalizeActiveListItemSurface()
 	-> std::optional<ActiveListItemSurface>;
 	[[nodiscard]] ApplyResult applyActiveTextUnchecked(TextWithEntities text);
@@ -833,6 +838,11 @@ private:
 	[[nodiscard]] bool unwrapMatchingListItemWrapper(
 		const Markdown::PreparedEditSelection &selection,
 		InsertBlockType type,
+		BoundaryTarget *destination = nullptr);
+	[[nodiscard]] bool unwrapListItemIntoParent(
+		const BlockPath &listPath,
+		int itemIndex,
+		bool materializeEmptyItem,
 		BoundaryTarget *destination = nullptr);
 	[[nodiscard]] std::vector<RichPage::Block> takeListItemBlocksForUnwrap(
 		RichPage::ListItem *item);

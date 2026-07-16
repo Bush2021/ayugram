@@ -1301,6 +1301,15 @@ bool EmojiListWidget::searchShortcutsShown() const {
 	return _searchMode && !_searchShortcutSets.empty();
 }
 
+bool EmojiListWidget::canConsumeHorizontalScroll(QPoint position, int) {
+	if (!searchShortcutsShown() || (_searchShortcutsScrollMax <= 0)) {
+		return false;
+	}
+	const auto top = searchShortcutsTop();
+	return (position.y() >= top)
+		&& (position.y() < top + searchShortcutsHeight());
+}
+
 bool EmojiListWidget::searchShortcutSelected() const {
 	return _searchSelectedSetId != 0;
 }

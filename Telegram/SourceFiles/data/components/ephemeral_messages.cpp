@@ -327,7 +327,9 @@ bool EphemeralMessages::wouldSend(const Api::MessageToSend &message) const {
 	}
 	if (const auto replyToId = realReplyId(message)) {
 		const auto replyTo = _session->data().message(replyToId);
-		return replyTo && replyTo->isEphemeral();
+		if (replyTo && replyTo->isEphemeral()) {
+			return true;
+		}
 	}
 	return findCommandBot(peer, message.textWithTags.text.trimmed())
 		!= nullptr;
@@ -340,6 +342,14 @@ bool EphemeralMessages::hasEphemeralCommand(
 		return false;
 	}
 	return findCommandBot(peer, text.trimmed()) != nullptr;
+}
+
+bool EphemeralMessages::wouldSendMedia(
+		not_null<PeerData*> peer,
+		FullReplyTo replyTo,
+		const QString &caption) const {
+	return isEphemeralBotReply(replyTo.messageId)
+		|| hasEphemeralCommand(peer, caption);
 }
 
 bool EphemeralMessages::isEphemeralBotReply(FullMsgId replyToId) const {
@@ -392,7 +402,6 @@ bool EphemeralMessages::trySend(const Api::MessageToSend &message) {
 			}
 			return true;
 		}
-		return false;
 	}
 	const auto bot = findCommandBot(peer, text.text);
 	if (!bot) {
@@ -463,27 +472,22 @@ bool EphemeralMessages::sendMedia(
 	const auto replyTo = item->replyTo();
 	const auto target = _session->data().message(replyTo.messageId);
 	if (!target || !target->isEphemeral()) {
-		const auto topicRoot = replyTo.topicRootId;
-		const auto realReply = replyTo.messageId
-			&& !(topicRoot && replyTo.messageId.msg == topicRoot);
-		if (!realReply) {
-			const auto bot = findCommandBot(
-				history->peer,
-				item->originalText().text.trimmed());
-			if (bot) {
-				request(
-					history,
-					bot,
-					item->originalText(),
-					media,
-					true,
-					0,
-					item->topicRootId(),
-					item->fullId(),
-					origin,
-					rebuildMedia);
-				return true;
-			}
+		const auto bot = findCommandBot(
+			history->peer,
+			item->originalText().text.trimmed());
+		if (bot) {
+			request(
+				history,
+				bot,
+				item->originalText(),
+				media,
+				true,
+				0,
+				item->topicRootId(),
+				item->fullId(),
+				origin,
+				rebuildMedia);
+			return true;
 		}
 		return false;
 	}

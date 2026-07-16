@@ -1409,6 +1409,8 @@ void HistoryWidget::initVoiceRecordBar() {
 	) | rpl::on_next([=](const auto &data) {
 		if (!_history) {
 			return;
+		} else if (data.progress >= 0 && suppressSendAction()) {
+			return;
 		}
 		session().sendProgressManager().update(
 			_history,
@@ -1663,7 +1665,9 @@ void HistoryWidget::initTabbedSelector() {
 		}
 		const auto type = Api::SendProgressType::ChooseSticker;
 		if (data != Selector::Action::Cancel) {
-			session().sendProgressManager().update(_history, type);
+			if (!suppressSendAction()) {
+				session().sendProgressManager().update(_history, type);
+			}
 		} else {
 			session().sendProgressManager().cancel(_history, type);
 		}
@@ -1953,7 +1957,7 @@ void HistoryWidget::initFieldAutocomplete() {
 		},
 		.sendMenuDetails = [=] { return sendMenuDetails(); },
 		.stickerChoosing = [=] {
-			if (_history) {
+			if (_history && !suppressSendAction()) {
 				session().sendProgressManager().update(
 					_history,
 					Api::SendProgressType::ChooseSticker);
@@ -2207,6 +2211,17 @@ Ui::ChatTheme *HistoryWidget::customChatTheme() const {
 	return _list ? _list->theme().get() : nullptr;
 }
 
+bool HistoryWidget::suppressSendAction() const {
+	if (!_history) {
+		return false;
+	}
+	auto &ephemeral = session().ephemeralMessages();
+	return ephemeral.isEphemeralBotReply(replyTo().messageId)
+		|| (_peer && ephemeral.hasEphemeralCommand(
+			_peer,
+			_field->getLastText()));
+}
+
 void HistoryWidget::fieldChanged() {
 	const auto updateTyping = (_textUpdateEvents
 		& TextUpdateEvent::SendTyping);
@@ -2217,7 +2232,8 @@ void HistoryWidget::fieldChanged() {
 			&& !_inlineBot
 			&& !_editMsgId
 			&& (!_autocomplete || !_autocomplete->stickersEmoji())
-			&& updateTyping) {
+			&& updateTyping
+			&& !suppressSendAction()) {
 			session().sendProgressManager().update(
 				_history,
 				Api::SendProgressType::Typing);
@@ -2347,8 +2363,15 @@ bool HistoryWidget::isComposeBoxOpen() const {
 			PeerId());
 }
 
+bool HistoryWidget::hasEditDraft() const {
+	return _history
+		&& (_history->localEditDraft(MsgId(), PeerId()) != nullptr);
+}
+
 bool HistoryWidget::bypassNormalDraftHandling() const {
-	return !_editMsgId && isComposeBoxOpen();
+	return !_editMsgId
+		&& !hasEditDraft()
+		&& isComposeBoxOpen();
 }
 
 bool HistoryWidget::shouldShowRichDraftPreview() const {
@@ -2789,6 +2812,7 @@ void HistoryWidget::fastShowAtEnd(not_null<History*> history) {
 
 bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 	if (bypassNormalDraftHandling()) {
+		clearFieldText(0, fieldHistoryAction);
 		updateCmdStartShown();
 		updateControlsVisibility();
 		updateControlsGeometry();
@@ -2803,7 +2827,7 @@ bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 	const auto editDraft = _history
 		? _history->localEditDraft(MsgId(), PeerId())
 		: nullptr;
-	const auto richDraft = shouldShowRichDraftPreview()
+	const auto richDraft = (!editDraft && shouldShowRichDraftPreview())
 		? cloudDraft()
 		: nullptr;
 	const auto draft = editDraft
@@ -2894,6 +2918,7 @@ bool HistoryWidget::applyDraft(FieldHistoryAction fieldHistoryAction) {
 		if (!_replyEditMsg) {
 			requestMessageData(_editMsgId);
 		}
+		updateExpandButtonVisibility();
 		if (editDraft && editDraft->suggest) {
 			using namespace HistoryView;
 			applySuggestOptions(editDraft->suggest, SuggestMode::Change);
@@ -7234,6 +7259,10 @@ void HistoryWidget::updateExpandButtonVisibility() {
 		|| _voiceRecordBar->isActive()
 		|| !hasEnoughLinesForExpand()
 		|| (textExceedsMaxSize() && !editingMessage())
+		|| (_editMsgId
+			&& _replyEditMsg
+			&& _replyEditMsg->media()
+			&& !_replyEditMsg->media()->webpage())
 		|| !Iv::Editor::CanAuthorRichMessages(&session());
 	if (_expand->isHidden() != hidden) {
 		_expand->setVisible(!hidden);
@@ -10252,6 +10281,9 @@ void HistoryWidget::setReplyFieldsFromProcessing() {
 void HistoryWidget::editMessage(
 		not_null<HistoryItem*> item,
 		const TextSelection &selection) {
+	if (Iv::Editor::ActivateEditWindowFor(&session(), item->fullId())) {
+		return;
+	}
 	if (item->richPage()) {
 		Iv::Editor::ShowEditBox(controller(), item);
 		return;
@@ -10645,6 +10677,13 @@ void HistoryWidget::confirmDeleteSelected() {
 
 	auto ids = _list->getSelectedItems();
 	if (ids.empty()) {
+		auto ephemeral = _list->getSelectedEphemeral();
+		if (!ephemeral.empty()) {
+			ConfirmDeleteSelectedEphemeral(
+				controller()->uiShow(),
+				std::move(ephemeral),
+				crl::guard(this, [=] { clearSelected(); }));
+		}
 		return;
 	}
 	const auto items = session().data().idsToItems(ids);

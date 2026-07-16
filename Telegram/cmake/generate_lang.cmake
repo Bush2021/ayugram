@@ -33,64 +33,52 @@ function(generate_lang target_name lang_file src_loc)
     )
     generate_target(${target_name} lang ${gen_timestamp} "${gen_files}" ${gen_dst})
 
-    file(GLOB_RECURSE lang_sources CONFIGURE_DEPENDS
-        ${src_loc}/*.cpp
-        ${src_loc}/*.h
-        ${src_loc}/*.mm
-    )
+    if (NOT CMAKE_GENERATOR STREQUAL "Xcode")
+        file(GLOB_RECURSE lang_sources CONFIGURE_DEPENDS
+            ${src_loc}/*.cpp
+            ${src_loc}/*.h
+            ${src_loc}/*.mm
+        )
 
-    # Xcode resolves precompiled headers through its SharedPrecompiledHeaders
-    # cache, which is keyed on the full command line of each translation unit.
-    # A per-source LANG_KEYS_SUBSET define makes every command line unique, so
-    # the shared prefix header gets precompiled once per source file and fills
-    # up the disk. Other generators precompile once per target and pass the
-    # result with -include, so the define is free there. Without the define the
-    # generated lang header falls back to the full keys header, which only
-    # costs compile time.
-    set(use_subset_defines TRUE)
-    if (CMAKE_GENERATOR STREQUAL "Xcode")
-        set(use_subset_defines FALSE)
-    endif()
-
-    set(subset_headers "")
-    foreach (entry ${lang_sources})
-        if (entry MATCHES "\\.(cpp|mm)$")
-            file(RELATIVE_PATH relative ${src_loc} ${entry})
-            list(APPEND subset_headers ${gen_dst}/lang_subsets/${relative}.h)
-            if (use_subset_defines)
+        set(subset_headers "")
+        foreach (entry ${lang_sources})
+            if (entry MATCHES "\\.(cpp|mm)$")
+                file(RELATIVE_PATH relative ${src_loc} ${entry})
+                list(APPEND subset_headers ${gen_dst}/lang_subsets/${relative}.h)
                 set_property(SOURCE ${entry} APPEND PROPERTY COMPILE_DEFINITIONS
                     "LANG_KEYS_SUBSET=\"lang_subsets/${relative}.h\"")
             endif()
-        endif()
-    endforeach()
+        endforeach()
 
-    set(subsets_timestamp ${gen_dst}/lang_subsets.timestamp)
-    add_custom_command(
-    OUTPUT
-        ${subsets_timestamp}
-        ${subset_headers}
-    COMMAND
-        codegen_lang
-        --subsets-only
-        -o${gen_dst}
-        -s${src_loc}
-        ${lang_file}
-    COMMAND
-        ${CMAKE_COMMAND} -E touch ${subsets_timestamp}
-    COMMENT "Generating lang subsets (${target_name})"
-    DEPENDS
-        codegen_lang
-        ${gen_keys}
-        ${lang_sources}
-    )
-    add_custom_target(${target_name}_lang_subsets DEPENDS ${subsets_timestamp})
-    init_target_folder(${target_name}_lang_subsets "(gen)")
+        set(subsets_timestamp ${gen_dst}/lang_subsets.timestamp)
+        add_custom_command(
+        OUTPUT
+            ${subsets_timestamp}
+            ${subset_headers}
+        COMMAND
+            codegen_lang
+            --subsets-only
+            -o${gen_dst}
+            -s${src_loc}
+            ${lang_file}
+        COMMAND
+            ${CMAKE_COMMAND} -E touch ${subsets_timestamp}
+        COMMENT "Generating lang subsets (${target_name})"
+        DEPENDS
+            codegen_lang
+            ${gen_keys}
+            ${lang_sources}
+        )
+        add_custom_target(${target_name}_lang_subsets DEPENDS ${subsets_timestamp})
+        init_target_folder(${target_name}_lang_subsets "(gen)")
 
-    # The subsets command reads ${gen_keys}, which the lang command declares as
-    # a BYPRODUCT. CMake only pulls a producing command into a consuming target
-    # for files listed as its OUTPUT, so without this the Visual Studio
-    # generator may run the subsets command before the keys header exists.
-    add_dependencies(${target_name}_lang_subsets ${target_name}_lang)
+        # The subsets command reads ${gen_keys}, which the lang command declares
+        # as a BYPRODUCT. CMake only pulls a producing command into a consuming
+        # target for files listed as its OUTPUT, so without this the Visual
+        # Studio generator may run the subsets command before the keys header
+        # exists.
+        add_dependencies(${target_name}_lang_subsets ${target_name}_lang)
 
-    add_dependencies(${target_name} ${target_name}_lang_subsets)
+        add_dependencies(${target_name} ${target_name}_lang_subsets)
+    endif()
 endfunction()

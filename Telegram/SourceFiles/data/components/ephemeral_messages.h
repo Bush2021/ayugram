@@ -47,6 +47,10 @@ public:
 	[[nodiscard]] bool hasEphemeralCommand(
 		not_null<PeerData*> peer,
 		const QString &text) const;
+	[[nodiscard]] bool wouldSendMedia(
+		not_null<PeerData*> peer,
+		FullReplyTo replyTo,
+		const QString &caption) const;
 	[[nodiscard]] bool isEphemeralBotReply(FullMsgId replyToId) const;
 	[[nodiscard]] bool trySend(const Api::MessageToSend &message);
 	void send(
