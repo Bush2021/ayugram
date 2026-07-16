@@ -13,7 +13,7 @@ jobs:
       matrix:
         arch: [x64]
         qt: [""]
-        generator: [""]
+        generator: ["Ninja Multi-Config"]
 
     env:
       UPLOAD_ARTIFACT: "true"
