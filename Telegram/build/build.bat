@@ -291,10 +291,16 @@ if %BuildUWP% neq 0 (
 ) else (
   if not exist "%ReleasePath%\deploy" mkdir "%ReleasePath%\deploy"
   if not exist "%ReleasePath%\deploy\%AppVersionStrMajor%" mkdir "%ReleasePath%\deploy\%AppVersionStrMajor%"
-  mkdir "%DeployPath%\%BinaryName%\modules\%Platform%\d3d" || goto error
+  if %BuildARM% neq 0 (
+    mkdir "%DeployPath%\%BinaryName%" || goto error
+  ) else (
+    mkdir "%DeployPath%\%BinaryName%\modules\%Platform%\d3d" || goto error
+  )
 
   move "%ReleasePath%\%BinaryName%.exe" "%DeployPath%\%BinaryName%\" || goto error
-  xcopy "%ReleasePath%\modules\%Platform%\d3d\d3dcompiler_47.dll" "%DeployPath%\%BinaryName%\modules\%Platform%\d3d\" || goto error
+  if %BuildARM% equ 0 (
+    xcopy "%ReleasePath%\modules\%Platform%\d3d\d3dcompiler_47.dll" "%DeployPath%\%BinaryName%\modules\%Platform%\d3d\" || goto error
+  )
   move "%ReleasePath%\Updater.exe" "%DeployPath%\" || goto error
   move "%ReleasePath%\%BinaryName%.pdb" "%DeployPath%\" || goto error
   move "%ReleasePath%\Updater.pdb" "%DeployPath%\" || goto error

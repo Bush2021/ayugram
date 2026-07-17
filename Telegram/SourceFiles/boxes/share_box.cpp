@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/business/data_shortcut_messages.h"
 #include "data/data_channel.h"
 #include "data/data_chat_filters.h"
+#include "data/data_community.h"
 #include "data/data_game.h"
 #include "data/data_histories.h"
 #include "data/data_user.h"
@@ -156,6 +157,7 @@ private:
 	void changeCheckState(Chat *chat);
 	void chooseForumTopic(not_null<Data::Forum*> forum);
 	void chooseMonoforumSublist(not_null<Data::SavedMessages*> monoforum);
+	void chooseCommunityChat(not_null<Data::CommunityInfo*> community);
 	enum class ChangeStateWay {
 		Default,
 		SkipCallback,
@@ -859,6 +861,7 @@ ShareBox::Inner::Inner(
 			if (const auto history = row->history()) {
 				if (!history->peer->isSelf()
 					&& (history->asForum()
+						|| JoinedCommunityChats(history->peer)
 						|| _descriptor.filterCallback(history))) {
 					_defaultChatsIndexed->addToEnd(history);
 				}
@@ -1233,9 +1236,14 @@ ShareBox::Inner::Chat::Chat(
 	st.checkbox,
 	updateCallback,
 	PaintUserpicCallback(peer, true),
-	[=](int size) { return (peer->isForum() || peer->isMonoforum())
-		? int(size * Ui::ForumUserpicRadiusMultiplier())
-		: std::optional<int>(); })
+	[=](int size) {
+		const auto channel = peer->asChannel();
+		return (peer->isForum()
+			|| peer->isMonoforum()
+			|| (channel && channel->isCommunity()))
+			? int(size * Ui::ForumUserpicRadiusMultiplier())
+			: std::optional<int>();
+	})
 , name(st.checkbox.imageRadius * 2) {
 }
 
@@ -1381,12 +1389,15 @@ void ShareBox::Inner::changeCheckState(Chat *chat) {
 	const auto checked = chat->checkbox.checked();
 	const auto forum = chat->peer->forum();
 	const auto monoforum = chat->peer->monoforum();
-	if (checked || (!forum && !monoforum)) {
+	const auto community = JoinedCommunityChats(chat->peer);
+	if (checked || (!forum && !monoforum && !community)) {
 		changePeerCheckState(chat, !checked);
 	} else if (forum) {
 		chooseForumTopic(forum);
 	} else if (monoforum) {
 		chooseMonoforumSublist(monoforum);
+	} else if (community) {
+		chooseCommunityChat(community);
 	}
 }
 
@@ -1480,6 +1491,66 @@ void ShareBox::Inner::chooseMonoforumSublist(
 	auto box = Box<PeerListBox>(
 		std::make_unique<ChooseSublistBoxController>(
 			monoforum,
+			std::move(chosen),
+			std::move(filter)),
+		std::move(initBox));
+	*weak = box.data();
+	_show->showBox(std::move(box));
+}
+
+void ShareBox::Inner::chooseCommunityChat(
+		not_null<Data::CommunityInfo*> community) {
+	const auto guard = base::make_weak(this);
+	const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
+	auto chosen = [=](not_null<Data::Thread*> thread) {
+		if (const auto strong = *weak) {
+			strong->closeBox();
+		}
+		if (!guard) {
+			return;
+		}
+		const auto history = thread->owningHistory();
+		auto row = _chatsIndexed->getRow(history);
+		if (!row) {
+			row = _chatsIndexed->addToEnd(history).main;
+		}
+		const auto chat = getChat(row);
+		if (chat->checkbox.checked()) {
+			changePeerCheckState(chat, false);
+		}
+		_chatsIndexed->moveToTop(history);
+		refresh();
+		if (const auto topic = thread->asTopic()) {
+			chat->topic = topic;
+			chat->topic->destroyed(
+			) | rpl::on_next([=] {
+				changePeerCheckState(chat, false);
+			}, chat->topicLifetime);
+		}
+		updateChatName(chat);
+		changePeerCheckState(chat, true);
+	};
+	auto initBox = [=](not_null<PeerListBox*> box) {
+		box->addButton(tr::lng_cancel(), [=] {
+			box->closeBox();
+		});
+
+		community->channel()->flagsValue(
+		) | rpl::filter([=](const ChannelData::Flags::Change &update) {
+			using Flag = ChannelData::Flag;
+			return (update.diff & Flag::Community)
+				&& !(update.value & Flag::Community);
+		}) | rpl::on_next([=] {
+			box->closeBox();
+		}, box->lifetime());
+	};
+	auto filter = [=](not_null<Data::Thread*> thread) {
+		return guard
+			&& (thread->asForum() || _descriptor.filterCallback(thread));
+	};
+	auto box = Box<PeerListBox>(
+		std::make_unique<ChooseCommunityChatBoxController>(
+			community,
 			std::move(chosen),
 			std::move(filter)),
 		std::move(initBox));
@@ -1583,6 +1654,7 @@ void ShareBox::Inner::applyChatFilter(FilterId id) {
 			for (const auto &row : list->all()) {
 				if (const auto history = row->history()) {
 					if (history->asForum()
+							|| JoinedCommunityChats(history->peer)
 							|| _descriptor.filterCallback(history)) {
 						_customChatsIndexed->addToEnd(history);
 					}
@@ -1613,6 +1685,7 @@ void ShareBox::Inner::peopleReceived(
 				const auto history = _descriptor.session->data().history(
 					peer);
 				if (!history->asForum()
+					&& !JoinedCommunityChats(peer)
 					&& !_descriptor.filterCallback(history)) {
 					continue;
 				} else if (history && _chatsIndexed->getRow(history)) {

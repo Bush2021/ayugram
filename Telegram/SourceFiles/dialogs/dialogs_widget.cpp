@@ -1297,20 +1297,15 @@ void Widget::setupTopBarSuggestions() {
 			auto on = rpl::combine(
 				controller()->activeChatsFilter(),
 				_openedFolderOrForumChanges.events_starting_with(false),
-				widthValue() | rpl::map(
-					_1 >= st::columnMinimalWidthLeft
-				) | rpl::distinct_until_changed(),
 				_searchStateForTopBarSuggestion.events_starting_with(
 					!_searchState.query.isEmpty()),
 				_jumpToDate->toggledValue()
 			) | rpl::map([=](
 					FilterId id,
 					bool folderOrForum,
-					bool wide,
 					bool search,
 					bool searchInPeer) {
 				return !folderOrForum
-					&& wide
 					&& !search
 					&& !searchInPeer
 					&& (id == owner->chatsFilters().defaultId());

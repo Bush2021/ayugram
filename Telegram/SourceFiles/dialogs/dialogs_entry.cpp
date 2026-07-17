@@ -259,7 +259,8 @@ bool Entry::hasUnreadUnmutedForSort() const {
 	const auto state = chatListUnreadState();
 	return (state.messages > state.messagesMuted)
 		|| (state.marks > state.marksMuted)
-		|| (state.reactions > state.reactionsMuted);
+		|| (state.reactions > state.reactionsMuted)
+		|| (state.mentions > 0);
 }
 
 void Entry::updateChatListExistence() {
