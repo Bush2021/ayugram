@@ -273,7 +273,6 @@ private:
 		None,
 		ThreeDots,
 		Plus,
-		MediaPixels,
 		UploadRadial,
 		LayoutSwitch,
 	};
@@ -358,6 +357,7 @@ private:
 		Markdown::PreparedEditHit anchorHit;
 		int textSegment = -1;
 		int textOffset = 0;
+		std::optional<int> interruptedFieldAnchor;
 		ArticleSelectionOperation operation
 			= ArticleSelectionOperation::None;
 		DragSelectionMode mode = DragSelectionMode::None;
@@ -509,8 +509,6 @@ private:
 		std::vector<RichPage::Block> blocks,
 		std::optional<State::ActiveTextInsertContext> context,
 		bool useStructuralSelection = true);
-	[[nodiscard]] std::optional<State::TextNodeSpan>
-	visibleFullDemotableFieldTextSpan() const;
 	[[nodiscard]] std::optional<MathEditRequest> activeMathEditRequest() const;
 	[[nodiscard]] MathEditRequest newDisplayMathRequest() const;
 	[[nodiscard]] int richOffsetForFieldOffset(

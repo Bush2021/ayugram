@@ -2161,9 +2161,10 @@ std::unique_ptr<Data::Draft> ComposeControls::readThreadFieldDraft() const {
 		return nullptr;
 	}
 	auto result = std::make_unique<Data::Draft>(
-		_field,
+		getTextWithAppliedMarkdown(),
 		_header->getDraftReply(),
 		_header->suggestOptions(),
+		MessageCursor(_field),
 		_preview ? _preview->draft() : Data::WebPageDraft());
 	result->reply.topicRootId = _topicRootId;
 	result->reply.monoforumPeerId = _monoforumPeerId;

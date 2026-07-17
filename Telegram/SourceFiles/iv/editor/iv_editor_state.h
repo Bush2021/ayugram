@@ -63,6 +63,9 @@ public:
 		double longitude = 0.;
 	};
 
+	[[nodiscard]] static bool BlockConversionExpandsToActiveLine(
+		InsertBlockType type);
+
 	enum class BlockContainerKind : uchar {
 		Root,
 		BlockChildren,
@@ -272,6 +275,10 @@ public:
 	[[nodiscard]] std::optional<int> previousEditableOrdinal() const;
 	[[nodiscard]] std::optional<int> nextEditableOrdinal() const;
 	[[nodiscard]] std::optional<int> firstTableCellOrdinalFromActiveTitle() const;
+	[[nodiscard]] std::optional<int> adjacentRowTableCellOrdinal(
+		bool down) const;
+	[[nodiscard]] std::optional<int> tableTitleOrdinalFromActiveCell() const;
+	[[nodiscard]] std::optional<int> ordinalAfterActiveTable() const;
 	[[nodiscard]] BoundaryTarget activeBoundaryTarget(bool forward) const;
 	[[nodiscard]] std::vector<BoundaryTarget> boundarySteps(
 		bool forward) const;
@@ -572,7 +579,7 @@ private:
 		int columnTill = -1;
 	};
 
-	struct ActiveNonPullquoteQuote {
+	struct ActiveQuote {
 		BlockPath path;
 		bool activeLeafIsLastEditableBodyLeaf = false;
 	};
@@ -738,8 +745,8 @@ private:
 		int index);
 	[[nodiscard]] auto resolveActiveTextInsertTarget()
 	-> std::optional<ActiveTextInsertTarget>;
-	[[nodiscard]] auto activeNonPullquoteQuote() const
-	-> std::optional<ActiveNonPullquoteQuote>;
+	[[nodiscard]] auto activeQuote(bool pullquote) const
+	-> std::optional<ActiveQuote>;
 	[[nodiscard]] auto activeListItemSurface() const
 	-> std::optional<ActiveListItemSurface>;
 	[[nodiscard]] std::optional<LeafPath> leafAfterUnwrappingBlockChildren(
@@ -748,7 +755,12 @@ private:
 	[[nodiscard]] bool unwrapActiveCodeBlockUnchecked(
 		const ActiveTextInsertContext &context,
 		ActiveTextSelectionTarget *target);
-	[[nodiscard]] bool unwrapActiveBlockquoteUnchecked(
+	[[nodiscard]] bool unwrapActiveQuoteUnchecked(
+		bool pullquote,
+		const ActiveTextInsertContext &context,
+		ActiveTextSelectionTarget *target);
+	[[nodiscard]] bool convertActiveHeadingOrFooterUnchecked(
+		InsertAction action,
 		const ActiveTextInsertContext &context,
 		ActiveTextSelectionTarget *target);
 	[[nodiscard]] bool joinActiveParagraphBoundaryUnchecked(
@@ -958,6 +970,9 @@ private:
 	[[nodiscard]] static bool StripWrapperEntityInEditMode(EntityType type);
 	[[nodiscard]] static TextWithEntities StripEditModeWrapperEntities(
 		TextWithEntities text);
+	static void StripEditModeWrapperEntities(RichPage::RichText &text);
+	static void StripEditModeWrapperEntities(
+		std::vector<RichPage::Block> &blocks);
 
 	std::shared_ptr<RichPage> _richPage;
 	std::shared_ptr<Markdown::MediaRuntime> _mediaRuntime;

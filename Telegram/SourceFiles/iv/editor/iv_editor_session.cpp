@@ -580,12 +580,8 @@ public:
 			if (const auto entry = LookupComposeThreadEntry(composeKey)) {
 				if (entry->readDraft) {
 					if (const auto draft = entry->readDraft()) {
-						const auto &withTags = draft->textWithTags;
-						auto migrated = SplitTextIntoRichPage({
-							withTags.text,
-							TextUtilities::ConvertTextTagsToEntities(
-								withTags.tags),
-						});
+						auto migrated = SplitTextIntoRichPage(
+							draft->textWithTags);
 						if (!migrated.blocks.empty()) {
 							*page = std::move(migrated);
 							if (entry->migratedAway) {
@@ -662,12 +658,7 @@ public:
 		if (const auto entry = LookupComposeThreadEntry(composeKey)) {
 			if (entry->readDraft) {
 				if (const auto draft = entry->readDraft()) {
-					const auto &withTags = draft->textWithTags;
-					*page = SplitTextIntoRichPage({
-						withTags.text,
-						TextUtilities::ConvertTextTagsToEntities(
-							withTags.tags),
-					});
+					*page = SplitTextIntoRichPage(draft->textWithTags);
 				}
 			}
 			if (entry->migratedAway) {

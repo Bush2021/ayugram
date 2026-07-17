@@ -2387,9 +2387,10 @@ std::unique_ptr<Data::Draft> HistoryWidget::readThreadFieldDraft() const {
 		return nullptr;
 	}
 	auto result = std::make_unique<Data::Draft>(
-		_field,
+		_field->getTextWithAppliedMarkdown(),
 		_replyTo,
 		suggestOptions(),
+		MessageCursor(_field),
 		_preview ? _preview->draft() : Data::WebPageDraft());
 	return Data::DraftIsNull(result.get()) ? nullptr : std::move(result);
 }
