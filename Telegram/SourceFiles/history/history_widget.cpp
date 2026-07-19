@@ -4458,7 +4458,7 @@ void HistoryWidget::destroyUnreadBar() {
 void HistoryWidget::destroyUnreadBarOnClose() {
 	if (!_history || !_historyInited) {
 		return;
-	} else if (_scroll->scrollTop() == _scroll->scrollTopMax()) {
+	} else if (_scroll->scrollTop() >= _scroll->scrollTopMax()) {
 		destroyUnreadBar();
 		return;
 	}
@@ -8390,7 +8390,7 @@ void HistoryWidget::updateHistoryGeometry(
 		return;
 	}
 	const auto wasScrollTop = _scroll->scrollTop();
-	const auto wasAtBottom = (wasScrollTop == _scroll->scrollTopMax());
+	const auto wasAtBottom = (wasScrollTop >= _scroll->scrollTopMax());
 	const auto needResize = (_scroll->width() != newScrollWidth)
 		|| (_scroll->height() != newScrollHeight);
 	if (needResize) {
@@ -8492,7 +8492,7 @@ void HistoryWidget::revealItemsCallback() {
 	}
 	if (_itemsRevealHeight != height) {
 		const auto wasScrollTop = _scroll->scrollTop();
-		const auto wasAtBottom = (wasScrollTop == _scroll->scrollTopMax());
+		const auto wasAtBottom = (wasScrollTop >= _scroll->scrollTopMax());
 		if (!wasAtBottom) {
 			height = 0;
 			_itemRevealAnimations.clear();

@@ -3831,11 +3831,25 @@ void ComposeControls::initExpandButton() {
 			const auto item = _history->owner().message(
 				_header->editMsgId());
 			if (item && Iv::Editor::CheckRichMessagesPremium(_regularWindow)) {
-				Iv::Editor::ShowEditFromFieldBox(
-					_regularWindow,
-					item,
-					_sendActionFactory());
+				if (hasRichDraftThreadScope()) {
+					Iv::Editor::ShowEditFromFieldBox(
+						_regularWindow,
+						item,
+						_sendActionFactory());
+				} else {
+					Iv::Editor::ShowEditFromFieldBox(
+						_regularWindow,
+						item,
+						_sendActionFactory(),
+						getTextWithAppliedMarkdown(),
+						crl::guard(_wrap.get(), [=] {
+							cancelEditMessage();
+						}));
+				}
 			}
+			return;
+		}
+		if (_mode != Mode::Normal || !hasRichDraftThreadScope()) {
 			return;
 		}
 		Iv::Editor::ShowComposeBox(
@@ -4224,6 +4238,8 @@ void ComposeControls::updateExpandButtonVisibility() {
 	const auto hidden = !_wrap->isVisible()
 		|| _recording.current()
 		|| !_field->isVisible()
+		|| ((_mode != Mode::Normal || !hasRichDraftThreadScope())
+			&& !isEditingMessage())
 		|| !hasEnoughLinesForExpand()
 		|| textExceedsMaxSize()
 		|| (media && !media->webpage())
@@ -4493,7 +4509,8 @@ void ComposeControls::updateAttachBotsMenu() {
 		|| !_features.attachments
 		|| !_history
 		|| !_sendActionFactory
-		|| !_regularWindow) {
+		|| !_regularWindow
+		|| (_mode != Mode::Normal)) {
 		return;
 	}
 	_attachBotsMenu = InlineBots::MakeAttachBotsMenu(
@@ -4658,8 +4675,10 @@ void ComposeControls::editMessage(
 
 void ComposeControls::editMessage(not_null<HistoryItem*> item) {
 	Expects(_history != nullptr);
-	Expects(draftKeyCurrent() != Data::DraftKey::None());
 
+	if (draftKey(DraftType::Edit) == Data::DraftKey::None()) {
+		return;
+	}
 	if (item->richPage()) {
 		if (!_regularWindow) {
 			_show->showToast(tr::lng_edit_error(tr::now));
@@ -4775,8 +4794,10 @@ void ComposeControls::maybeCancelEditMessage() {
 
 void ComposeControls::replyToMessage(FullReplyTo id) {
 	Expects(_history != nullptr);
-	Expects(draftKeyCurrent() != Data::DraftKey::None());
 
+	if (draftKey(DraftType::Normal) == Data::DraftKey::None()) {
+		return;
+	}
 	id.topicRootId = _topicRootId;
 	id.monoforumPeerId = _monoforumPeerId;
 	if (!id) {

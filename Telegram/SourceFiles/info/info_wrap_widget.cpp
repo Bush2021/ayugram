@@ -1115,7 +1115,8 @@ void WrapWidget::resizeEvent(QResizeEvent *e) {
 }
 
 void WrapWidget::keyPressEvent(QKeyEvent *e) {
-	if (_content && _content->processZoomKey(e)) {
+	if (_content
+		&& (_content->processZoomKey(e) || _content->processScrollKey(e))) {
 		return;
 	}
 	if (e->key() == Qt::Key_Escape || e->key() == Qt::Key_Back) {
