@@ -5,11 +5,10 @@
 - [Choose architecture and initialize terminal](#choose-architecture-and-initialize-terminal)
 - [Clone source code and prepare libraries](#clone-source-code-and-prepare-libraries)
 - [Build the project](#build-the-project)
-- [Qt Visual Studio Tools](#qt-visual-studio-tools)
 
 ## Prepare folder
 
-The build is done in **Visual Studio 2026** with **10.0.26100.0** SDK version.
+The build uses the MSVC toolchain from **Visual Studio 2026** with **10.0.26100.0** SDK version and CMake with Ninja.
 
 Choose an empty folder for the future build, for example **D:\\TBuild**. It will be named ***BuildPath*** in the rest of this document. Create two folders there, ***BuildPath*\\ThirdParty** and ***BuildPath*\\Libraries**.
 
@@ -19,6 +18,7 @@ The default modern toolset from Visual Studio 2026 (`v145`) does not support Win
 
 * Download **Python 3.14** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
 * Download **Git** installer from [https://git-scm.com/download/win](https://git-scm.com/download/win) and install it.
+* In the Visual Studio Installer, install the Desktop development with C++ workload, including CMake tools for Windows and Ninja.
 
 ## Choose architecture and initialize terminal
 
@@ -48,15 +48,19 @@ Go to ***BuildPath*\\ayugram\\Telegram** and run:
 
 For `win` (32-bit):
 
-    configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+    configure.bat -G "Ninja Multi-Config" -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
 
 For `win64` (64-bit):
 
-    configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+    configure.bat -G "Ninja Multi-Config" -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
 
-* Open ***BuildPath*\\ayugram\\out\\Telegram.slnx** in Visual Studio 2026
-* Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
-* The result AyuGram.exe will be located in **D:\TBuild\ayugram\out\Debug** (and **Release**)
+Build the Release version:
+
+    cmake --build ..\out --config Release --target Telegram --parallel
+
+For a Debug build, replace `Release` with `Debug`. The result `AyuGram.exe` will be located in **D:\TBuild\ayugram\out\Release** or **D:\TBuild\ayugram\out\Debug**.
+
+After the first configuration, source-only changes normally need only the `cmake --build` command. Re-run `configure.bat` when changing CMake options or CMake files. A build directory configured with the Visual Studio generator cannot be reused with Ninja; remove and reconfigure `out` when switching generators.
 
 If you encounter issue like `error C1090: PDB API call failed, error code '12'` on Release build, apply the following patch in `tdesktop/cmake` folder (via pwsh or manually):
 
@@ -102,12 +106,3 @@ option(DESKTOP_APP_TEST_APPS "Build test apps, development only." OFF)
 option(DESKTOP_APP_LOTTIE_DISABLE_RECOLORING "Disable recoloring of lottie animations." OFF)
 '@ | git -C cmake apply -
 ```
-
-### Qt Visual Studio Tools
-
-For better debugging you may want to install Qt Visual Studio Tools:
-
-* Open **Extensions** -> **Manage Extensions**
-* Go to **Online** tab
-* Search for **Qt**
-* Install **Qt Visual Studio Tools** extension
