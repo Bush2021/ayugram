@@ -385,25 +385,16 @@ void UserData::setName(
 
 	bool changeName = !filteredFirstName.isEmpty() || !filteredLastName.isEmpty();
 
-	QString newFullName;
 	if (changeName && filteredFirstName.trimmed().isEmpty()) {
 		firstName = filteredLastName;
 		lastName = QString();
-		newFullName = firstName;
 	} else {
 		if (changeName) {
 			firstName = filteredFirstName;
 			lastName = filteredLastName;
 		}
-		newFullName = lastName.isEmpty()
-			? firstName
-			: tr::lng_full_name(
-				tr::now,
-				lt_first_name,
-				firstName,
-				lt_last_name,
-				lastName);
 	}
+	const auto newFullName = langFullName(firstName, lastName);
 	updateNameDelayed(newFullName, newPhoneName, newUsername);
 }
 

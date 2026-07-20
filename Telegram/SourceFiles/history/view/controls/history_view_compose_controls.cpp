@@ -1190,7 +1190,6 @@ rpl::producer<> ComposeControls::showScheduledRequests() const {
 
 ComposeControls::~ComposeControls() {
 	saveFieldToHistoryLocalDraft();
-	unregisterThreadFieldBridge();
 	unregisterDraftSources();
 	setTabbedPanel(nullptr);
 	session().api().request(_inlineBotResolveRequestId).cancel();
@@ -1201,11 +1200,11 @@ Main::Session &ComposeControls::session() const {
 }
 
 void ComposeControls::updateTopicRootId(MsgId topicRootId) {
-	unregisterThreadFieldBridge();
+	untrackThreadFieldVisibility();
 	unregisterDraftSources();
 	_topicRootId = topicRootId;
 	_header->updateTopicRootId(_topicRootId);
-	registerThreadFieldBridge();
+	trackThreadFieldVisibility();
 	registerDraftSource();
 	updateFieldVisibility();
 }
@@ -1214,6 +1213,7 @@ void ComposeControls::updateShortcutId(BusinessShortcutId shortcutId) {
 	unregisterDraftSources();
 	_shortcutId = shortcutId;
 	registerDraftSource();
+	updateExpandButtonVisibility();
 }
 
 void ComposeControls::setHistory(SetHistoryArgs &&args) {
@@ -1234,15 +1234,14 @@ void ComposeControls::setHistory(SetHistoryArgs &&args) {
 	if (_history == history) {
 		return;
 	}
-	unregisterThreadFieldBridge();
+	untrackThreadFieldVisibility();
 	unregisterDraftSources();
 	_history = history;
 	_topicRootId = args.topicRootId;
 	_monoforumPeerId = args.monoforumPeerId;
 	_historyLifetime.destroy();
-	_threadFieldBridgeLifetime.destroy();
 	_header->setHistory(args);
-	registerThreadFieldBridge();
+	trackThreadFieldVisibility();
 	registerDraftSource();
 	_selector->setCurrentPeer(history ? history->peer.get() : nullptr);
 	initFieldAutocomplete();
@@ -1398,6 +1397,14 @@ void ComposeControls::updateFeatures(ChatHelpers::ComposeFeatures features) {
 	if (was.emojiOnlyPanel != features.emojiOnlyPanel) {
 		initFieldAutocomplete();
 	}
+	if (was.richEditor != features.richEditor) {
+		untrackThreadFieldVisibility();
+		unregisterDraftSources();
+		trackThreadFieldVisibility();
+		registerDraftSource();
+		updateExpandButtonVisibility();
+		changed = true;
+	}
 	if (changed) {
 		updateControlsGeometry(_wrap->size());
 	}
@@ -1405,14 +1412,14 @@ void ComposeControls::updateFeatures(ChatHelpers::ComposeFeatures features) {
 
 void ComposeControls::setCurrentDialogsEntryState(
 		Dialogs::EntryState state) {
-	unregisterThreadFieldBridge();
+	untrackThreadFieldVisibility();
 	unregisterDraftSources();
 	state.currentReplyTo.topicRootId = _topicRootId;
 	state.currentReplyTo.monoforumPeerId = _monoforumPeerId;
 	state.currentSuggest = SuggestOptions();
 	_currentDialogsEntryState = state;
 	updateForwarding();
-	registerThreadFieldBridge();
+	trackThreadFieldVisibility();
 	registerDraftSource();
 }
 
@@ -2133,7 +2140,18 @@ bool ComposeControls::isComposeBoxOpen() const {
 }
 
 bool ComposeControls::hasRichDraftThreadScope() const {
-	return draftKey(DraftType::Normal).isLocal();
+	return _features.richEditor
+		&& draftKey(DraftType::Normal).isLocal();
+}
+
+bool ComposeControls::isShortcutComposeEligible() const {
+	return _features.richEditor
+		&& _history
+		&& !isEditingMessage()
+		&& (_mode == Mode::Normal)
+		&& (_currentDialogsEntryState.section
+			== Dialogs::EntryState::Section::ShortcutMessages)
+		&& (_shortcutId > 0);
 }
 
 bool ComposeControls::hasEditDraft() const {
@@ -2156,37 +2174,6 @@ bool ComposeControls::shouldShowRichDraftPreview() const {
 		&& draft->hasRichMessage();
 }
 
-std::unique_ptr<Data::Draft> ComposeControls::readThreadFieldDraft() const {
-	if (!_history || !hasRichDraftThreadScope()) {
-		return nullptr;
-	}
-	auto result = std::make_unique<Data::Draft>(
-		getTextWithAppliedMarkdown(),
-		_header->getDraftReply(),
-		_header->suggestOptions(),
-		MessageCursor(_field),
-		_preview ? _preview->draft() : Data::WebPageDraft());
-	result->reply.topicRootId = _topicRootId;
-	result->reply.monoforumPeerId = _monoforumPeerId;
-	return Data::DraftIsNull(result.get()) ? nullptr : std::move(result);
-}
-
-void ComposeControls::saveThreadFieldDraft(std::unique_ptr<Data::Draft> draft) {
-	if (!_history || !hasRichDraftThreadScope()) {
-		return;
-	}
-	const auto key = draftKey(DraftType::Normal);
-	if (!key) {
-		return;
-	}
-	if (!draft || Data::DraftIsNull(draft.get())) {
-		_history->clearDraft(key);
-	} else {
-		_history->setDraft(key, std::move(draft));
-	}
-	applyDraft(Ui::InputField::HistoryAction::NewEntry);
-}
-
 void ComposeControls::migrateFieldToRichEditor() {
 	if (!_history) {
 		return;
@@ -2195,7 +2182,10 @@ void ComposeControls::migrateFieldToRichEditor() {
 		cancelEditMessage();
 	} else {
 		clearFieldText();
-		saveThreadFieldDraft(nullptr);
+		if (const auto key = draftKey(DraftType::Normal)) {
+			_history->clearDraft(key);
+		}
+		applyDraft(Ui::InputField::HistoryAction::NewEntry);
 		_history->clearCloudDraft(_topicRootId, _monoforumPeerId);
 		if (const auto thread = _history->threadFor(
 				_topicRootId,
@@ -2210,6 +2200,28 @@ void ComposeControls::migrateFieldToRichEditor() {
 			}
 		}
 	}
+}
+
+void ComposeControls::migrateScheduledFieldToRichEditor() {
+	Expects(_history != nullptr);
+	Expects(!isEditingMessage());
+	Expects(_mode == Mode::Scheduled);
+
+	cancelPendingDraftSaves();
+	clearFieldText();
+	_history->clearDraft(draftKey(DraftType::Normal));
+}
+
+void ComposeControls::migrateShortcutFieldToRichEditor(
+		BusinessShortcutId expectedShortcutId) {
+	if (!isShortcutComposeEligible()
+		|| _shortcutId != expectedShortcutId) {
+		return;
+	}
+
+	cancelPendingDraftSaves();
+	clearFieldText();
+	_history->clearDraft(Data::DraftKey::Shortcut(expectedShortcutId));
 }
 
 void ComposeControls::clearFieldText(
@@ -2966,19 +2978,12 @@ void ComposeControls::registerDraftSource() {
 	}
 }
 
-void ComposeControls::unregisterThreadFieldBridge() {
-	_threadFieldBridgeLifetime.destroy();
-	if (_history) {
-		Iv::Editor::UnregisterThreadFieldBridge(
-			_session,
-			_history->peer->id,
-			_topicRootId,
-			_monoforumPeerId);
-	}
+void ComposeControls::untrackThreadFieldVisibility() {
+	_threadFieldVisibleLifetime.destroy();
 	_threadFieldVisible = false;
 }
 
-void ComposeControls::registerThreadFieldBridge() {
+void ComposeControls::trackThreadFieldVisibility() {
 	if (!_history || !hasRichDraftThreadScope()) {
 		_threadFieldVisible = false;
 		updateFieldVisibility();
@@ -2987,20 +2992,6 @@ void ComposeControls::registerThreadFieldBridge() {
 	const auto peerId = _history->peer->id;
 	const auto topicRootId = _topicRootId;
 	const auto monoforumPeerId = _monoforumPeerId;
-	Iv::Editor::RegisterThreadFieldBridge(
-		_session,
-		peerId,
-		topicRootId,
-		monoforumPeerId,
-		[this] {
-			return readThreadFieldDraft();
-		},
-		[this](std::unique_ptr<Data::Draft> draft) {
-			saveThreadFieldDraft(std::move(draft));
-		},
-		[this] {
-			migrateFieldToRichEditor();
-		});
 	Iv::Editor::FieldVisibleValue(
 		_session,
 		peerId,
@@ -3019,7 +3010,7 @@ void ComposeControls::registerThreadFieldBridge() {
 		updateControlsVisibility();
 		updateHeight();
 		updateControlsGeometry(_wrap->size());
-	}, _threadFieldBridgeLifetime);
+	}, _threadFieldVisibleLifetime);
 }
 
 void ComposeControls::updateFieldVisibility() {
@@ -3830,23 +3821,73 @@ void ComposeControls::initExpandButton() {
 		if (isEditingMessage()) {
 			const auto item = _history->owner().message(
 				_header->editMsgId());
-			if (item && Iv::Editor::CheckRichMessagesPremium(_regularWindow)) {
-				if (hasRichDraftThreadScope()) {
-					Iv::Editor::ShowEditFromFieldBox(
-						_regularWindow,
-						item,
-						_sendActionFactory());
-				} else {
-					Iv::Editor::ShowEditFromFieldBox(
-						_regularWindow,
-						item,
-						_sendActionFactory(),
-						getTextWithAppliedMarkdown(),
-						crl::guard(_wrap.get(), [=] {
-							cancelEditMessage();
-						}));
-				}
+			if (item) {
+				Iv::Editor::ShowEditFromFieldBox(
+					_regularWindow,
+					item,
+					_sendActionFactory(),
+					getTextWithAppliedMarkdown(),
+					crl::guard(_wrap.get(), [=] {
+						cancelEditMessage();
+					}));
 			}
+			return;
+		}
+		if (_mode == Mode::Scheduled) {
+			Iv::Editor::ShowComposeBox(
+				_regularWindow,
+				_history->peer,
+				_sendActionFactory(),
+				sendMenuDetails(),
+				getTextWithAppliedMarkdown(),
+				crl::guard(_wrap.get(), [=] {
+					migrateScheduledFieldToRichEditor();
+				}),
+				Iv::Editor::ComposeBoxOptions{
+					.scope = Iv::Editor::ComposeBoxOptions::Scope::Detached,
+					.submitPolicy = Iv::Editor::ComposeBoxOptions::SubmitPolicy::Schedule,
+					.returnText = crl::guard(
+						_wrap.get(),
+						[=](TextWithTags text) {
+							setText(text);
+						}),
+				});
+			return;
+		}
+		if (_currentDialogsEntryState.section
+				== Dialogs::EntryState::Section::ShortcutMessages) {
+			if (!isShortcutComposeEligible()) {
+				return;
+			}
+			const auto expectedShortcutId = _shortcutId;
+			auto action = _sendActionFactory();
+			if (!isShortcutComposeEligible()
+				|| _shortcutId != expectedShortcutId
+				|| action.options.shortcutId != expectedShortcutId) {
+				return;
+			}
+			auto fieldText = getTextWithAppliedMarkdown();
+			Iv::Editor::ShowComposeBox(
+				_regularWindow,
+				_history->peer,
+				std::move(action),
+				sendMenuDetails(),
+				std::move(fieldText),
+				crl::guard(_wrap.get(), [=] {
+					migrateShortcutFieldToRichEditor(
+						expectedShortcutId);
+				}),
+				Iv::Editor::ComposeBoxOptions{
+					.scope = Iv::Editor::ComposeBoxOptions::Scope::Detached,
+					.returnText = crl::guard(
+						_wrap.get(),
+						[=](TextWithTags text) {
+							if (isShortcutComposeEligible()
+								&& _shortcutId == expectedShortcutId) {
+								setText(text);
+							}
+						}),
+				});
 			return;
 		}
 		if (_mode != Mode::Normal || !hasRichDraftThreadScope()) {
@@ -3856,7 +3897,11 @@ void ComposeControls::initExpandButton() {
 			_regularWindow,
 			_history->peer,
 			_sendActionFactory(),
-			sendMenuDetails());
+			sendMenuDetails(),
+			getTextWithAppliedMarkdown(),
+			crl::guard(_wrap.get(), [=] {
+				migrateFieldToRichEditor();
+			}));
 	});
 }
 
@@ -4235,11 +4280,13 @@ void ComposeControls::updateExpandButtonVisibility() {
 		? _history->owner().message(_header->editMsgId())
 		: nullptr;
 	const auto media = item ? item->media() : nullptr;
+	const auto composeEligible = (_mode == Mode::Scheduled)
+		|| ((_mode == Mode::Normal) && hasRichDraftThreadScope())
+		|| isShortcutComposeEligible();
 	const auto hidden = !_wrap->isVisible()
 		|| _recording.current()
 		|| !_field->isVisible()
-		|| ((_mode != Mode::Normal || !hasRichDraftThreadScope())
-			&& !isEditingMessage())
+		|| (!composeEligible && !isEditingMessage())
 		|| !hasEnoughLinesForExpand()
 		|| textExceedsMaxSize()
 		|| (media && !media->webpage())
@@ -4519,7 +4566,13 @@ void ComposeControls::updateAttachBotsMenu() {
 		_history->peer,
 		_sendActionFactory,
 		[=] { return sendMenuDetails(); },
-		[=](bool compress) { _attachRequests.fire_copy(compress); });
+		[=](bool compress) { _attachRequests.fire_copy(compress); },
+		crl::guard(_wrap.get(), [=] {
+			return getTextWithAppliedMarkdown();
+		}),
+		crl::guard(_wrap.get(), [=] {
+			migrateFieldToRichEditor();
+		}));
 	if (!_attachBotsMenu) {
 		return;
 	}
