@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync AyuGram"
+  short_description: "Rebase dev onto AyuGram upstream safely"
+  default_prompt: "Use $sync-ayu to rebase dev onto ayu/dev with fork-safety checks."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Telegram"
+  short_description: "Merge Telegram upstream while preserving AyuGram"
+  default_prompt: "Use $sync-tg to merge tg/dev into dev while preserving the AyuGram fork."
