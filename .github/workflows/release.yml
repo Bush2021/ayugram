@@ -1,0 +1,264 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v7.0.4
+        required: true
+        type: string
+      prerelease:
+        description: Mark the release as a prerelease
+        required: true
+        default: false
+        type: boolean
+      dry_run:
+        description: Validate and download artifacts without creating a release
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+
+  release:
+    name: Release
+    runs-on: ubuntu-slim
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      PRERELEASE: ${{ inputs.prerelease }}
+
+    steps:
+      - name: Select and validate builds
+        id: builds
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          latest_successful_run() {
+            local workflow="$1"
+            local branch="$2"
+            gh api --method GET \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
+              -f branch="$branch" \
+              -f event=workflow_dispatch \
+              -f status=success \
+              -f per_page=1 \
+              --jq '.workflow_runs[0] // {}'
+          }
+
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || fail "Tag must use the vMAJOR.MINOR.PATCH format."
+
+          mac_run="$(latest_successful_run mac.yml dev)"
+          windows_run="$(latest_successful_run win.yml dev)"
+          qt6_run="$(latest_successful_run win.yml vs2026)"
+
+          mac_id="$(jq -r '.id // empty' <<< "$mac_run")"
+          windows_id="$(jq -r '.id // empty' <<< "$windows_run")"
+          qt6_id="$(jq -r '.id // empty' <<< "$qt6_run")"
+          [[ -n "$mac_id" ]] || fail "No successful macOS run was found on dev."
+          [[ -n "$windows_id" ]] || fail "No successful Windows run was found on dev."
+          [[ -n "$qt6_id" ]] || fail "No successful Windows run was found on vs2026."
+
+          mac_sha="$(jq -r '.head_sha' <<< "$mac_run")"
+          windows_sha="$(jq -r '.head_sha' <<< "$windows_run")"
+          qt6_sha="$(jq -r '.head_sha' <<< "$qt6_run")"
+          [[ "$mac_sha" == "$windows_sha" ]] || fail \
+            "Latest macOS and Windows dev runs use different commits."
+
+          comparison="$(gh api \
+            "repos/$GITHUB_REPOSITORY/compare/$windows_sha...$qt6_sha")"
+          merge_base="$(jq -r '.merge_base_commit.sha' <<< "$comparison")"
+          behind_by="$(jq -r '.behind_by' <<< "$comparison")"
+          [[ "$merge_base" == "$windows_sha" && "$behind_by" == "0" ]] \
+            || fail "Latest vs2026 run does not contain the dev build commit."
+
+          version_file="$(gh api --method GET \
+            "repos/$GITHUB_REPOSITORY/contents/Telegram/build/version" \
+            -f ref="$windows_sha" \
+            --jq '.content' | base64 --decode)"
+          version="$(awk '$1 == "AppVersionStr" { print $2 }' \
+            <<< "$version_file")"
+          [[ -n "$version" ]] || fail "Could not read AppVersionStr."
+          [[ "$RELEASE_TAG" == "v$version" ]] || fail \
+            "Tag $RELEASE_TAG does not match AppVersionStr $version."
+
+          tag_refs="$(gh api \
+            "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$RELEASE_TAG")"
+          tag_count="$(jq --arg ref "refs/tags/$RELEASE_TAG" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$tag_refs")"
+          [[ "$tag_count" == "0" || "$tag_count" == "1" ]] || fail \
+            "Multiple exact tag references were returned for $RELEASE_TAG."
+          if [[ "$tag_count" == "1" ]]; then
+            tag_sha="$(gh api \
+              "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" \
+              --jq '.sha')"
+            [[ "$tag_sha" == "$windows_sha" ]] || fail \
+              "Tag $RELEASE_TAG already points to a different commit."
+          fi
+
+          {
+            echo "version=$version"
+            echo "dev_sha=$windows_sha"
+            echo "qt6_sha=$qt6_sha"
+            echo "mac_id=$mac_id"
+            echo "windows_id=$windows_id"
+            echo "qt6_id=$qt6_id"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Selected builds"
+            echo
+            echo "| Build | Run | Commit |"
+            echo "| --- | --- | --- |"
+            echo "| macOS dev | [$mac_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$mac_id) | \`$mac_sha\` |"
+            echo "| Windows dev | [$windows_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$windows_id) | \`$windows_sha\` |"
+            echo "| Windows vs2026 | [$qt6_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$qt6_id) | \`$qt6_sha\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Download and verify artifacts
+        shell: bash
+        env:
+          VERSION: ${{ steps.builds.outputs.version }}
+          MAC_RUN_ID: ${{ steps.builds.outputs.mac_id }}
+          WINDOWS_RUN_ID: ${{ steps.builds.outputs.windows_id }}
+          QT6_RUN_ID: ${{ steps.builds.outputs.qt6_id }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          download_artifact() {
+            local run_id="$1"
+            local artifact_name="$2"
+            local output_name="$3"
+            local artifacts
+            local matches
+            local artifact_id
+            local expected_digest
+            local actual_digest
+
+            artifacts="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts")"
+            matches="$(jq --arg name "$artifact_name" \
+              '[.artifacts[] | select(.name == $name and .expired == false)] | length' \
+              <<< "$artifacts")"
+            [[ "$matches" == "1" ]] || fail \
+              "Run $run_id does not contain one usable '$artifact_name' artifact."
+
+            artifact_id="$(jq -r --arg name "$artifact_name" \
+              '.artifacts[] | select(.name == $name and .expired == false) | .id' \
+              <<< "$artifacts")"
+            expected_digest="$(jq -r --arg name "$artifact_name" \
+              '.artifacts[] | select(.name == $name and .expired == false) | .digest' \
+              <<< "$artifacts")"
+
+            gh api \
+              "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+              > "$output_name"
+            actual_digest="sha256:$(sha256sum "$output_name" | cut -d ' ' -f 1)"
+            [[ "$actual_digest" == "$expected_digest" ]] || fail \
+              "Digest mismatch for '$artifact_name'."
+
+            echo "$output_name $actual_digest" >> artifact-digests.txt
+          }
+
+          mkdir release-assets
+          download_artifact \
+            "$MAC_RUN_ID" \
+            "AyuGram" \
+            "release-assets/AyuGram_v${VERSION}_macOS_universal.zip"
+          download_artifact \
+            "$WINDOWS_RUN_ID" \
+            "AyuGram x64 Ninja Multi-Config" \
+            "release-assets/AyuGram_v${VERSION}_windows_x64.zip"
+          download_artifact \
+            "$QT6_RUN_ID" \
+            "AyuGram x64 qt6 Ninja Multi-Config" \
+            "release-assets/AyuGram_v${VERSION}_windows_x64_Qt6_win10+.zip"
+
+          {
+            echo
+            echo "## Verified artifacts"
+            echo
+            echo '```text'
+            cat artifact-digests.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create draft release
+        if: inputs.dry_run == false
+        shell: bash
+        env:
+          DEV_SHA: ${{ steps.builds.outputs.dev_sha }}
+        run: |
+          set -euo pipefail
+
+          if release="$(gh release view "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft,targetCommitish,url 2>/dev/null)"; then
+            is_draft="$(jq -r '.isDraft' <<< "$release")"
+            target="$(jq -r '.targetCommitish' <<< "$release")"
+            [[ "$is_draft" == "true" ]] || {
+              echo "::error::Release $RELEASE_TAG is already published."
+              exit 1
+            }
+            [[ "$target" == "$DEV_SHA" ]] || {
+              echo "::error::Draft release targets $target instead of $DEV_SHA."
+              exit 1
+            }
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --prerelease="$PRERELEASE"
+          else
+            create_args=(
+              "$RELEASE_TAG"
+              --repo "$GITHUB_REPOSITORY"
+              --target "$DEV_SHA"
+              --title "$RELEASE_TAG"
+              --draft
+              --generate-notes
+            )
+            if [[ "$PRERELEASE" == "true" ]]; then
+              create_args+=(--prerelease)
+            fi
+            gh release create "${create_args[@]}"
+          fi
+
+          gh release upload "$RELEASE_TAG" release-assets/*.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+          release_url="$(gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json url \
+            --jq '.url')"
+          {
+            echo
+            echo "## Draft release"
+            echo
+            echo "[$RELEASE_TAG]($release_url) is ready for review."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report dry run
+        if: inputs.dry_run == true
+        run: echo "Dry run completed. No release was created." >> "$GITHUB_STEP_SUMMARY"
