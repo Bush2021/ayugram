@@ -20,6 +20,10 @@ namespace Main {
 class Session;
 }
 
+namespace Core {
+class Settings;
+}
+
 enum class PeerIdDisplay {
 	Hidden = 0,
 	TelegramApi = 1,
@@ -275,6 +279,8 @@ public:
 		const QString &apiKey,
 		const QString &systemPrompt,
 		const QString &promptTemplate);
+	[[nodiscard]] bool loadApiKey(Core::Settings &settings);
+	void finishApiKeyMigration();
 
 	[[nodiscard]] rpl::producer<QString> modelValue() const { return _model.value(); }
 	[[nodiscard]] rpl::producer<QString> apiBaseOrEndpointValue() const { return _apiBaseOrEndpoint.value(); }
@@ -287,12 +293,15 @@ public:
 
 private:
 	friend class AyuSettings;
+	friend class Core::Settings;
+	void writeApiKey(Core::Settings &settings) const;
 
 	rpl::variable<QString> _model = DefaultModel();
 	rpl::variable<QString> _apiBaseOrEndpoint = DefaultApiBaseOrEndpoint();
 	rpl::variable<QString> _apiKey;
 	rpl::variable<QString> _systemPrompt = DefaultSystemPrompt();
 	rpl::variable<QString> _promptTemplate = DefaultPromptTemplate();
+	bool _apiKeyNeedsMigration = false;
 
 };
 

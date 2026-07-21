@@ -1399,6 +1399,21 @@ void Settings::writePrefImpl<bool>(std::string_view key, bool value) {
 	writePrefGeneric(key, value ? "\x1"_q : QByteArray());
 }
 
+template <>
+std::optional<QString> Settings::readPrefImpl<QString>(std::string_view key) {
+	if (const auto data = readPrefGeneric(key)) {
+		return QString::fromUtf8(*data);
+	}
+	return {};
+}
+
+template <>
+void Settings::writePrefImpl<QString>(
+		std::string_view key,
+		QString value) {
+	writePrefGeneric(key, value.toUtf8());
+}
+
 QString Settings::getSoundPath(const QString &key) const {
 	auto it = _soundOverrides.find(key);
 	if (it != _soundOverrides.end()) {
@@ -1788,6 +1803,7 @@ void Settings::resetOnLastLogout() {
 	_ttlVoiceClickTooltipHidden = false;
 	const auto srDisabled = readPref<bool>(kScreenReaderModeDisabledKey);
 	_prefs.clear();
+	AyuSettings::getInstance().openAiTranslationSettings().writeApiKey(*this);
 	if (srDisabled) {
 		writePref<bool>(kScreenReaderModeDisabledKey, true);
 	}

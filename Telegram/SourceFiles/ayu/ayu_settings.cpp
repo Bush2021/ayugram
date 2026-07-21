@@ -12,6 +12,7 @@
 #include "ayu/ayu_worker.h"
 #include "ayu/ui/ayu_logo.h"
 #include "core/application.h"
+#include "core/core_settings.h"
 #include "features/filters/filters_cache_controller.h"
 #include "features/translator/ayu_translator.h"
 #include "main/main_domain.h"
@@ -26,6 +27,9 @@
 using json = nlohmann::json;
 
 namespace {
+
+constexpr auto kOpenAiTranslationApiKeyPref
+	= std::string_view("ayu-openai-translation-api-key");
 
 std::string getSettingsPath() {
 	return (cWorkingDir() + u"tdata/ayu_settings.json"_q).toStdString();
@@ -446,9 +450,10 @@ void OpenAiTranslationSettings::apply(
 		? DefaultApiBaseOrEndpoint()
 		: apiBaseOrEndpoint.trimmed();
 	const auto normalizedApiKey = apiKey.trimmed();
+	const auto apiKeyChanged = (_apiKey.current() != normalizedApiKey);
 	const auto changed = (_model.current() != normalizedModel)
 		|| (_apiBaseOrEndpoint.current() != normalizedApiBaseOrEndpoint)
-		|| (_apiKey.current() != normalizedApiKey)
+		|| apiKeyChanged
 		|| (_systemPrompt.current() != systemPrompt)
 		|| (_promptTemplate.current() != promptTemplate);
 	if (!changed) {
@@ -457,20 +462,60 @@ void OpenAiTranslationSettings::apply(
 	_model = normalizedModel;
 	_apiBaseOrEndpoint = normalizedApiBaseOrEndpoint;
 	_apiKey = normalizedApiKey;
+	if (apiKeyChanged) {
+		writeApiKey(Core::App().settings());
+		_apiKeyNeedsMigration = false;
+	}
 	_systemPrompt = systemPrompt;
 	_promptTemplate = promptTemplate;
 	resetTranslationCache();
 	AyuSettings::save();
 }
 
+bool OpenAiTranslationSettings::loadApiKey(Core::Settings &settings) {
+	const auto stored = settings.readPref<QString>(
+		kOpenAiTranslationApiKeyPref);
+	if (!_apiKeyNeedsMigration) {
+		_apiKey = stored;
+		return false;
+	} else if (!stored.isEmpty()) {
+		_apiKey = stored;
+		finishApiKeyMigration();
+		return false;
+	}
+	writeApiKey(settings);
+	return true;
+}
+
+void OpenAiTranslationSettings::finishApiKeyMigration() {
+	if (!_apiKeyNeedsMigration) {
+		return;
+	}
+	_apiKeyNeedsMigration = false;
+	AyuSettings::save();
+}
+
+void OpenAiTranslationSettings::writeApiKey(
+		Core::Settings &settings) const {
+	if (_apiKey.current().isEmpty()) {
+		settings.clearPref(kOpenAiTranslationApiKeyPref);
+	} else {
+		settings.writePref<QString>(
+			kOpenAiTranslationApiKeyPref,
+			_apiKey.current());
+	}
+}
+
 void to_json(nlohmann::json &j, const OpenAiTranslationSettings &s) {
 	j = nlohmann::json{
 		{"model", s._model.current()},
 		{"apiBaseOrEndpoint", s._apiBaseOrEndpoint.current()},
-		{"apiKey", s._apiKey.current()},
 		{"systemPrompt", s._systemPrompt.current()},
 		{"promptTemplate", s._promptTemplate.current()}
 	};
+	if (s._apiKeyNeedsMigration) {
+		j["apiKey"] = s._apiKey.current();
+	}
 }
 
 void from_json(const nlohmann::json &j, OpenAiTranslationSettings &s) {
@@ -479,6 +524,7 @@ void from_json(const nlohmann::json &j, OpenAiTranslationSettings &s) {
 		"apiBaseOrEndpoint",
 		OpenAiTranslationSettings::DefaultApiBaseOrEndpoint());
 	s._apiKey = j.value("apiKey", QString());
+	s._apiKeyNeedsMigration = !s._apiKey.current().isEmpty();
 	s._systemPrompt = j.value(
 		"systemPrompt",
 		OpenAiTranslationSettings::DefaultSystemPrompt());

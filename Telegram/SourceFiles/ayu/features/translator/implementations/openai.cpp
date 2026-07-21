@@ -20,6 +20,7 @@
 #include <QtCore/QStringList>
 #include <QtCore/QTimer>
 #include <QtCore/QUrl>
+#include <QtNetwork/QHostAddress>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
 
@@ -48,16 +49,23 @@ struct NormalizedEndpoint {
 };
 
 std::optional<NormalizedEndpoint> NormalizeEndpoint(const QString &endpointText) {
-	auto url = QUrl::fromUserInput(endpointText.trimmed());
+	auto normalizedText = endpointText.trimmed();
+	if (!normalizedText.contains(u"://"_q)) {
+		normalizedText.prepend(u"https://"_q);
+	}
+	auto url = QUrl::fromUserInput(normalizedText);
 	if (!url.isValid()) {
 		return std::nullopt;
 	}
 	const auto scheme = url.scheme().toLower();
-	if ((scheme != QStringLiteral("http"))
-		&& (scheme != QStringLiteral("https"))) {
+	const auto host = url.host().toLower();
+	if (host.isEmpty()) {
 		return std::nullopt;
 	}
-	if (url.host().isEmpty()) {
+	const auto loopback = (host == u"localhost"_q)
+		|| QHostAddress(host).isLoopback();
+	if ((scheme != u"https"_q)
+		&& ((scheme != u"http"_q) || !loopback)) {
 		return std::nullopt;
 	}
 
@@ -541,6 +549,9 @@ void OpenAITranslator::startTranslation(const StartTranslationArgs &args) {
 		schema);
 
 	QNetworkRequest request(endpoint->url);
+	request.setAttribute(
+		QNetworkRequest::RedirectPolicyAttribute,
+		QNetworkRequest::SameOriginRedirectPolicy);
 	request.setHeader(QNetworkRequest::UserAgentHeader, randomDesktopUserAgent());
 	request.setHeader(
 		QNetworkRequest::ContentTypeHeader,
