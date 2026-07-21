@@ -2186,26 +2186,46 @@ void TopBar::setTabSelectedItems(SelectedItems &&items) {
 	if (_tabSelectionBar) {
 		if (mode) {
 			updateTabSelectionState();
-			_tabSelectionBar->raise();
+			raiseTabSelectionOverlay();
 		}
 		_tabSelectionBar->toggle(mode, anim::type::normal);
 	}
 }
 
+void TopBar::raiseTabSelectionOverlay() {
+	if (!_tabSelectionBar || !tabSelectionMode()) {
+		return;
+	}
+	_tabSelectionBar->raise();
+}
+
 void TopBar::createTabSelectionBar() {
 	_tabSelectionBar.create(
 		this,
-		object_ptr<Ui::RpWidget>(this),
-		st::infoTopBarScale);
+		object_ptr<Ui::RpWidget>(this));
 	const auto bar = _tabSelectionBar.data();
 	bar->setDuration(st::infoTopBarDuration);
 	bar->toggle(false, anim::type::instant);
 
 	const auto inner = bar->entity();
 	inner->paintRequest(
-	) | rpl::on_next([=](QRect clip) {
+	) | rpl::on_next([=] {
 		auto p = QPainter(inner);
-		p.fillRect(clip, _st.bg);
+		auto hq = PainterHighQualityEnabler(p);
+		const auto radius = _roundEdges ? st::boxRadius : 0;
+		p.setPen(Qt::NoPen);
+		p.setBrush(_st.bg);
+		p.drawRoundedRect(
+			inner->rect() + QMargins(0, 0, 0, radius),
+			radius,
+			radius);
+		const auto line = st::lineWidth;
+		p.fillRect(
+			0,
+			inner->height() - line,
+			inner->width(),
+			line,
+			st::shadowFg);
 	}, inner->lifetime());
 
 	const auto forwardAction = [=](SelectionAction action) {
@@ -2328,7 +2348,7 @@ void TopBar::updateTabSelectionGeometry() {
 	_tabSelectionBar->move(0, 0);
 
 	_tabSelectionCancel->moveToLeft(0, 0);
-	auto right = 0;
+	auto right = _st.mediaActionsSkip;
 	if (!_tabSelectionDelete->isHidden()) {
 		_tabSelectionDelete->moveToRight(right, 0, inner->width());
 		right += _tabSelectionDelete->width();
@@ -2972,6 +2992,7 @@ void TopBar::setupButtons(
 			}
 		}
 		raiseTabSearchOverlay();
+		raiseTabSelectionOverlay();
 	}, lifetime());
 }
 
