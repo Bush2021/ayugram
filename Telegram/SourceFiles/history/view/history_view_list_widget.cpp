@@ -496,8 +496,10 @@ ListWidget::ListWidget(
 	setAccessibleName(tr::lng_sr_message_list(tr::now));
 	if (const auto scroll = _delegate->listScrollArea()) {
 		scroll->lockWheelDirection();
-		scroll->setCrossAxisWheelProcess([=](QPoint delta) {
-			return consumeScrollAction(delta);
+		scroll->setCrossAxisWheelProcess([=](
+				QPoint delta,
+				Qt::ScrollPhase phase) {
+			return consumeScrollAction(delta, phase);
 		});
 	}
 	if (_readMetricsTracker) {
@@ -1876,9 +1878,9 @@ bool ListWidget::canConsumeHorizontalScroll(QPoint position, int delta) const {
 			delta);
 }
 
-bool ListWidget::consumeScrollAction(QPoint delta) {
+bool ListWidget::consumeScrollAction(QPoint delta, Qt::ScrollPhase phase) {
 	const auto horizontal = (std::abs(delta.x()) > std::abs(delta.y()));
-	if (!horizontal) {
+	if ((phase == Qt::NoScrollPhase) && !horizontal) {
 		return false;
 	}
 	const auto position = mapFromGlobal(_mousePosition);
@@ -1886,7 +1888,8 @@ bool ListWidget::consumeScrollAction(QPoint delta) {
 	return view
 		&& view->consumeHorizontalScroll(
 			mapPointToItem(position, view),
-			delta.x());
+			delta.x(),
+			phase);
 }
 
 auto ListWidget::findViewForPinnedTracking(int top) const
