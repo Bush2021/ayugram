@@ -205,12 +205,15 @@ QIcon CreateSupportIcon(Main::Session *session) {
 
 QIcon CreateIcon(Main::Session *session, bool returnNullIfDefault) {
 	const auto supportIcon = CreateSupportIcon(session);
-	if (!supportIcon.isNull() || returnNullIfDefault) {
+	if (!supportIcon.isNull()) {
 		return supportIcon;
 	}
 
 	const auto officialIcon = QIcon(
 		Ui::PixmapFromImage(base::duplicate(Logo())));
+	if (!officialIcon.isNull() || returnNullIfDefault) {
+		return officialIcon;
+	}
 
 	if constexpr (!Platform::IsLinux()) {
 		return officialIcon;

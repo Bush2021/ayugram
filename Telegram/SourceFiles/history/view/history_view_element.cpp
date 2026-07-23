@@ -58,7 +58,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/round_rect.h"
 #include "data/components/ephemeral_messages.h"
 #include "data/components/sponsored_messages.h"
-#include "data/data_channel.h"
 #include "data/data_groups.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_todo_list.h"

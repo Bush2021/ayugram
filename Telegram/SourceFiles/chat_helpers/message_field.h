@@ -26,6 +26,7 @@ struct now_t;
 class DocumentData;
 class HistoryItem;
 class PeerData;
+struct PeerId;
 class UserData;
 
 namespace Main {

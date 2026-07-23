@@ -563,25 +563,11 @@ void BottomInfo::layoutDateText() {
 			Ui::NameTextOptions(),
 			helper.context());
 	} else {
-		TextWithEntities burnt;
-		if (_data.flags & Data::Flag::AyuBurnt) {
-			burnt = Ui::Text::IconEmoji(&st::burntIcon);
-			if (!(_data.flags & Data::Flag::AyuDeleted)
-				&& !(_data.flags & Data::Flag::Edited)) {
-				burnt.append(' ');
-			}
-		}
-
-		TextWithEntities deleted;
-		if (_data.flags & Data::Flag::AyuDeleted) {
-			deleted = Ui::Text::IconEmoji(&st::deletedIcon);
-			if (!(_data.flags & Data::Flag::Edited)) {
-				deleted.append(' ');
-			}
-		}
+		const auto editedIcon = !editedPrimary
+			&& (_data.flags & Data::Flag::Edited);
 
 		TextWithEntities edited;
-		if (!editedPrimary && (_data.flags & Data::Flag::Edited)) {
+		if (editedIcon) {
 			edited = Ui::Text::IconEmoji(&st::editedIcon);
 			edited.append(' ');
 		} else if (!editedPrimary && (_data.flags & Data::Flag::EstimateDate)) {
@@ -590,11 +576,25 @@ void BottomInfo::layoutDateText() {
 			edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
 		}
 
+		TextWithEntities burnt;
+		if (_data.flags & Data::Flag::AyuBurnt) {
+			burnt = Ui::Text::IconEmoji(&st::burntIcon);
+			if (!(_data.flags & Data::Flag::AyuDeleted) && edited.empty()) {
+				burnt.append(' ');
+			}
+		}
+
+		TextWithEntities deleted;
+		if (_data.flags & Data::Flag::AyuDeleted) {
+			deleted = Ui::Text::IconEmoji(&st::deletedIcon);
+			if (edited.empty()) {
+				deleted.append(' ');
+			}
+		}
+
 		const auto author = settings.filterZalgo() ? filterZalgo(_data.author) : _data.author;
 		const auto prefix = !author.isEmpty()
-			? (!editedPrimary && (_data.flags & Data::Flag::Edited)
-				? u" "_q
-				: u", "_q)
+			? (editedIcon ? u" "_q : u", "_q)
 			: QString();
 
 		const auto dateStr = editedPrimary
