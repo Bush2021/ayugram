@@ -6,17 +6,19 @@ on:
 jobs:
 
   windows:
-    name: Windows
-    runs-on: windows-2022
+    name: "Windows ts=${{ matrix.toolset || 'default' }}"
+    runs-on: windows-latest
 
     strategy:
+      fail-fast: false
       matrix:
         arch: [x64]
         qt: [""]
         generator: ["Ninja Multi-Config"]
+        toolset: ["14.44", ""]
 
     env:
-      UPLOAD_ARTIFACT: "true"
+      UPLOAD_ARTIFACT: "false"
       ONLY_CACHE: "false"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
@@ -59,12 +61,22 @@ jobs:
           git config --global user.email "you@example.com"
           git config --global user.name "Sample"
 
+      - name: List MSVC toolsets.
+        shell: pwsh
+        run: |
+          Write-Host "ImageOS=$env:ImageOS  ImageVersion=$env:ImageVersion"
+          $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) { & $vswhere -all -products * -property installationPath,installationVersion }
+          Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            Get-ChildItem (Join-Path $_.FullName "*\VC\Tools\MSVC") -Directory -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "MSVC toolset: $($_.Name)" }
+          }
+
       - uses: Eden-CI/msvc-dev-cmd@master
         name: Native Tools Command Prompt.
         with:
           arch: ${{ matrix.arch }}
           sdk: ${{ env.SDK }}
-          toolset: ${{ case(matrix.arch == 'arm64', '', '14.44') }}
+          toolset: ${{ matrix.toolset }}
 
       - name: NuGet sources.
         run: |
