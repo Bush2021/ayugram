@@ -1418,9 +1418,9 @@ HistoryMessageMarkupData UnsupportedMessageMarkup() {
 	auto row = std::vector<Button>();
 	row.emplace_back(
 		Button::Type::Url,
-		tr::lng_update_telegram(tr::now),
+		tr::lng_update_telegram(tr::now).replace("Telegram", "AyuGram"),
 		Button::Visual(),
-		QByteArray("https://desktop.telegram.org"));
+		QByteArray("https://t.me/AyuGramReleases"));
 	markup.rows.push_back(std::move(row));
 	return markup;
 }
