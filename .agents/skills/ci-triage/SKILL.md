@@ -1,25 +1,19 @@
 ---
 name: ci-triage
-description: Diagnose the newest failing GitHub Actions run for this repository by reading the actual failed job and matrix logs with gh, classifying the root cause, and recommending the smallest next step. Use when asked to inspect, triage, or explain a recent CI failure. This is a read-only diagnostic workflow and does not implement, commit, or push fixes.
+description: Diagnose the newest failing GitHub Actions run for this repository by reading the actual failed job and matrix logs, classifying the root cause, and recommending the smallest next step. Use when asked to inspect, triage, or explain a recent CI failure. This is a read-only diagnostic workflow and does not implement, commit, or push fixes.
 ---
 
 # Triage CI
 
-Read `AGENTS.md` before acting. Use `gh` for all GitHub access. Keep the repository unchanged.
+Let the user choose the GitHub access method when they express a preference. Otherwise, choose among the available tools based on the task and current access. Keep the repository unchanged.
 
 ## 1. Select the failure
 
-Run `gh run list --limit 5` and select the newest failed run. If the output is ambiguous, request structured fields with `gh run list --json` and identify the run by its database ID, conclusion, workflow, branch, commit, and creation time. If no failed run appears, report that fact instead of guessing.
+List the five or more newest workflow runs and select the newest failed run. If the result is ambiguous, retrieve structured fields and identify the run by its database ID, conclusion, workflow, branch, commit, and creation time. If no failed run appears, report that fact instead of guessing.
 
 ## 2. Read actual failed logs
 
-Run:
-
-```bash
-gh run view <run-id> --log-failed
-```
-
-Read the failed matrix job log itself. Do not diagnose from the workflow summary, annotations, or job title alone. If truncated output hides the failure, use `gh run view <run-id> --json jobs` to identify the failed job and retrieve the relevant job log with `gh`.
+Retrieve and read the failed matrix job log itself. Do not diagnose from the workflow summary, annotations, or job title alone. If the initial output is truncated or incomplete, identify the failed job and retrieve its relevant log through any available GitHub access method.
 
 ## 3. Identify the root cause
 
@@ -31,7 +25,7 @@ Trace the first causal error rather than the final cascade. Classify it as one o
 - Repository or CI configuration failure.
 - Unresolved when the available evidence is insufficient.
 
-Support the classification with exact log evidence. For any upstream claim, inspect the actual upstream source, commits, workflows, or runs with `gh`; do not rely on memory.
+Support the classification with exact log evidence. For any upstream claim, inspect the actual upstream source, commits, workflows, or runs through an available access method; do not rely on memory.
 
 ## 4. Report the next step
 
