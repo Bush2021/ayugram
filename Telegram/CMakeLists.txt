@@ -252,6 +252,21 @@ set(ayugram_files
         info/profile/info_profile_music_button.h
 )
 
+set(ayugram_build_info_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
+set(ayugram_build_info_header
+    ${ayugram_build_info_dir}/ayu/ayu_build_info.h)
+add_custom_target(generate_ayugram_build_info
+    COMMAND ${CMAKE_COMMAND}
+        "-Dsource_dir=${CMAKE_SOURCE_DIR}"
+        "-Doutput_file=${ayugram_build_info_header}"
+        -P ${src_loc}/ayu/generate_build_info.cmake
+    BYPRODUCTS ${ayugram_build_info_header}
+    VERBATIM
+)
+init_target_folder(generate_ayugram_build_info "(gen)")
+add_dependencies(Telegram generate_ayugram_build_info)
+target_include_directories(Telegram PRIVATE ${ayugram_build_info_dir})
+
 if (NOT DESKTOP_APP_DISABLE_SWIFT6)
     telegram_add_apple_swift_runtime(Telegram)
 endif()
