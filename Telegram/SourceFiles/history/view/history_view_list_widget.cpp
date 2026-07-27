@@ -251,9 +251,9 @@ void ListWidget::enumerateItems(Method method) {
 		return;
 	}
 
-	auto collapseGapsTotal = 0;
-	for (const auto &gap : _collapseGaps) {
-		collapseGapsTotal += gap.height;
+	auto collapseGapTotal = 0;
+	for (const auto &gap : collapseGaps()) {
+		collapseGapTotal += gap.height;
 	}
 
 	const auto beginning = begin(_items);
@@ -262,7 +262,7 @@ void ListWidget::enumerateItems(Method method) {
 		? std::lower_bound(
 			beginning,
 			ending,
-			_visibleTop - collapseGapsTotal,
+			_visibleTop - collapseGapTotal,
 			[this](auto &elem, int top) {
 				return this->itemTop(elem) + elem->height() <= top;
 			})
@@ -278,17 +278,17 @@ void ListWidget::enumerateItems(Method method) {
 		--from;
 	}
 
-	const auto gapCount = int(_collapseGaps.size());
+	const auto gapCount = int(collapseGaps().size());
 	auto nextGapIndex = 0;
 	auto collapseShift = 0;
 	if (TopToBottom) {
 		const auto firstTop = itemTop(from->get());
 		for (; nextGapIndex < gapCount; ++nextGapIndex) {
-			if (firstTop < _collapseGaps[nextGapIndex].absY) break;
-			collapseShift += _collapseGaps[nextGapIndex].height;
+			if (firstTop < collapseGaps()[nextGapIndex].absY) break;
+			collapseShift += collapseGaps()[nextGapIndex].height;
 		}
 	} else {
-		collapseShift = collapseGapsTotal;
+		collapseShift = collapseGapTotal;
 		nextGapIndex = gapCount;
 	}
 
@@ -298,14 +298,14 @@ void ListWidget::enumerateItems(Method method) {
 
 		if (TopToBottom) {
 			while (nextGapIndex < gapCount) {
-				const auto &gap = _collapseGaps[nextGapIndex];
+				const auto &gap = collapseGaps()[nextGapIndex];
 				if (logicalTop < gap.absY) break;
 				collapseShift += gap.height;
 				++nextGapIndex;
 			}
 		} else {
 			while (nextGapIndex > 0) {
-				const auto &gap = _collapseGaps[nextGapIndex - 1];
+				const auto &gap = collapseGaps()[nextGapIndex - 1];
 				if (logicalTop >= gap.absY) break;
 				collapseShift -= gap.height;
 				--nextGapIndex;
@@ -425,8 +425,12 @@ void ListWidget::enumerateDates(Method method) {
 			if (lowestInOneDayItemBottom < 0) {
 				lowestInOneDayItemBottom = itembottom - view->marginBottom();
 			}
+			const auto collapsed = Ui::CollapseDateShift(
+				collapseGaps(),
+				itemtop);
+
 			// Attach date to the top of the visible area with the same margin as it has in service message.
-			auto dateTop = qMax(itemtop, _visibleTop) + st::msgServiceMargin.top();
+			auto dateTop = qMax(itemtop - collapsed, _visibleTop) + st::msgServiceMargin.top();
 
 			// Do not let the date go below the single-day messages pack bottom line.
 			auto dateHeight = st::msgServicePadding.bottom() + st::msgServiceFont->height + st::msgServicePadding.top();
@@ -1887,12 +1891,16 @@ bool ListWidget::canConsumeHorizontalScroll(QPoint position, int delta) const {
 			delta);
 }
 
-bool ListWidget::consumeScrollAction(QPoint delta, Qt::ScrollPhase phase) {
+bool ListWidget::consumeScrollAction(
+		QPoint delta,
+		Qt::ScrollPhase phase,
+		std::optional<QPoint> globalPosition) {
 	const auto horizontal = (std::abs(delta.x()) > std::abs(delta.y()));
 	if ((phase == Qt::NoScrollPhase) && !horizontal) {
 		return false;
 	}
-	const auto position = mapFromGlobal(_mousePosition);
+	const auto position = mapFromGlobal(
+		globalPosition.value_or(_mousePosition));
 	const auto view = lookupItemByY(position.y());
 	return view
 		&& view->consumeHorizontalScroll(
@@ -2407,13 +2415,8 @@ void ListWidget::revealItemsCallback() {
 		const auto old = std::exchange(_itemsRevealHeight, revealHeight);
 		const auto delta = old - _itemsRevealHeight;
 		_itemsHeight += delta;
-		_itemsTop = (_minHeight > _itemsHeight + st::historyPaddingBottom)
-			? (_minHeight - _itemsHeight - st::historyPaddingBottom)
-			: 0;
-		auto collapseGapTotal = 0;
-		for (const auto &gap : _collapseGaps) {
-			collapseGapTotal += gap.height;
-		}
+		setItemsTop(countItemsTop());
+		const auto collapseGapTotal = collapseGapsTotal();
 		const auto wasHeight = height();
 		const auto nowHeight = _itemsTop
 			+ _itemsHeight
@@ -2453,17 +2456,15 @@ int ListWidget::resizeGetHeight(int newWidth) {
 	startItemRevealAnimations();
 	_itemsWidth = newWidth;
 	_itemsHeight = newHeight - _itemsRevealHeight;
-	auto collapseGapTotal = 0;
-	for (const auto &gap : _collapseGaps) {
-		collapseGapTotal += gap.height;
+	if (_thanosController) {
+		_thanosController->clearRemovalHeight();
 	}
-	_itemsTop = (_minHeight > _itemsHeight + st::historyPaddingBottom)
-		? (_minHeight - _itemsHeight - st::historyPaddingBottom)
-		: 0;
+	const auto collapseGapTotal = collapseGapsTotal();
+	setItemsTop(countItemsTop());
 	if (const auto about = _delegate->listAboutView()) {
 		if (const auto view = about->view()) {
 			about->height = view->resizeGetHeight(newWidth);
-			_itemsTop = std::max(_itemsTop, about->height);
+			setItemsTop(std::max(_itemsTop, about->height));
 			about->top = std::min(
 				_itemsTop - about->height,
 				std::max(0, (_minHeight - about->height) / 2));
@@ -2636,12 +2637,16 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 
 	auto clip = e->rect();
 
-	auto collapseGapsTotal = 0;
-	for (const auto &gap : _collapseGaps) {
-		collapseGapsTotal += gap.height;
+	if (_thanosController) {
+		_thanosController->clearRemovalHeight();
 	}
 
-	auto from = std::lower_bound(begin(_items), end(_items), clip.top() - collapseGapsTotal, [this](auto &elem, int top) {
+	auto collapseGapTotal = 0;
+	for (const auto &gap : collapseGaps()) {
+		collapseGapTotal += gap.height;
+	}
+
+	auto from = std::lower_bound(begin(_items), end(_items), clip.top() - collapseGapTotal, [this](auto &elem, int top) {
 		return this->itemTop(elem) + elem->height() <= top;
 	});
 	auto to = std::lower_bound(begin(_items), end(_items), clip.top() + clip.height(), [this](auto &elem, int bottom) {
@@ -2674,8 +2679,8 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 
 	auto nextGapIndex = 0;
 	auto collapseShift = 0;
-	for (; nextGapIndex < int(_collapseGaps.size()); ++nextGapIndex) {
-		const auto &gap = _collapseGaps[nextGapIndex];
+	for (; nextGapIndex < int(collapseGaps().size()); ++nextGapIndex) {
+		const auto &gap = collapseGaps()[nextGapIndex];
 		if (top < gap.absY) break;
 		collapseShift += gap.height;
 	}
@@ -2685,8 +2690,8 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 	p.translate(0, top);
 	const auto sendingAnimation = _delegate->listSendingAnimation();
 	for (auto i = from; i != to; ++i) {
-		while (nextGapIndex < int(_collapseGaps.size())) {
-			const auto &gap = _collapseGaps[nextGapIndex];
+		while (nextGapIndex < int(collapseGaps().size())) {
+			const auto &gap = collapseGaps()[nextGapIndex];
 			if (top - collapseShift < gap.absY) break;
 			top += gap.height;
 			collapseShift += gap.height;
@@ -3070,7 +3075,7 @@ int ListWidget::findItemIndexByY(int y) const {
 	Expects(!_items.empty());
 
 	auto gapShift = 0;
-	for (const auto &gap : _collapseGaps) {
+	for (const auto &gap : collapseGaps()) {
 		if (y < gap.absY + gapShift) {
 			break;
 		}
@@ -3100,7 +3105,7 @@ Element *ListWidget::strictFindItemByY(int y) const {
 		return nullptr;
 	}
 	auto gapTotal = 0;
-	for (const auto &gap : _collapseGaps) {
+	for (const auto &gap : collapseGaps()) {
 		gapTotal += gap.height;
 	}
 	return (y >= _itemsTop && y < _itemsTop + _itemsHeight + gapTotal)
@@ -3673,11 +3678,20 @@ void ListWidget::onTouchScrollTimer() {
 	} else if (_touchScrollState == Ui::TouchScrollState::Auto || _touchScrollState == Ui::TouchScrollState::Acceleration) {
 		const auto elapsed = int(nowTime - _touchTime);
 		const auto delta = _touchSpeed * elapsed / 1000;
-		const auto hasScrolled = _delegate->listScrollTo(
-			_visibleTop - delta.y());
+		const auto consumedHorizontal = consumeScrollAction(
+			delta,
+			Qt::NoScrollPhase,
+			_touchPos);
+		if (consumedHorizontal) {
+			_horizontalScrollLocked = true;
+		}
+		const auto hasScrolled = consumedHorizontal
+			|| (!_horizontalScrollLocked
+				&& _delegate->listScrollTo(_visibleTop - delta.y()));
 		if (_touchSpeed.isNull() || !hasScrolled) {
 			_touchScrollState = Ui::TouchScrollState::Manual;
 			_touchScroll = false;
+			_horizontalScrollLocked = false;
 			_touchScrollTimer.cancel();
 		} else {
 			_touchTime = nowTime;
@@ -3755,6 +3769,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 		_touchInProgress = false;
 		_touchSelectTimer.cancel();
 		_touchScroll = _touchSelect = false;
+		_horizontalScrollLocked = false;
 		_touchScrollState = Ui::TouchScrollState::Manual;
 		_touchMaybeSelecting = false;
 		mouseActionCancel();
@@ -3777,6 +3792,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 		if (e->touchPoints().isEmpty()) return;
 
 		_touchInProgress = true;
+		_horizontalScrollLocked = false;
 		if (_touchScrollState == Ui::TouchScrollState::Auto) {
 			_touchMaybeSelecting = false;
 			_touchScrollState = Ui::TouchScrollState::Acceleration;
@@ -3842,6 +3858,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 				_touchTime = crl::now();
 			} else if (_touchScrollState == Ui::TouchScrollState::Auto) {
 				_touchScrollState = Ui::TouchScrollState::Manual;
+				_horizontalScrollLocked = false;
 				_touchScroll = false;
 				touchResetSpeed();
 			} else if (_touchScrollState == Ui::TouchScrollState::Acceleration) {
@@ -3919,9 +3936,16 @@ void ListWidget::registerReadMetricsActivity() {
 
 void ListWidget::touchScrollUpdated(const QPoint &screenPos) {
 	_touchPos = screenPos;
-	_delegate->listScrollTo(
-		_visibleTop - (_touchPos - _touchPrevPos).y(),
-		false);
+	if (consumeScrollAction(
+			_touchPos - _touchPrevPos,
+			Qt::NoScrollPhase,
+			_touchPos)) {
+		_horizontalScrollLocked = true;
+	} else if (!_horizontalScrollLocked) {
+		_delegate->listScrollTo(
+			_visibleTop - (_touchPos - _touchPrevPos).y(),
+			false);
+	}
 	touchUpdateSpeed();
 }
 
@@ -4794,15 +4818,41 @@ int ListWidget::itemTop(not_null<const Element*> view) const {
 	return _itemsTop + view->y();
 }
 
-void ListWidget::setCollapseGaps(std::vector<Ui::CollapseGap> gaps) {
-	if (_collapseGaps == gaps) {
+const std::vector<Ui::CollapseGap> &ListWidget::collapseGaps() const {
+	static const auto kNone = std::vector<Ui::CollapseGap>();
+	return _thanosController ? _thanosController->renderGaps() : kNone;
+}
+
+int ListWidget::collapseGapsTotal() const {
+	auto result = 0;
+	for (const auto &gap : collapseGaps()) {
+		result += gap.height;
+	}
+	if (_thanosController) {
+		result = std::max(result - _thanosController->removalHeight(), 0);
+	}
+	return result;
+}
+
+int ListWidget::countItemsTop() const {
+	const auto full = _itemsHeight
+		+ collapseGapsTotal()
+		+ st::historyPaddingBottom;
+	return (_minHeight > full) ? (_minHeight - full) : 0;
+}
+
+void ListWidget::setItemsTop(int top) {
+	if (_itemsTop == top) {
 		return;
+	} else if (_thanosController) {
+		_thanosController->shiftGaps(top - _itemsTop);
 	}
-	_collapseGaps = std::move(gaps);
-	auto gapTotal = 0;
-	for (const auto &gap : _collapseGaps) {
-		gapTotal += gap.height;
-	}
+	_itemsTop = top;
+}
+
+void ListWidget::collapseGapsUpdated() {
+	const auto gapTotal = collapseGapsTotal();
+	setItemsTop(countItemsTop());
 	const auto nowHeight = _itemsTop
 		+ _itemsHeight
 		+ gapTotal
@@ -4812,6 +4862,7 @@ void ListWidget::setCollapseGaps(std::vector<Ui::CollapseGap> gaps) {
 	}
 	update();
 }
+
 
 void ListWidget::setupThanosEffect() {
 	if (!_delegate->listThanosEffectEnabled()) {
@@ -4849,9 +4900,7 @@ void ListWidget::setupThanosEffect() {
 			.scrollToY = [=](int y) {
 				scroll->scrollToY(y);
 			},
-			.setCollapseGaps = [=](std::vector<Ui::CollapseGap> gaps) {
-				setCollapseGaps(std::move(gaps));
-			},
+			.collapseGapsUpdated = [=] { collapseGapsUpdated(); },
 		},
 		lifetime());
 }
@@ -4967,10 +5016,13 @@ void ListWidget::viewHeightAdjusted(not_null<Element*> view) {
 		(*next)->setY((*next)->y() + delta);
 	}
 	_itemsHeight += delta;
-	_itemsTop = (_minHeight > _itemsHeight + st::historyPaddingBottom)
-		? (_minHeight - _itemsHeight - st::historyPaddingBottom)
-		: 0;
-	resize(width(), _itemsTop + _itemsHeight + st::historyPaddingBottom);
+	setItemsTop(countItemsTop());
+	resize(
+		width(),
+		_itemsTop
+			+ _itemsHeight
+			+ collapseGapsTotal()
+			+ st::historyPaddingBottom);
 	restoreScrollPosition();
 	updateVisibleTopItem();
 	update();
@@ -5456,8 +5508,10 @@ void ListWidget::playPauseFocusedMedia() {
 				|| document->isSong()
 				|| document->isAudioFile()
 				|| document->isVideoMessage()) {
-				::Media::Player::instance()->playPause(
-					{ document, item->fullId() });
+				// Go the same way as a mouse click on the media, so that
+				// the playlist gets the same context (e.g. is not scoped
+				// to a single topic when the whole forum is shown).
+				_delegate->listOpenDocument(document, item->fullId(), false);
 			}
 		}
 	}

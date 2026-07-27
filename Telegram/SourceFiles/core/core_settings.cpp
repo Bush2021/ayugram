@@ -1286,6 +1286,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		const auto uncheckedChatFiltersTabsMode = static_cast<Mode>(
 			chatFiltersTabsMode);
 		switch (uncheckedChatFiltersTabsMode) {
+		case Mode::Default:
 		case Mode::TextOnly:
 		case Mode::TextAndIcons:
 		case Mode::IconsOnly:
@@ -1811,7 +1812,7 @@ void Settings::resetOnLastLogout() {
 	_recordVideoMessages = false;
 	_videoQuality = {};
 	_chatFiltersHorizontal = false;
-	_chatFiltersTabsMode = Ui::ChatsFiltersTabsMode::TextOnly;
+	_chatFiltersTabsMode = Ui::ChatsFiltersTabsMode::Default;
 	_pullToNextChannel = true;
 	_quickDialogAction = Dialogs::Ui::QuickDialogAction::Disabled;
 	_notificationsVolume = 100;
