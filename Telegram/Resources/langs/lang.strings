@@ -8703,7 +8703,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SettingsShowID_Hide" = "Hide";
 "ayu_SettingsShowMessageShot" = "Show Message Shot";
 "ayu_SettingsShowMessageShotDescription" = "Allows taking a screenshot of the selected messages.";
-"ayu_SettingsRecentStickersCount" = "Recent Stickers Count";
+"ayu_SettingsUnlimitedRecentStickers" = "Unlimited Recent Stickers";
 "ayu_SettingsCustomizationHint" = "You must restart the application after making changes in the \"Customization\" section.";
 "ayu_MaterialSwitches" = "MD3 Switch Style";
 "ayu_RemoveMessageTail" = "Remove Message Tail";

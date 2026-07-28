@@ -300,7 +300,7 @@ public:
 	[[nodiscard]] bool replaceBottomInfoWithIcons() const { return _replaceBottomInfoWithIcons.current(); }
 	[[nodiscard]] const QString &deletedMark() const { return _deletedMark.current(); }
 	[[nodiscard]] const QString &editedMark() const { return _editedMark.current(); }
-	[[nodiscard]] int recentStickersCount() const { return _recentStickersCount.current(); }
+	[[nodiscard]] bool unlimitedRecentStickers() const { return _unlimitedRecentStickers.current(); }
 	[[nodiscard]] ContextMenuVisibility showReactionsPanelInContextMenu() const { return _showReactionsPanelInContextMenu.current(); }
 	[[nodiscard]] ContextMenuVisibility showViewsPanelInContextMenu() const { return _showViewsPanelInContextMenu.current(); }
 	[[nodiscard]] ContextMenuVisibility showHideMessageInContextMenu() const { return _showHideMessageInContextMenu.current(); }
@@ -385,7 +385,7 @@ public:
 	void setReplaceBottomInfoWithIcons(bool val);
 	void setDeletedMark(const QString &val);
 	void setEditedMark(const QString &val);
-	void setRecentStickersCount(int val);
+	void setUnlimitedRecentStickers(bool val);
 	void setShowReactionsPanelInContextMenu(ContextMenuVisibility val);
 	void setShowViewsPanelInContextMenu(ContextMenuVisibility val);
 	void setShowHideMessageInContextMenu(ContextMenuVisibility val);
@@ -505,8 +505,8 @@ public:
 	[[nodiscard]] rpl::producer<QString> deletedMarkChanges() const { return _deletedMark.changes(); }
 	[[nodiscard]] rpl::producer<QString> editedMarkValue() const { return _editedMark.value(); }
 	[[nodiscard]] rpl::producer<QString> editedMarkChanges() const { return _editedMark.changes(); }
-	[[nodiscard]] rpl::producer<int> recentStickersCountValue() const { return _recentStickersCount.value(); }
-	[[nodiscard]] rpl::producer<int> recentStickersCountChanges() const { return _recentStickersCount.changes(); }
+	[[nodiscard]] rpl::producer<bool> unlimitedRecentStickersValue() const { return _unlimitedRecentStickers.value(); }
+	[[nodiscard]] rpl::producer<bool> unlimitedRecentStickersChanges() const { return _unlimitedRecentStickers.changes(); }
 	[[nodiscard]] rpl::producer<ContextMenuVisibility> showReactionsPanelInContextMenuValue() const { return _showReactionsPanelInContextMenu.value(); }
 	[[nodiscard]] rpl::producer<ContextMenuVisibility> showReactionsPanelInContextMenuChanges() const { return _showReactionsPanelInContextMenu.changes(); }
 	[[nodiscard]] rpl::producer<ContextMenuVisibility> showViewsPanelInContextMenuValue() const { return _showViewsPanelInContextMenu.value(); }
@@ -649,7 +649,7 @@ private:
 	rpl::variable<bool> _replaceBottomInfoWithIcons = true;
 	rpl::variable<QString> _deletedMark = QString::fromUtf8("🧹");
 	rpl::variable<QString> _editedMark;
-	rpl::variable<int> _recentStickersCount = 100;
+	rpl::variable<bool> _unlimitedRecentStickers = false;
 	rpl::variable<ContextMenuVisibility> _showReactionsPanelInContextMenu = ContextMenuVisibility::Visible;
 	rpl::variable<ContextMenuVisibility> _showViewsPanelInContextMenu = ContextMenuVisibility::Visible;
 	rpl::variable<ContextMenuVisibility> _showHideMessageInContextMenu = ContextMenuVisibility::Hidden;

@@ -516,7 +516,6 @@ void AyuSettings::validate() {
 
 	validateRange(_messageBubbleRadius, 0, 16, defaults._messageBubbleRadius);
 	validateRange(_wideMultiplier, 0.5, 4.0, defaults._wideMultiplier);
-	validateRange(_recentStickersCount, 1, 200, defaults._recentStickersCount);
 	validateRange(_avatarCorners, 0, AyuUiSettings::kMaxAvatarCorners, defaults._avatarCorners);
 
 	const auto embeddedType = _messageShotSettings._embeddedThemeType.current();
@@ -735,9 +734,9 @@ void AyuSettings::setEditedMark(const QString &val) {
 	save();
 }
 
-void AyuSettings::setRecentStickersCount(int val) {
-	if (_recentStickersCount.current() == val) return;
-	_recentStickersCount = val;
+void AyuSettings::setUnlimitedRecentStickers(bool val) {
+	if (_unlimitedRecentStickers.current() == val) return;
+	_unlimitedRecentStickers = val;
 	save();
 }
 
@@ -1099,7 +1098,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"replaceBottomInfoWithIcons", s._replaceBottomInfoWithIcons.current()},
 		{"deletedMark", s._deletedMark.current()},
 		{"editedMark", s._editedMark.current()},
-		{"recentStickersCount", s._recentStickersCount.current()},
+		{"unlimitedRecentStickers", s._unlimitedRecentStickers.current()},
 		{"showReactionsPanelInContextMenu", s._showReactionsPanelInContextMenu.current()},
 		{"showViewsPanelInContextMenu", s._showViewsPanelInContextMenu.current()},
 		{"showHideMessageInContextMenu", s._showHideMessageInContextMenu.current()},
@@ -1201,7 +1200,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._replaceBottomInfoWithIcons = j.value("replaceBottomInfoWithIcons", defaults._replaceBottomInfoWithIcons.current());
 	s._deletedMark = j.value("deletedMark", defaults._deletedMark.current());
 	s._editedMark = j.value("editedMark", defaults._editedMark.current());
-	s._recentStickersCount = j.value("recentStickersCount", defaults._recentStickersCount.current());
+	s._unlimitedRecentStickers = j.value("unlimitedRecentStickers", defaults._unlimitedRecentStickers.current());
 	s._showReactionsPanelInContextMenu = j.value("showReactionsPanelInContextMenu", defaults._showReactionsPanelInContextMenu.current());
 	s._showViewsPanelInContextMenu = j.value("showViewsPanelInContextMenu", defaults._showViewsPanelInContextMenu.current());
 	s._showHideMessageInContextMenu = j.value("showHideMessageInContextMenu", defaults._showHideMessageInContextMenu.current());

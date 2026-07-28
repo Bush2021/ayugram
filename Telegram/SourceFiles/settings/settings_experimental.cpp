@@ -158,7 +158,7 @@ struct ResolvedReferrer {
 	} else if (id == u"use-small-msg-bubble-radius"_q) {
 		return u"ayu/messageBubbleRadius"_q;
 	} else if (id == u"unlimited-recent-stickers"_q) {
-		return u"ayu/recentStickersCount"_q;
+		return u"ayu/unlimitedRecentStickers"_q;
 	} else if (id == u"hide-ai-button"_q) {
 		return u"ayu/showAiEditorButtonInMessageField"_q;
 	} else if (id == u"unlimited-message-width"_q) {

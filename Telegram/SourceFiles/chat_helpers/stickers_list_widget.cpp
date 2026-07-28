@@ -63,7 +63,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "styles/style_ayu_styles.h"
-#include "boxes/abstract_box.h"
 
 
 namespace ChatHelpers {
@@ -3328,10 +3327,9 @@ auto StickersListWidget::collectRecentStickers() -> std::vector<Sticker> {
 	result.reserve(cloudCount + recent.size() + customCount);
 	_custom.reserve(cloudCount + recent.size() + customCount);
 
-    const auto &settings = AyuSettings::getInstance();
-
 	auto add = [&](not_null<DocumentData*> document, bool custom) {
-		if (result.size() >= settings.recentStickersCount()) {
+		if (result.size() >= kRecentDisplayLimit
+			&& !AyuSettings::getInstance().unlimitedRecentStickers()) {
 			return;
 		}
 		const auto i = ranges::find(result, document, &Sticker::document);
