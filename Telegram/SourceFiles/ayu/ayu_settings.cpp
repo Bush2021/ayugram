@@ -1010,6 +1010,12 @@ void AyuSettings::setVoiceConfirmation(bool val) {
 	save();
 }
 
+void AyuSettings::setRoundConfirmation(bool val) {
+	if (_roundConfirmation.current() == val) return;
+	_roundConfirmation = val;
+	save();
+}
+
 void AyuSettings::setTranslationProvider(TranslationProvider val) {
 	if ((val == TranslationProvider::Native)
 		&& !Platform::IsTranslateProviderAvailable()) {
@@ -1143,6 +1149,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"stickerConfirmation", s._stickerConfirmation.current()},
 		{"gifConfirmation", s._gifConfirmation.current()},
 		{"voiceConfirmation", s._voiceConfirmation.current()},
+		{"roundConfirmation", s._roundConfirmation.current()},
 		{"translationProvider", s._translationProvider.current()},
 		{"adaptiveCoverColor", s._adaptiveCoverColor.current()},
 		{"improveLinkPreviews", s._improveLinkPreviews.current()},
@@ -1245,6 +1252,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._stickerConfirmation = j.value("stickerConfirmation", defaults._stickerConfirmation.current());
 	s._gifConfirmation = j.value("gifConfirmation", defaults._gifConfirmation.current());
 	s._voiceConfirmation = j.value("voiceConfirmation", defaults._voiceConfirmation.current());
+	s._roundConfirmation = j.value("roundConfirmation", defaults._roundConfirmation.current());
 	s._translationProvider = j.value("translationProvider", defaults._translationProvider.current());
 	s._adaptiveCoverColor = j.value("adaptiveCoverColor", defaults._adaptiveCoverColor.current());
 	s._improveLinkPreviews = j.value("improveLinkPreviews", defaults._improveLinkPreviews.current());
