@@ -157,7 +157,7 @@ void AyuSectionBuilder::addChooseButton(ChooseButtonArgs &&args) {
 
 	_builder.add([&](const Builder::BuildContext &ctx) {
 		v::match(ctx, [&](const Builder::WidgetContext &wctx) {
-			AddChooseButtonWithIconAndRightTextInner(
+			const auto button = AddChooseButtonWithIconAndRightTextInner(
 				wctx.container,
 				wctx.controller,
 				initialSelection,
@@ -167,6 +167,12 @@ void AyuSectionBuilder::addChooseButton(ChooseButtonArgs &&args) {
 				icon.icon ? st::settingsButton : st::settingsButtonNoIcon,
 				std::move(icon),
 				setter);
+			if (!id.isEmpty() && wctx.highlights) {
+				wctx.highlights->push_back({
+					id,
+					{ button.get(), {} },
+				});
+			}
 		}, [&](const Builder::SearchContext &sctx) {
 			if (!id.isEmpty()) {
 				sctx.entries->push_back({

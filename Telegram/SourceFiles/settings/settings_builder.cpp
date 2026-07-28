@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
 #include "api/api_user_privacy.h"
+#include "ayu/ui/settings/settings_ayu_utils.h"
 #include "boxes/edit_privacy_box.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
@@ -73,6 +74,7 @@ BuildHelper::BuildHelper(
 		.highlights = highlights,
 	});
 	_method(builder);
+	SetupCopyLinkMenus(controller, *highlights, lifetime);
 
 	std::move(showFinished) | rpl::on_next([=] {
 		for (const auto &[id, entry] : *highlights) {
