@@ -442,6 +442,7 @@ void SetupExperimental(
 	addToggle(Window::Notifications::kOptionHideReplyButton);
 	addToggle(Window::Notifications::kOptionCustomNotification);
 	addToggle(Window::Notifications::kOptionGNotification);
+	addToggle(Window::Notifications::kOptionMacModernNotifications);
 	addToggle(Core::kOptionFreeType);
 	addToggle(Core::kOptionSkipUrlSchemeRegister);
 	addToggle(Core::kOptionDeadlockDetector);
