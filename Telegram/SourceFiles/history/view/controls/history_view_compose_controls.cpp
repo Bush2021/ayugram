@@ -3298,28 +3298,12 @@ void ComposeControls::initTabbedSelector() {
 					const auto effectiveFrom = options.scheduled
 						? Ui::MessageSendingAnimationFrom()
 						: from;
-					auto sendGIFCallback = crl::guard(_field, [
-							=,
-							options = std::move(options),
-							caption = std::move(caption)
-					]() mutable {
-						_fileChosen.fire({
-							.document = document,
-							.options = options,
-							.messageSendingFrom = effectiveFrom,
-							.caption = std::move(caption),
-						});
+					_fileChosen.fire({
+						.document = document,
+						.options = options,
+						.messageSendingFrom = effectiveFrom,
+						.caption = std::move(caption),
 					});
-					const auto &settings = AyuSettings::getInstance();
-					if (settings.gifConfirmation()) {
-						_show->show(Ui::MakeConfirmBox({
-							.text = tr::ayu_ConfirmationGIF(),
-							.confirmed = sendGIFCallback,
-							.confirmText = tr::lng_send_button(),
-						}));
-					} else {
-						sendGIFCallback();
-					}
 				}));
 		} else {
 			_fileChosen.fire(std::move(data));

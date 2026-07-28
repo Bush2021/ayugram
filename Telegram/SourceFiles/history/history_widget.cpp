@@ -2444,31 +2444,15 @@ void HistoryWidget::fileChosen(ChatHelpers::FileChosen &&data) {
 					const auto effectiveFrom = options.scheduled
 						? Ui::MessageSendingAnimationFrom()
 						: from;
-					auto sendGIFCallback = crl::guard(this, [
-							=,
-							options = std::move(options),
-							caption = std::move(caption)
-					]() mutable {
-						controller()->sendingAnimation().appendSending(
-							effectiveFrom);
-						auto messageToSend = Api::MessageToSend(
-							prepareSendAction(options));
-						messageToSend.textWithTags = std::move(caption);
-						sendExistingDocument(
-							document,
-							std::move(messageToSend),
-							effectiveFrom.localId);
-					});
-					const auto &settings = AyuSettings::getInstance();
-					if (settings.gifConfirmation()) {
-						controller()->show(Ui::MakeConfirmBox({
-							.text = tr::ayu_ConfirmationGIF(),
-							.confirmed = sendGIFCallback,
-							.confirmText = tr::lng_send_button(),
-						}));
-					} else {
-						sendGIFCallback();
-					}
+					controller()->sendingAnimation().appendSending(
+						effectiveFrom);
+					auto messageToSend = Api::MessageToSend(
+						prepareSendAction(options));
+					messageToSend.textWithTags = std::move(caption);
+					sendExistingDocument(
+						document,
+						std::move(messageToSend),
+						effectiveFrom.localId);
 				}));
 			return;
 		}
