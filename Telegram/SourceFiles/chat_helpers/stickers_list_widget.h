@@ -460,6 +460,7 @@ private:
 
 	bool _paintAsPremium = false;
 	bool _showingSetById = false;
+	bool _refreshDelayed = false;
 	crl::time _lastScrolledAt = 0;
 	crl::time _lastFullUpdatedAt = 0;
 
