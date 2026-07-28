@@ -299,7 +299,11 @@ StickersListWidget::StickersListWidget(
 			? Data::StickersType::Masks
 			: Data::StickersType::Stickers
 		) | rpl::on_next([=] {
-			refreshRecent();
+			if (underMouse()) {
+				_refreshDelayed = true;
+			} else {
+				refreshRecent();
+			}
 		}, lifetime());
 	}
 
@@ -2995,10 +2999,16 @@ void StickersListWidget::resizeEvent(QResizeEvent *e) {
 
 void StickersListWidget::leaveEventHook(QEvent *e) {
 	clearSelection();
+	if (base::take(_refreshDelayed)) {
+		refreshRecent();
+	}
 }
 
 void StickersListWidget::leaveToChildEvent(QEvent *e, QWidget *child) {
 	clearSelection();
+	if (base::take(_refreshDelayed)) {
+		refreshRecent();
+	}
 }
 
 void StickersListWidget::enterFromChildEvent(QEvent *e, QWidget *child) {
@@ -3276,6 +3286,7 @@ bool StickersListWidget::appendSet(
 }
 
 void StickersListWidget::refreshRecent() {
+	_refreshDelayed = false;
 	if (_section == Section::Stickers) {
 		refreshRecentStickers();
 	}
@@ -3361,6 +3372,7 @@ auto StickersListWidget::collectRecentStickers() -> std::vector<Sticker> {
 }
 
 void StickersListWidget::refreshRecentStickers(bool performResize) {
+	_refreshDelayed = false;
 	clearSelection();
 
 	auto recentPack = collectRecentStickers();

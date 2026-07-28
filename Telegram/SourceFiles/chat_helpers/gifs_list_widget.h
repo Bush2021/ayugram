@@ -186,6 +186,7 @@ private:
 	crl::time _lastUpdatedAt = 0;
 	base::Timer _updateInlineItems;
 	bool _inlineWithThumb = false;
+	bool _refreshDelayed = false;
 
 	std::map<
 		not_null<DocumentData*>,
