@@ -784,7 +784,7 @@ void PullToNextChannel::pushIndicator() {
 	_scroll->setContentBottomInset(std::max(0, int(base::SafeRound(
 		_jumping ? effective : (effective - _pull)))));
 	_indicator->setData(effective, _reached, _next.get());
-	_hint->setData(_pull > 0., _reached, _next.get());
+	_hint->setData((_parent->height() > _scroll->y() + _scroll->height()) && (_pull > 0.), _reached, _next.get());
 }
 
 void PullToNextChannel::updateGeometry() {
@@ -801,6 +801,8 @@ void PullToNextChannel::updateGeometry() {
 	if (bottom > top) {
 		_hint->setGeometry(_scroll->x(), top, _scroll->width(), bottom - top);
 		_hint->raise();
+	} else {
+		_hint->hideNow();
 	}
 }
 
