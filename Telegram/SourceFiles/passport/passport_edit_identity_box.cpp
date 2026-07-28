@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text_options.h"
 #include "lang/lang_keys.h"
 #include "core/file_utilities.h"
+#include "styles/style_add_contact_box.h"
 #include "styles/style_widgets.h"
 #include "styles/style_boxes.h"
 #include "styles/style_passport.h"
