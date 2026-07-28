@@ -421,10 +421,17 @@ auto DeleteMessagesBox::revokeText(not_null<PeerData*> peer) const
 		return result;
 	}
 
-	const auto items = peer->owner().idsToItems(_ids);
+	auto items = peer->owner().idsToItems(_ids);
 
 	if (items.size() != _ids.size()) {
 		// We don't have information about all messages.
+		return std::nullopt;
+	}
+
+	items.erase(
+		ranges::remove_if(items, &HistoryItem::isDeleted),
+		end(items));
+	if (items.empty()) {
 		return std::nullopt;
 	}
 
