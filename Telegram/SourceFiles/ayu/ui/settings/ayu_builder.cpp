@@ -190,12 +190,21 @@ void AyuSectionBuilder::addSlider(SliderArgs &&args) {
 	_builder.add([&](const Builder::BuildContext &ctx) {
 		v::match(ctx, [&](const Builder::WidgetContext &wctx) {
 			const auto container = wctx.container;
-			if (args.showTitle) {
-				container->add(
+			const auto titleButton = args.showTitle
+				? container->add(
 					object_ptr<Button>(container,
 						std::move(args.title),
-						st::settingsButtonNoIcon)
-				)->setAttribute(Qt::WA_TransparentForMouseEvents);
+						st::settingsButtonNoIcon))
+				: nullptr;
+			if (titleButton) {
+				titleButton->setAttribute(
+					Qt::WA_TransparentForMouseEvents);
+				if (!id.isEmpty() && wctx.highlights) {
+					wctx.highlights->push_back({
+						id,
+						{ titleButton, { .rippleShape = true } },
+					});
+				}
 			}
 
 			auto sliderWithLabel = MakeSliderWithLabel(

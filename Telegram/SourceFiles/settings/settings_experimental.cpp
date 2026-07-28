@@ -161,6 +161,8 @@ struct ResolvedReferrer {
 		return u"ayu/recentStickersCount"_q;
 	} else if (id == u"hide-ai-button"_q) {
 		return u"ayu/showAiEditorButtonInMessageField"_q;
+	} else if (id == u"unlimited-message-width"_q) {
+		return u"ayu/wideMultiplier"_q;
 	}
 	return QString();
 }
