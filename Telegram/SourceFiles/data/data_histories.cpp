@@ -35,6 +35,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
+#include "ayu/data/messages_storage.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -993,7 +994,9 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 				continue;
 			}
 			remove.push_back(item);
-			if (item->isRegular()) {
+			if (item->isDeleted()) {
+				AyuMessages::removeDeletedMessage(item);
+			} else if (item->isRegular()) {
 				idsByPeer[history].push_back(MTP_int(itemId.msg));
 			}
 		}
