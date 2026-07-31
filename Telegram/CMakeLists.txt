@@ -1878,6 +1878,7 @@ PRIVATE
     platform/win/windows_taskbar_buttons.h
     platform/win/windows_toast_activator.cpp
     platform/win/windows_toast_activator.h
+    platform/platform_file_utilities.cpp
     platform/platform_file_utilities.h
     platform/platform_launcher.h
     platform/platform_integration.cpp
@@ -2062,8 +2063,14 @@ PRIVATE
     test/test_agent.h
     test/test_capture.cpp
     test/test_capture.h
+    test/test_launch_fuse.cpp
+    test/test_launch_fuse.h
     test/test_log.cpp
     test/test_log.h
+    test/test_messages.cpp
+    test/test_messages.h
+    test/test_open_handoff.cpp
+    test/test_open_handoff.h
     test/test_runner.cpp
     test/test_runner.h
     test/test_scenario.cpp

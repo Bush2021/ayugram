@@ -438,8 +438,8 @@ void ItemBase::updateZoom(float64 zoom) {
 		_imageSize.width(),
 		_imageSize.height());
 	_sizeLimits = {
-		.min = int(maxSide * kMinSizeRatio),
-		.max = int(maxSide * kMaxSizeRatio),
+		.min = std::max(int(maxSide * kMinSizeRatio), 1),
+		.max = std::max(int(maxSide * kMaxSizeRatio), 1),
 	};
 	_horizontalSize = std::clamp(
 		_horizontalSize,
@@ -494,6 +494,7 @@ ItemBase::Placement ItemBase::placement() const {
 		.scale = scale(),
 		.zValue = zValue(),
 		.size = _horizontalSize,
+		.aspectRatio = _aspectRatio,
 		.flipped = _flipped,
 	};
 }
@@ -501,6 +502,7 @@ ItemBase::Placement ItemBase::placement() const {
 void ItemBase::applyPlacement(const Placement &placement) {
 	prepareGeometryChange();
 	_horizontalSize = placement.size;
+	_aspectRatio = placement.aspectRatio;
 	updateVerticalSize();
 	setPos(placement.position);
 	setRotation(placement.rotation);

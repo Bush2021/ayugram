@@ -175,6 +175,11 @@ foreach(v
         list(APPEND fido2_definitions ${v})
     endif()
 endforeach()
+# Qt6Core embeds TinyCBOR and emits its own cbor_encode_double() in debug
+# builds, so rename libcbor's one to avoid LNK2005.
+list(APPEND fido2_definitions
+    cbor_encode_double=libcbor_encode_double)
+
 target_compile_definitions(lib_fido2 PRIVATE ${fido2_definitions})
 
 # --- Dependencies. ---
@@ -208,10 +213,10 @@ if (LINUX)
     pkg_check_modules(UDEV REQUIRED IMPORTED_TARGET libudev)
     target_link_libraries(lib_fido2 PRIVATE PkgConfig::UDEV)
 elseif (APPLE)
-    target_link_libraries(lib_fido2
+    target_link_frameworks(lib_fido2
     PRIVATE
-        "-framework CoreFoundation"
-        "-framework IOKit")
+        CoreFoundation
+        IOKit)
 elseif (WIN32)
     target_link_libraries(lib_fido2
     PRIVATE
