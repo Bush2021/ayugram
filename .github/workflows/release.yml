@@ -31,7 +31,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-slim
-    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.tag }}
