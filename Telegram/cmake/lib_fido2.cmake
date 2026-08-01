@@ -9,6 +9,20 @@
 # On Windows it serves only systems without webauthn.dll (Win7/8/8.1,
 # Win10 < 1903); winhello.c is left out.
 
+if (DESKTOP_APP_USE_PACKAGED)
+    find_package(PkgConfig)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(TDESKTOP_FIDO2 IMPORTED_TARGET libfido2)
+    endif()
+
+    if (TDESKTOP_FIDO2_FOUND)
+        add_library(lib_fido2 INTERFACE IMPORTED GLOBAL)
+        add_library(tdesktop::lib_fido2 ALIAS lib_fido2)
+        target_link_libraries(lib_fido2 INTERFACE PkgConfig::TDESKTOP_FIDO2)
+        return()
+    endif()
+endif()
+
 add_library(lib_fido2 STATIC)
 init_target(lib_fido2 "(external)")
 add_library(tdesktop::lib_fido2 ALIAS lib_fido2)
@@ -91,16 +105,16 @@ set(fido2_sources
     ${fido2_src}/util.c)
 
 # Platform USB-HID backend.
-if (LINUX)
+if (WIN32)
     list(APPEND fido2_sources
-        ${fido2_src}/hid_linux.c
-        ${fido2_src}/hid_unix.c)
+        ${fido2_src}/hid_win.c)
 elseif (APPLE)
     list(APPEND fido2_sources
         ${fido2_src}/hid_osx.c)
-elseif (WIN32)
+else()
     list(APPEND fido2_sources
-        ${fido2_src}/hid_win.c)
+        ${fido2_src}/hid_linux.c
+        ${fido2_src}/hid_unix.c)
 endif()
 
 # openbsd-compat/*.c are each internally guarded by #ifndef HAVE_<fn>, so the
@@ -208,22 +222,22 @@ PRIVATE
     desktop-app::external_zlib)
 
 # Platform HID transport dependencies.
-if (LINUX)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(UDEV REQUIRED IMPORTED_TARGET libudev)
-    target_link_libraries(lib_fido2 PRIVATE PkgConfig::UDEV)
-elseif (APPLE)
-    target_link_frameworks(lib_fido2
-    PRIVATE
-        CoreFoundation
-        IOKit)
-elseif (WIN32)
+if (WIN32)
     target_link_libraries(lib_fido2
     PRIVATE
         bcrypt
         setupapi
         hid
         ws2_32)
+elseif (APPLE)
+    target_link_frameworks(lib_fido2
+    PRIVATE
+        CoreFoundation
+        IOKit)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TDESKTOP_UDEV REQUIRED IMPORTED_TARGET libudev)
+    target_link_libraries(lib_fido2 PRIVATE PkgConfig::TDESKTOP_UDEV)
 endif()
 
 # Silence third-party C warnings. On MSVC the flags must ride an INTERFACE lib
