@@ -328,9 +328,9 @@ void ResolveDocument(
 					}
 					context = QVariant::fromValue(clickHandlerContext);
 				}
-			}
-			if (!Core::App().iv().showMarkdown(path, context)) {
-				LaunchWithWarning(path, item);
+				if (!Core::App().iv().showMarkdown(path, context)) {
+					LaunchWithWarning(path, item);
+				}
 			}
 		} else if (document->status == FileReady
 			|| document->status == FileDownloadFailed) {
