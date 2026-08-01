@@ -204,7 +204,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create draft release
+      - name: Create release
         if: inputs.dry_run == false
         shell: bash
         env:
@@ -212,37 +212,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          if release="$(gh release view "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --json isDraft,targetCommitish,url 2>/dev/null)"; then
-            is_draft="$(jq -r '.isDraft' <<< "$release")"
-            target="$(jq -r '.targetCommitish' <<< "$release")"
-            [[ "$is_draft" == "true" ]] || {
-              echo "::error::Release $RELEASE_TAG is already published."
-              exit 1
-            }
-            [[ "$target" == "$DEV_SHA" ]] || {
-              echo "::error::Draft release targets $target instead of $DEV_SHA."
-              exit 1
-            }
-            gh release edit "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --draft \
-              --prerelease="$PRERELEASE"
-          else
-            create_args=(
-              "$RELEASE_TAG"
-              --repo "$GITHUB_REPOSITORY"
-              --target "$DEV_SHA"
-              --title "$RELEASE_TAG"
-              --draft
-              --generate-notes
-            )
-            if [[ "$PRERELEASE" == "true" ]]; then
-              create_args+=(--prerelease)
-            fi
-            gh release create "${create_args[@]}"
+          create_args=(
+            "$RELEASE_TAG"
+            --repo "$GITHUB_REPOSITORY"
+            --target "$DEV_SHA"
+            --title "$RELEASE_TAG"
+            --generate-notes
+          )
+          if [[ "$PRERELEASE" == "true" ]]; then
+            create_args+=(--prerelease)
           fi
+          gh release create "${create_args[@]}"
 
           gh release upload "$RELEASE_TAG" release-assets/*.zip \
             --repo "$GITHUB_REPOSITORY" \
@@ -254,9 +234,9 @@ jobs:
             --jq '.url')"
           {
             echo
-            echo "## Draft release"
+            echo "## Release"
             echo
-            echo "[$RELEASE_TAG]($release_url) is ready for review."
+            echo "[$RELEASE_TAG]($release_url) was published."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report dry run
