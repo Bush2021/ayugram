@@ -2876,6 +2876,7 @@ void Element::refreshReactions() {
 					if (id.paid() || ranges::contains(chosen, id)) {
 						now->animateReaction({
 							.id = id,
+							.haptic = true,
 						});
 					}
 				}

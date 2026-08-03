@@ -35,6 +35,7 @@ struct ReactionFlyAnimationArgs {
 	bool flyKeepSize = false;
 	bool effectOnly = false;
 	bool forceFirstFrame = false;
+	bool haptic = false;
 
 	[[nodiscard]] ReactionFlyAnimationArgs translated(QPoint point) const;
 };
@@ -131,6 +132,7 @@ private:
 	bool _forceFirstFrame = false;
 	bool _effectOnly = false;
 	bool _valid = false;
+	bool _haptic = false;
 
 	bool _hapticExecuted = false;
 
