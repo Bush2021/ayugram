@@ -3561,8 +3561,7 @@ void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 
 	using namespace HistoryView::Reactions;
 	const auto desiredPosition = e->globalPos();
-	const auto reactItem = (_overElement
-		&& _overState.pointState != PointState::Outside)
+	const auto reactItem = _overElement
 		? _overElement->data().get()
 		: nullptr;
 	const auto attached = reactItem

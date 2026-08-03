@@ -3930,6 +3930,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	const auto desiredPosition = e->globalPos();
 	const auto reactItem = Element::Hovered()
 		? Element::Hovered()->data().get()
+		: Element::Moused()
+		? Element::Moused()->data().get()
 		: nullptr;
 	const auto attached = reactItem
 		? AttachSelectorToMenu(
