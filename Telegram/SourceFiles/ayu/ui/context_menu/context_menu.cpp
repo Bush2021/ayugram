@@ -858,11 +858,17 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, Hi
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	if (!item->isHistoryEntry() || item->isLocal() || item->out() || item->isDeleted() || item->history()->peer->isSelf()) {
+	const auto group = item->history()->owner().groups().find(item);
+	const auto readItem = group ? group->items.back().get() : item;
+	if (!readItem->isHistoryEntry()
+		|| readItem->isLocal()
+		|| readItem->out()
+		|| readItem->isDeleted()
+		|| readItem->history()->peer->isSelf()) {
 		return;
 	}
 
-	const auto &ghost = AyuSettings::ghost(&item->history()->session());
+	const auto &ghost = AyuSettings::ghost(&readItem->history()->session());
 	if (ghost.sendReadMessages()) {
 		return;
 	}
@@ -871,25 +877,30 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		tr::ayu_ReadUntilMenuText(tr::now),
 		[=]
 		{
-			readHistory(item);
-			if (item->media() && item->media()->ttlSeconds() <= 0 && item->unsupportedTTL() <= 0 && !item->out()) {
-				const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
-				if (const auto channel = item->history()->peer->asChannel()) {
-					item->history()->session().api().request(MTPchannels_ReadMessageContents(
+			readHistory(readItem);
+			const auto media = readItem->media();
+			if (media
+				&& media->ttlSeconds() <= 0
+				&& readItem->unsupportedTTL() <= 0
+				&& !readItem->out()) {
+				const auto ids = MTP_vector<MTPint>(1, MTP_int(readItem->id));
+				if (const auto channel = readItem->history()->peer->asChannel()) {
+					readItem->history()->session().api().request(
+						MTPchannels_ReadMessageContents(
 						channel->inputChannel(),
-						ids
-					)).send();
+						ids)).send();
 				} else {
-					item->history()->session().api().request(MTPmessages_ReadMessageContents(
-						ids
-					)).done([=](const MTPmessages_AffectedMessages &result)
+					readItem->history()->session().api().request(
+						MTPmessages_ReadMessageContents(ids)
+					).done([=](const MTPmessages_AffectedMessages &result)
 					{
-						item->history()->session().api().applyAffectedMessages(
-							item->history()->peer,
+						readItem->history()->session().api()
+							.applyAffectedMessages(
+							readItem->history()->peer,
 							result);
 					}).send();
 				}
-				item->markContentsRead();
+				readItem->markContentsRead();
 			}
 		},
 		&st::menuIconShowInChat);
