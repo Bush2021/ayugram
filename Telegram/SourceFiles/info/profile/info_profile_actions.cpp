@@ -1921,37 +1921,6 @@ Section DetailsFiller::makeInfo() {
 			});
 		}
 
-		const auto hook = [=](Ui::FlatLabel::ContextMenuRequest request)
-		{
-			if (!request.link) {
-				return;
-			}
-			const auto text = request.link->copyToClipboardContextItemText();
-			if (text.isEmpty()) {
-				return;
-			}
-			const auto link = request.link->copyToClipboardText();
-			request.menu->addAction(
-				text,
-				[=] { QGuiApplication::clipboard()->setText(link); });
-			const auto last = link.lastIndexOf('/');
-			if (last < 0) {
-				return;
-			}
-			const auto mention = '@' + link.mid(last + 1);
-			if (mention.size() < 2) {
-				return;
-			}
-			request.menu->addAction(
-				tr::lng_context_copy_mention(tr::now),
-				[=] { QGuiApplication::clipboard()->setText(mention); });
-		};
-
-		if (!_topic) {
-			linkLine.text->setContextMenuHook(hook);
-			linkLine.subtext->setContextMenuHook(hook);
-		}
-
 		if (const auto channel = _topic ? nullptr : _peer->asChannel()) {
 			auto locationText = LocationValue(
 				channel
