@@ -1163,6 +1163,9 @@ bool Application::canApplyLangPackWithoutRestart() const {
 }
 
 void Application::checkStartUrls() {
+	if (_setupEmailLock.current()) {
+		return;
+	}
 	if (!Core::App().passcodeLocked()) {
 		cRefStartUrls() = ranges::views::all(
 			cRefStartUrls()
@@ -1334,6 +1337,7 @@ rpl::producer<bool> Application::passcodeLockValue() const {
 
 void Application::lockBySetupEmail() {
 	_setupEmailLock = true;
+	closeAdditionalWindows();
 	enumerateWindows([&](not_null<Window::Controller*> w) {
 		w->setupSetupEmailLock();
 	});
@@ -1344,6 +1348,7 @@ void Application::unlockSetupEmail() {
 	enumerateWindows([&](not_null<Window::Controller*> w) {
 		w->clearSetupEmailLock();
 	});
+	checkStartUrls();
 }
 
 bool Application::someSessionExists() const {
