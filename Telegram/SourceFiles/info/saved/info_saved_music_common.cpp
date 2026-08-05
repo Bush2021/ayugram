@@ -49,11 +49,13 @@ namespace {
 
 } // namespace
 
-void SetupSavedMusic(
+rpl::producer<bool> SetupSavedMusic(
 		not_null<Ui::VerticalLayout*> container,
 		not_null<Info::Controller*> controller,
 		not_null<PeerData*> peer,
 		rpl::producer<std::optional<QColor>> topBarColor) {
+	const auto hasMusic = container->lifetime().make_state<
+		rpl::variable<bool>>(false);
 	auto musicValue = Data::SavedMusic::Supported(peer->id)
 		? Data::SavedMusicList(
 			peer,
@@ -78,6 +80,7 @@ void SetupSavedMusic(
 		while (divider->entity()->count()) {
 			delete divider->entity()->widgetAt(0);
 		}
+		auto shown = false;
 		if (item) {
 			if (const auto document = item->media()
 					? item->media()->document()
@@ -149,11 +152,16 @@ void SetupSavedMusic(
 							st::widgetFadeDuration);
 					},
 					musicButton->lifetime());
+
+				shown = true;
 			}
 			divider->toggle(true, anim::type::normal);
 		}
+		*hasMusic = shown;
 	}, container->lifetime());
 	divider->finishAnimating();
+
+	return hasMusic->value();
 }
 
 } // namespace Info::Saved

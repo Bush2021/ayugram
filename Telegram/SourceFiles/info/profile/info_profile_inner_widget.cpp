@@ -86,14 +86,12 @@ void AddSavedMusic(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			layout,
 			object_ptr<Ui::VerticalLayout>(layout)));
-	Info::Saved::SetupSavedMusic(
-		wrap->entity(),
-		controller,
-		peer,
-		std::move(topBarColor));
-	using namespace rpl::mappers;
 	wrap->toggleOn(
-		wrap->entity()->heightValue() | rpl::map(_1 > 0),
+		Info::Saved::SetupSavedMusic(
+			wrap->entity(),
+			controller,
+			peer,
+			std::move(topBarColor)),
 		anim::type::instant);
 }
 
