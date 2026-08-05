@@ -16,8 +16,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/format_values.h"
 #include "ui/text/text_entity.h"
 #include "ui/effects/animations.h"
+#include "ui/widgets/menu/menu_action.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/menu/menu_common.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
@@ -1998,7 +2000,7 @@ base::unique_qptr<Ui::PopupMenu> EmojiListWidget::fillContextMenu(
 	auto menu = base::make_unique_q<Ui::PopupMenu>(
 		this,
 		(_mode == Mode::Full
-			? st::popupMenuWithIcons
+			? st().menu
 			: st::defaultPopupMenu));
 	if (_mode == Mode::Full) {
 		fillRecentMenu(menu, section, index);
@@ -2038,19 +2040,19 @@ void EmojiListWidget::fillRecentMenu(
 			});
 			addAction(tr::lng_emoji_copy(tr::now), [=] {
 				TextUtilities::SetClipboardText(data);
-			}, &st::menuIconCopy);
+			}, &st().icons.menuEmojiCopy);
 		}
 		if (recent && setId && _features.openStickerSets) {
 			addAction(
 				tr::lng_emoji_view_pack(tr::now),
 				crl::guard(this, [=] { displaySet(document); }),
-				&st::menuIconShowAll);
+				&st().icons.menuEmojiViewPack);
 		}
 	} else if (recent && emoji) {
 		addAction(tr::lng_emoji_copy(tr::now), [=] {
 			const auto text = emoji->text();
 			TextUtilities::SetClipboardText({ text, { text } });
-		}, &st::menuIconCopy);
+		}, &st().icons.menuEmojiCopy);
 	}
 	if (!recent) {
 		return;
@@ -2065,7 +2067,7 @@ void EmojiListWidget::fillRecentMenu(
 	addAction(tr::lng_emoji_remove_recent(tr::now), crl::guard(this, [=] {
 		Core::App().settings().hideRecentEmoji(id);
 		refreshRecent();
-	}), &st::menuIconCancel);
+	}), &st().icons.menuEmojiRemoveRecent);
 
 	menu->addSeparator(&st().expandedSeparator);
 
@@ -2082,12 +2084,16 @@ void EmojiListWidget::fillRecentMenu(
 			.labelStyle = &st().boxLabel,
 		}));
 	};
-	addAction({
-		.text = tr::lng_emoji_reset_recent(tr::now),
-		.handler = crl::guard(this, resetRecent),
-		.icon = &st::menuIconRestoreAttention,
-		.isAttention = true,
-	});
+	const auto resetIcon = &st::menuIconRestoreAttention;
+	menu->addAction(base::make_unique_q<Ui::Menu::Action>(
+		menu->menu(),
+		st().menuAttention,
+		Ui::Menu::CreateAction(
+			menu->menu().get(),
+			tr::lng_emoji_reset_recent(tr::now),
+			crl::guard(this, resetRecent)),
+		resetIcon,
+		resetIcon));
 }
 
 void EmojiListWidget::fillEmojiStatusMenu(
@@ -2126,7 +2132,8 @@ base::unique_qptr<Ui::PopupMenu> EmojiListWidget::fillSetContextMenu(
 		_localSetsManager.get(),
 		crl::guard(this, [this](uint64 id) { removeSet(id); }),
 		crl::guard(this, [this] { update(); }),
-		st::popupMenuWithIcons);
+		st().menu,
+		st().icons);
 }
 
 void EmojiListWidget::paintEvent(QPaintEvent *e) {
@@ -2423,7 +2430,8 @@ void EmojiListWidget::paint(
 				&& (info.section >= _staticCount)
 				&& (_custom[info.section - _staticCount].id
 					== Data::Stickers::MegagroupSetId);
-			const auto amCreator = !megagroupEmoji
+			const auto amCreator = _features.openStickerSets
+				&& !megagroupEmoji
 				&& titleSet
 				&& (titleSet->flags & Data::StickersSetFlag::AmCreator);
 			const auto badgeText = megagroupEmoji
@@ -4194,7 +4202,7 @@ EmojiListWidget::createSearchShortcutRipple(int index) {
 		searchShortcutRect(index).size(),
 		st::roundRadiusLarge);
 	return std::make_unique<Ui::RippleAnimation>(
-		st::defaultRippleAnimation,
+		st().searchPackRipple,
 		std::move(mask),
 		[this, setId] {
 			const auto i = ranges::find(

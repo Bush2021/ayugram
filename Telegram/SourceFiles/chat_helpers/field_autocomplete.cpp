@@ -1963,10 +1963,10 @@ void InitFieldAutocomplete(
 	}
 
 	field->tabbed(
-	) | rpl::on_next([=](not_null<bool*> handled) {
+	) | rpl::on_next([=](not_null<Ui::InputField::TabbedRequest*> request) {
 		if (!raw->isHidden()) {
 			raw->chooseSelected(FieldAutocomplete::ChooseMethod::ByTab);
-			*handled = true;
+			request->handled = true;
 		}
 	}, raw->lifetime());
 

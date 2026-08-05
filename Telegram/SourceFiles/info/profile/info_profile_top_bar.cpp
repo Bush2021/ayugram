@@ -1342,7 +1342,8 @@ void TopBar::setupUserpicButton(
 			: (user && !user->isSelf() && !_peer->isBot())
 			? &tr::lng_profile_set_personal_sure
 			: nullptr;
-		const auto useForumShape = _peer->isForum() && !_peer->isBot();
+		const auto useForumShape = (_peer->userpicShape()
+			== Ui::PeerUserpicShape::Forum);
 		return Editor::EditorData{
 			.about = (phrase
 				? (*phrase)(
@@ -1402,10 +1403,12 @@ void TopBar::setupUserpicButton(
 				this,
 				st::popupMenuWithIcons);
 
-			(*menu)->addAction(
-				tr::lng_profile_open_photo(tr::now),
-				openPhoto,
-				&st::menuIconPhoto);
+			if (_peer->userpicPhotoId()) {
+				(*menu)->addAction(
+					tr::lng_profile_open_photo(tr::now),
+					openPhoto,
+					&st::menuIconPhoto);
+			}
 
 			if (canReport()) {
 				(*menu)->addAction(

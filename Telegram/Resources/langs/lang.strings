@@ -7468,6 +7468,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_article_limit_blocks" = "The article has too many blocks.";
 "lng_article_limit_columns" = "The article table has too many columns.";
 "lng_article_limit_media" = "The article has too many media files.";
+"lng_article_table_truncated" = "The pasted table didn't fit and was truncated.";
+"lng_article_paste_truncated" = "The pasted content didn't fit and was truncated.";
 "lng_article_submit_empty" = "The article can't be empty.";
 "lng_article_premium_required" = "Subscribe to {link} to be able to send rich articles.";
 "lng_article_premium_required_link" = "Telegram Premium";
@@ -8489,6 +8491,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_ai_compose_select_style" = "Select Style";
 "lng_ai_compose_apply_style" = "Apply Style";
 "lng_ai_compose_style_tooltip" = "Choose Style";
+"lng_ai_compose_style_prompt_placeholder" = "Write a prompt...";
 "lng_ai_compose_create_tone_title" = "New Style";
 "lng_ai_compose_edit_tone_title" = "Edit Style";
 "lng_ai_compose_create_title" = "Create with AI";

@@ -424,7 +424,7 @@ base::unique_qptr<Ui::PopupMenu> GifsListWidget::fillContextMenu(
 			crl::guard(this, [=] {
 				selectInlineResult(selected, {}, true, true);
 			}),
-			&st::menuIconEdit);
+			&icons->menuGifCaption);
 	}
 
 	if (const auto item = _mosaic.maybeItemAt(_selected)) {

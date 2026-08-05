@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/editor_layer_widget.h"
 #include "editor/photo_editor.h"
 #include "editor/photo_editor_common.h"
+#include "iv/editor/iv_editor_clipboard_import.h"
 #include "iv/editor/iv_editor_text_entities.h"
 #include "iv/editor/iv_editor_window.h"
 #include "iv/markdown/iv_markdown_article_paint.h"
@@ -1417,48 +1418,6 @@ struct InlineFieldTrimResult {
 	return context;
 }
 
-[[nodiscard]] bool IsUsernameChar(QChar ch) {
-	const auto code = ch.unicode();
-	return (code >= 'a' && code <= 'z')
-		|| (code >= 'A' && code <= 'Z')
-		|| (code >= '0' && code <= '9')
-		|| (ch == '_');
-}
-
-[[nodiscard]] QStringView TrimmedView(QStringView text) {
-	auto from = 0;
-	auto till = text.size();
-	while (from != till && text[from].isSpace()) {
-		++from;
-	}
-	while (till != from && text[till - 1].isSpace()) {
-		--till;
-	}
-	return text.mid(from, till - from);
-}
-
-[[nodiscard]] QString StartingMention(QStringView text) {
-	const auto trimmed = TrimmedView(text);
-	if (trimmed.size() < 3 || trimmed[0] != '@') {
-		return QString();
-	}
-	auto till = 1;
-	while (till != trimmed.size() && IsUsernameChar(trimmed[till])) {
-		++till;
-	}
-	return (till > 1 && till != trimmed.size())
-		? trimmed.mid(0, till).toString()
-		: QString();
-}
-
-[[nodiscard]] bool HtmlTextMatchesPlainTextStart(
-		const QString &htmlText,
-		const QString &plainText) {
-	const auto htmlMention = StartingMention(QStringView(htmlText));
-	return htmlMention.isEmpty()
-		|| StartingMention(QStringView(plainText)) == htmlMention;
-}
-
 [[nodiscard]] std::optional<ClipboardData> BlockClipboardDataFromRichText(
 		TextWithEntities text) {
 	const auto isBlockEntity = [](const EntityInText &entity) {
@@ -1492,26 +1451,6 @@ struct InlineFieldTrimResult {
 	auto entities = TextUtilities::ConvertTextTagsToEntities(tags);
 	return BlockClipboardDataFromRichText({
 		std::move(text),
-		std::move(entities),
-	});
-}
-
-[[nodiscard]] std::optional<ClipboardData> BlockClipboardDataFromHtml(
-		not_null<const QMimeData*> data) {
-	const auto textMime = TextUtilities::TagsTextMimeType();
-	const auto tagsMime = TextUtilities::TagsMimeType();
-	if (!data->hasHtml()
-		|| (data->hasFormat(textMime) && data->hasFormat(tagsMime))) {
-		return std::nullopt;
-	}
-	auto parsed = TextUtilities::TextWithTagsFromHtml(data->html());
-	if (!parsed
-		|| !HtmlTextMatchesPlainTextStart(parsed->text, data->text())) {
-		return std::nullopt;
-	}
-	auto entities = TextUtilities::ConvertTextTagsToEntities(parsed->tags);
-	return BlockClipboardDataFromRichText({
-		std::move(parsed->text),
 		std::move(entities),
 	});
 }
@@ -3777,6 +3716,41 @@ void Widget::copyCurrentSelectionToClipboard() {
 	QApplication::clipboard()->setMimeData(mimeData.release());
 }
 
+std::optional<TableImportResult> Widget::importTableFromMimeData(
+		not_null<const QMimeData*> data) const {
+	return TableFromMimeData(
+		data,
+		TableImportLimitsFor(
+			_state->limits(),
+			CountRichPageBlocks(_state->richPage())));
+}
+
+void Widget::pasteImportedTable(TableImportResult &&imported) {
+	auto tableData = ClipboardBlockData();
+	tableData.blocks.push_back(std::move(imported.block));
+	pasteStructuredClipboardData(ClipboardData(std::move(tableData)));
+	if (imported.truncated) {
+		_show->showToast(tr::lng_article_table_truncated(tr::now));
+	}
+}
+
+std::optional<BlocksImportResult> Widget::importBlocksFromMimeData(
+		not_null<const QMimeData*> data) const {
+	return BlocksFromMimeData(
+		data,
+		_state->limits(),
+		CountRichPageBlocks(_state->richPage()));
+}
+
+void Widget::pasteImportedBlocks(BlocksImportResult &&imported) {
+	auto blocksData = ClipboardBlockData();
+	blocksData.blocks = std::move(imported.blocks);
+	pasteStructuredClipboardData(ClipboardData(std::move(blocksData)));
+	if (imported.truncated) {
+		_show->showToast(tr::lng_article_paste_truncated(tr::now));
+	}
+}
+
 void Widget::pasteStructuredClipboardData(const ClipboardData &data) {
 	const auto blocks = std::get_if<ClipboardBlockData>(&data);
 	const auto items = std::get_if<ClipboardListItemsData>(&data);
@@ -3908,6 +3882,14 @@ bool Widget::hasActiveSelection() const {
 	return hasStructuralSelection()
 		|| !_selection.empty()
 		|| hasFieldTextSpanSelection();
+}
+
+rpl::producer<bool> Widget::hasSelectionValue() const {
+	return _hasSelection.value();
+}
+
+void Widget::updateHasSelection() {
+	_hasSelection = hasActiveSelection();
 }
 
 TextWithEntities Widget::textSpanForCurrentSelection() {
@@ -4185,6 +4167,21 @@ bool Widget::handleClipboardKey(QKeyEvent *e) {
 			pasteStructuredClipboardData(*data);
 			e->accept();
 			return true;
+		}
+		if (mimeData && mimeData->hasHtml()) {
+			if (auto imported = importBlocksFromMimeData(
+					not_null<const QMimeData*>(mimeData))) {
+				pasteImportedBlocks(std::move(*imported));
+				e->accept();
+				return true;
+			}
+		}
+		if (mimeData && MimeDataLooksLikeTable(mimeData)) {
+			if (auto imported = importTableFromMimeData(mimeData)) {
+				pasteImportedTable(std::move(*imported));
+				e->accept();
+				return true;
+			}
 		}
 		if (mimeData && _applyPreparedMedia) {
 			if (auto list = PreparedMediaFromClipboard(
@@ -4633,6 +4630,7 @@ void Widget::performUndoRedo(bool redo, bool allowFieldLocal) {
 }
 
 void Widget::notifyToolbarStateChanged() {
+	updateHasSelection();
 	_toolbarStateChanges.fire_copy(toolbarStateValue());
 }
 
@@ -8753,9 +8751,10 @@ bool Widget::handleIvClipboardMime(
 		&& (modifiers & Qt::ShiftModifier)) {
 		return false;
 	}
+	const auto insertContext = ClipboardPasteInsertContext(
+		activeTextInsertContext());
 	const auto clipboardData = ClipboardDataFromMimeData(data.get());
-	if (clipboardData
-		&& ClipboardPasteInsertContext(activeTextInsertContext())) {
+	if (clipboardData && insertContext) {
 		if (action == Ui::InputField::MimeAction::Check) {
 			return true;
 		}
@@ -8765,11 +8764,28 @@ bool Widget::handleIvClipboardMime(
 		return true;
 	}
 	auto blockData = BlockClipboardDataFromFieldTags(data);
-	if (!blockData) {
-		blockData = BlockClipboardDataFromHtml(data);
+	if (!blockData && insertContext && data->hasHtml()) {
+		if (auto imported = importBlocksFromMimeData(data)) {
+			if (action == Ui::InputField::MimeAction::Check) {
+				return true;
+			}
+			crl::on_main(this, [=, imported = std::move(*imported)]() mutable {
+				pasteImportedBlocks(std::move(imported));
+			});
+			return true;
+		}
 	}
-	if (blockData
-		&& ClipboardPasteInsertContext(activeTextInsertContext())) {
+	if (!blockData && insertContext && MimeDataLooksLikeTable(data)) {
+		if (action == Ui::InputField::MimeAction::Check) {
+			return true;
+		} else if (auto imported = importTableFromMimeData(data)) {
+			crl::on_main(this, [=, imported = std::move(*imported)]() mutable {
+				pasteImportedTable(std::move(imported));
+			});
+			return true;
+		}
+	}
+	if (blockData && insertContext) {
 		if (action == Ui::InputField::MimeAction::Check) {
 			return true;
 		}
@@ -11030,6 +11046,7 @@ void Widget::startArticleSelection(
 		.from = MakeSelectionEndpoint(hit),
 		.to = MakeSelectionEndpoint(hit),
 	};
+	updateHasSelection();
 	update();
 }
 
@@ -11202,6 +11219,7 @@ void Widget::updateArticleSelection(
 		if (_selection != selection || endpointsChanged || forceUpdate) {
 			_selection = selection;
 			_selectionEndpoints = endpoints;
+			updateHasSelection();
 			update();
 		} else {
 			_selectionEndpoints = endpoints;

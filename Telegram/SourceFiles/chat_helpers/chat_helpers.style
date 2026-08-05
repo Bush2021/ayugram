@@ -66,6 +66,14 @@ ComposeIcons {
 	menuRecentRemove: icon;
 	menuGifAdd: icon;
 	menuGifRemove: icon;
+	menuGifCaption: icon;
+	menuSetAdd: icon;
+	menuSetShare: icon;
+	menuSetCopyLink: icon;
+	menuSetRemove: icon;
+	menuEmojiCopy: icon;
+	menuEmojiViewPack: icon;
+	menuEmojiRemoveRecent: icon;
 	menuMute: icon;
 	menuUnmute: icon;
 	menuSchedule: icon;
@@ -120,6 +128,7 @@ EmojiPan {
 	fadeLeft: icon;
 	fadeRight: icon;
 	menu: PopupMenu;
+	menuAttention: Menu;
 	expandedSeparator: MenuSeparator;
 	tabs: SettingsSlider;
 	search: TabbedSearch;
@@ -133,6 +142,7 @@ EmojiPan {
 	searchPackTextTop: pixels;
 	searchPackTextPadding: pixels;
 	searchPacksBottom: pixels;
+	searchPackRipple: RippleAnimation;
 	searchResultsHeight: pixels;
 	searchResultsTextTop: pixels;
 	searchSwapDuration: int;
@@ -687,6 +697,14 @@ defaultComposeIcons: ComposeIcons {
 	menuRecentRemove: menuIconDelete;
 	menuGifAdd: menuIconGif;
 	menuGifRemove: menuIconDelete;
+	menuGifCaption: menuIconEdit;
+	menuSetAdd: menuIconAdd;
+	menuSetShare: menuIconShare;
+	menuSetCopyLink: menuIconLink;
+	menuSetRemove: menuIconDelete;
+	menuEmojiCopy: menuIconCopy;
+	menuEmojiViewPack: menuIconShowAll;
+	menuEmojiRemoveRecent: menuIconCancel;
 	menuMute: menuIconMute;
 	menuUnmute: menuIconUnmute;
 	menuSchedule: menuIconSchedule;
@@ -747,6 +765,7 @@ defaultEmojiPan: EmojiPan {
 	fadeLeft: icon {{ "fade_horizontal-flip_horizontal", emojiPanCategories }};
 	fadeRight: icon {{ "fade_horizontal", emojiPanCategories }};
 	menu: popupMenuWithIcons;
+	menuAttention: menuWithIconsAttention;
 	expandedSeparator: MenuSeparator(defaultMenuSeparator) {
 		padding: margins(0px, 4px, 0px, 4px);
 		width: 6px;
@@ -763,6 +782,7 @@ defaultEmojiPan: EmojiPan {
 	searchPackTextTop: 55px;
 	searchPackTextPadding: 5px;
 	searchPacksBottom: 0px;
+	searchPackRipple: defaultRippleAnimation;
 	searchResultsHeight: 20px;
 	searchResultsTextTop: 3px;
 	searchSwapDuration: 100;
@@ -1464,6 +1484,13 @@ historySendAsFileButton: IconButton(historyAiComposeButton) {
 historyExpandComposeButton: IconButton(historyAiComposeButton) {
 	icon: icon {{ "menu/rich/expand-20x20", historyComposeIconFg }};
 	iconOver: icon {{ "menu/rich/expand-20x20", historyComposeIconFgOver }};
+}
+historyDiscardRichDraftButton: IconButton(historyAiComposeButton) {
+	width: 34px;
+	height: 34px;
+	rippleAreaSize: 34px;
+	icon: icon {{ "chat/input_discard-26x26", historyComposeIconFg }};
+	iconOver: icon {{ "chat/input_discard-26x26", historyComposeIconFgOver }};
 }
 historyAiComposeTooltipSkip: 8px;
 importantTooltipHide: IconButton(defaultIconButton) {
