@@ -6,12 +6,14 @@
 // Copyright @Radolyn, 2026
 #pragma once
 
+#include "base/basic_types.h"
+
 class QWidget;
 
-namespace AyuFeatures::StreamerMode {
+namespace AyuFeatures::StreamerMode::Platform {
 
-void apply(bool enabled);
-void hideWidgetWindow(QWidget *widget);
-void showWidgetWindow(QWidget *widget);
+void SetWindowCaptureExcluded(
+	not_null<QWidget*> widget,
+	bool excluded);
 
-} // namespace AyuFeatures::StreamerMode
+} // namespace AyuFeatures::StreamerMode::Platform

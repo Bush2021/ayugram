@@ -40,7 +40,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QLocale>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/ayu_url_handlers.h"
+#include "ayu/features/streamer_mode/streamer_mode.h"
 
 
 namespace Core {
@@ -470,6 +472,12 @@ bool UiIntegration::copyPreOnClick(const QVariant &context) {
 
 rpl::producer<> UiIntegration::forcePopupMenuHideRequests() {
 	return Core::App().passcodeLockChanges() | rpl::to_empty;
+}
+
+void UiIntegration::preparePopupMenu(not_null<QWidget*> widget) {
+	if (AyuSettings::getInstance().streamerMode()) {
+		AyuFeatures::StreamerMode::hideWidgetWindow(widget);
+	}
 }
 
 const Ui::Emoji::One *UiIntegration::defaultEmojiVariant(

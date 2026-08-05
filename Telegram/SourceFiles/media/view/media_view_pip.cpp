@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QApplication>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
 
@@ -987,7 +988,7 @@ void Pip::setupPanel() {
 	_panel.setPosition(Deserialize(_delegate->pipLoadGeometry()));
 	_panel.widget()->show();
 
-	if (AyuFeatures::StreamerMode::isEnabled()) {
+	if (AyuSettings::getInstance().streamerMode()) {
 		AyuFeatures::StreamerMode::hideWidgetWindow(_panel.widget());
 	} else {
 		AyuFeatures::StreamerMode::showWidgetWindow(_panel.widget());

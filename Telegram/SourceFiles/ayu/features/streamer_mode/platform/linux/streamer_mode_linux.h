@@ -6,11 +6,4 @@
 // Copyright @Radolyn, 2026
 #pragma once
 
-namespace AyuFeatures::StreamerMode::Impl {
-
-void enableHook();
-void disableHook();
-void hideWidgetWindow(QWidget *widget);
-void showWidgetWindow(QWidget *widget);
-
-}
+#include "ayu/features/streamer_mode/platform/platform_streamer_mode.h"
