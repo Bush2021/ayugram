@@ -81,6 +81,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/popup_menu.h"
+#include "webview/webview_dialog.h"
 #include "webview/webview_interface.h"
 #include "window/themes/window_theme.h"
 #include "window/window_controller.h"
@@ -2198,7 +2199,7 @@ void WebViewInstance::botDownloadFile(
 		return;
 	}
 	_confirmingDownload = true;
-	const auto done = [=](QString path) {
+	const auto done = crl::guard(this, [=](QString path) {
 		_confirmingDownload = false;
 		if (path.isEmpty()) {
 			callback(false);
@@ -2210,7 +2211,7 @@ void WebViewInstance::botDownloadFile(
 			.path = path,
 		});
 		callback(true);
-	};
+	});
 	_api.request(MTPbots_CheckDownloadFileParams(
 		_bot->inputUser(),
 		MTP_string(request.name),
@@ -2514,20 +2515,51 @@ void AttachWebView::watchJoinChatWebView(
 	};
 }
 
+void AttachWebView::destroyDeferred(
+		std::vector<std::unique_ptr<WebViewInstance>> instances) {
+	if (instances.empty()) {
+		return;
+	} else if (!Webview::InsideBlockingPopup()) {
+		// Destroyed right here, `instances` goes out of scope.
+		return;
+	}
+
+	// A popup may have been opened from inside a webview callback, so the
+	// frames of that callback, and the closures owning them, are still on
+	// the stack below the popup. Destroy the instances only from a clean
+	// stack, after the popup is finished.
+	const auto was = _closing.size();
+	for (auto &instance : instances) {
+		_closing.push_back(std::move(instance));
+	}
+	if (was > 0) {
+		return;
+	}
+	const auto weak = base::make_weak(this);
+	Webview::RunWhenBlockingPopupFinished([=] {
+		if (const auto strong = weak.get()) {
+			base::take(strong->_closing);
+		}
+	});
+}
+
 void AttachWebView::close(not_null<WebViewInstance*> instance) {
 	const auto i = ranges::find(
 		_instances,
 		instance.get(),
 		&std::unique_ptr<WebViewInstance>::get);
-	if (i != end(_instances)) {
-		const auto taken = base::take(*i);
-		_instances.erase(i);
+	if (i == end(_instances)) {
+		return;
 	}
+	auto taken = std::vector<std::unique_ptr<WebViewInstance>>();
+	taken.push_back(base::take(*i));
+	_instances.erase(i);
+	destroyDeferred(std::move(taken));
 }
 
 void AttachWebView::closeAll() {
 	cancel();
-	base::take(_instances);
+	destroyDeferred(base::take(_instances));
 }
 
 void AttachWebView::loadPopularAppBots() {

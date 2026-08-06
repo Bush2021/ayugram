@@ -438,6 +438,9 @@ public:
 	[[nodiscard]] rpl::producer<> popularAppBotsLoaded() const;
 
 private:
+	void destroyDeferred(
+		std::vector<std::unique_ptr<WebViewInstance>> instances);
+
 	void resolveUsername(
 		std::shared_ptr<Ui::Show> show,
 		Fn<void(not_null<PeerData*>)> done);
@@ -488,6 +491,7 @@ private:
 	};
 	base::flat_map<uint64, JoinChatWebView> _joinChatWebViews;
 	std::vector<std::unique_ptr<WebViewInstance>> _instances;
+	std::vector<std::unique_ptr<WebViewInstance>> _closing;
 
 	std::vector<not_null<UserData*>> _popularAppBots;
 	mtpRequestId _popularAppBotsRequestId = 0;
