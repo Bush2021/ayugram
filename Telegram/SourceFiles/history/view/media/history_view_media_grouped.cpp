@@ -137,7 +137,9 @@ bool GroupedMedia::hideMessageText() const {
 
 GroupedMedia::Mode GroupedMedia::DetectMode(not_null<Data::Media*> media) {
 	const auto document = media->document();
-	return (document && !document->isVideoFile())
+	return (document
+		&& !document->isVideoFile()
+		&& !document->isAnimation())
 		? Mode::Column
 		: Mode::Grid;
 }

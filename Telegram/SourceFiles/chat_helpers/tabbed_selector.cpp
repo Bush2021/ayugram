@@ -40,7 +40,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwindow.h"
 #include "apiwrap.h"
 #include "styles/style_chat_helpers.h"
-#include "styles/style_menu_icons.h"
 
 namespace ChatHelpers {
 
@@ -797,6 +796,10 @@ void TabbedSelector::resizeEvent(QResizeEvent *e) {
 	update();
 }
 
+void TabbedSelector::contextMenuEvent(QContextMenuEvent *e) {
+	e->accept();
+}
+
 void TabbedSelector::updateScrollGeometry(QSize oldSize) {
 	auto scrollWidth = width() - st::emojiPanRadius;
 	auto scrollHeight = height() - scrollTop() - scrollBottom();
@@ -863,8 +866,12 @@ void TabbedSelector::paintEvent(QPaintEvent *e) {
 		paintSlideFrame(p);
 		if (!_a_slide.animating()) {
 			_slideAnimation.reset();
-			afterShown();
-			_slideFinished.fire({});
+			InvokeQueued(this, [=] {
+				if (!_slideAnimation) {
+					afterShown();
+					_slideFinished.fire({});
+				}
+			});
 		}
 	} else {
 		paintContent(p);

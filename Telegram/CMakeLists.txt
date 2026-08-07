@@ -33,6 +33,7 @@ include(cmake/lib_ffmpeg.cmake)
 include(cmake/lib_stripe.cmake)
 include(cmake/lib_tgcalls.cmake)
 include(cmake/lib_prisma.cmake)
+include(cmake/lib_fido2.cmake)
 include(cmake/td_export.cmake)
 include(cmake/td_iv.cmake)
 include(cmake/td_lang.cmake)
@@ -40,6 +41,7 @@ include(cmake/td_mtproto.cmake)
 include(cmake/td_scheme.cmake)
 include(cmake/td_tde2e.cmake)
 include(cmake/td_ui.cmake)
+include(cmake/td_webauthn.cmake)
 include(cmake/telegram_apple_swift_runtime.cmake)
 include(cmake/generate_appstream_changelog.cmake)
 
@@ -59,6 +61,7 @@ set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
 target_link_libraries(Telegram
 PRIVATE
+    tdesktop::lib_fido2
     tdesktop::lib_tgcalls
     tdesktop::td_export
     tdesktop::td_iv
@@ -67,6 +70,7 @@ PRIVATE
     tdesktop::td_scheme
     tdesktop::td_tde2e
     tdesktop::td_ui
+    tdesktop::td_webauthn
     desktop-app::lib_webrtc
     desktop-app::lib_base
     desktop-app::lib_crl
@@ -1523,6 +1527,8 @@ PRIVATE
     iv/iv_delegate_impl.h
     iv/iv_instance.cpp
     iv/iv_instance.h
+    iv/iv_rich_message_html_export.cpp
+    iv/iv_rich_message_html_export.h
     iv/iv_rich_message_serializer.cpp
     iv/iv_rich_message_serializer.h
     iv/iv_rich_page.cpp
@@ -1795,6 +1801,8 @@ PRIVATE
     platform/mac/native_event_mac.mm
     platform/mac/notifications_manager_mac.mm
     platform/mac/notifications_manager_mac.h
+    platform/mac/notifications_manager_mac_un.mm
+    platform/mac/notifications_manager_mac_un.h
     platform/mac/overlay_widget_mac.h
     platform/mac/overlay_widget_mac.mm
     platform/mac/specific_mac.mm
@@ -1852,6 +1860,7 @@ PRIVATE
     platform/win/windows_taskbar_buttons.h
     platform/win/windows_toast_activator.cpp
     platform/win/windows_toast_activator.h
+    platform/platform_file_utilities.cpp
     platform/platform_file_utilities.h
     platform/platform_launcher.h
     platform/platform_integration.cpp
@@ -2032,6 +2041,23 @@ PRIVATE
     support/support_templates.h
     tde2e/tde2e_integration.cpp
     tde2e/tde2e_integration.h
+    test/test_agent.cpp
+    test/test_agent.h
+    test/test_capture.cpp
+    test/test_capture.h
+    test/test_launch_fuse.cpp
+    test/test_launch_fuse.h
+    test/test_log.cpp
+    test/test_log.h
+    test/test_messages.cpp
+    test/test_messages.h
+    test/test_open_handoff.cpp
+    test/test_open_handoff.h
+    test/test_runner.cpp
+    test/test_runner.h
+    test/test_scenario.cpp
+    test/test_widgets.cpp
+    test/test_widgets.h
     ui/boxes/edit_invite_link_session.cpp
     ui/boxes/edit_invite_link_session.h
     ui/boxes/emoji_stake_box.cpp
@@ -2120,6 +2146,12 @@ PRIVATE
     ui/unread_badge.h
     ui/peer/video_userpic_player.cpp
     ui/peer/video_userpic_player.h
+    webauthn/cable.h
+    webauthn/cable_box.cpp
+    webauthn/cable_box.h
+    webauthn/cable_ceremony.cpp
+    webauthn/webauthn_common.cpp
+    webauthn/webauthn_common.h
     window/main_window.cpp
     window/main_window.h
     window/notifications_manager.cpp
@@ -2247,6 +2279,7 @@ PRIVATE
     qrc/emoji_preview.qrc
     qrc/telegram/animations.qrc
     qrc/telegram/export.qrc
+    qrc/telegram/export_rich.qrc
     qrc/telegram/picker.qrc
     qrc/telegram/telegram.qrc
     qrc/telegram/sounds.qrc
@@ -2291,11 +2324,10 @@ elseif (APPLE)
         target_link_libraries(Telegram PRIVATE desktop-app::external_iconv)
     endif()
 
-#    find_program(ACTOOL_EXECUTABLE actool)
-#    if(NOT ACTOOL_EXECUTABLE)
-#        message(FATAL_ERROR "actool not found.")
-#    endif()
+    target_link_frameworks(Telegram PRIVATE CoreBluetooth)
+    target_link_frameworks_weak(Telegram PRIVATE UserNotifications)
 
+    set(icons_path ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Images.xcassets)
     if (CMAKE_GENERATOR STREQUAL Xcode)
         set(ayugram_icons
             Default
@@ -2312,32 +2344,42 @@ elseif (APPLE)
             Extera2
         )
 
-#        set(ICON_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/IconOutput")
         foreach (icon ${ayugram_icons})
-#            add_custom_command(TARGET Telegram
-#                    PRE_LINK
-#                    COMMAND mkdir -p "${ICON_OUTPUT_DIR}"
-#                    COMMAND ${ACTOOL_EXECUTABLE}
-#                    "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/AppIcon-${icon}.icon"
-#                    --compile "${ICON_OUTPUT_DIR}"
-#                    --app-icon AppIcon-${icon}
-#                    --enable-on-demand-resources NO
-#                    --development-region en
-#                    --target-device mac
-#                    --platform macosx
-#                    --minimum-deployment-target 10.13
-#                    --output-partial-info-plist /dev/null
-#                    --output-format human-readable-text
-#                    COMMENT "Compiling icon ${icon}"
-#                    COMMAND cp "${ICON_OUTPUT_DIR}/AppIcon-${icon}.icns" "$<TARGET_FILE_DIR:Telegram>/../Resources"
-#            )
-
-            # create resulting Assets.car with all icons
             target_add_resource(Telegram "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/AppIcon-${icon}.icon")
             set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/Telegram/AppIcon-${icon}.icon" PROPERTIES
                     XCODE_EXPLICIT_FILE_TYPE "folder.iconcomposer.icon"
             )
         endforeach()
+    else()
+        set(icon_path ${icons_path}/Icon.iconset)
+        find_program(ICONUTIL iconutil)
+        find_program(PNG2ICNS png2icns)
+        if (ICONUTIL)
+            add_custom_command(
+                OUTPUT Icon.icns
+                COMMAND ${ICONUTIL}
+                ARGS
+                    --convert icns
+                    --output Icon.icns
+                    ${icon_path}
+            )
+        elseif (PNG2ICNS)
+            add_custom_command(
+                OUTPUT Icon.icns
+                COMMAND ${PNG2ICNS}
+                ARGS
+                    Icon.icns
+                    ${icon_path}/icon_16x16.png
+                    ${icon_path}/icon_32x32.png
+                    ${icon_path}/icon_128x128.png
+                    ${icon_path}/icon_256x256.png
+                    ${icon_path}/icon_512x512.png
+            )
+        endif()
+        if (ICONUTIL OR PNG2ICNS)
+            set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+            target_add_resource(Telegram Icon.icns)
+        endif()
     endif()
 
     set(lang_packs
@@ -2518,7 +2560,8 @@ if (MSVC)
             /DELAYLOAD:API-MS-Win-Core-Fibers-l2-1-0.dll
             /DELAYLOAD:API-MS-Win-Core-Fibers-l2-1-1.dll
             /DELAYLOAD:API-MS-Win-Core-File-l1-1-0.dll
-            /DELAYLOAD:API-MS-Win-Core-LibraryLoader-l1-2-0.dll
+            # Not delayed: WindowsApp.lib binds LoadLibraryExA here, and
+            # __delayLoadHelper2 calls it to resolve delayed imports -- self-recurses.
             /DELAYLOAD:API-MS-Win-Core-Localization-l1-2-0.dll
             /DELAYLOAD:API-MS-Win-Core-Memory-l1-1-0.dll
             /DELAYLOAD:API-MS-Win-Core-Memory-l1-1-1.dll

@@ -94,7 +94,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/accessible/ui_accessible_factory.h"
 #include "ui/boxes/confirm_box.h"
 #include "core/cached_webview_availability.h"
-#include "styles/style_window.h"
+#include "test/test_agent.h"
 
 #include <QtCore/QStandardPaths>
 #include <QtCore/QMimeDatabase>
@@ -279,6 +279,8 @@ void Application::run() {
 	style::SetCustomFont(settings().customFontFamily());
 	style::internal::StartFonts();
 
+	Test::ApplyStartupOverrides();
+
 	ValidateScale();
 
 	refreshGlobalProxy(); // Depends on app settings being read.
@@ -431,6 +433,9 @@ void Application::run() {
 	}
 
 	processCreatedWindow(_lastActivePrimaryWindow);
+
+	Test::Fire(u"launch_finished"_q);
+	Test::Start();
 }
 
 void Application::autoRegisterUrlScheme() {
@@ -1153,6 +1158,9 @@ bool Application::canApplyLangPackWithoutRestart() const {
 }
 
 void Application::checkStartUrls() {
+	if (_setupEmailLock.current()) {
+		return;
+	}
 	if (!Core::App().passcodeLocked()) {
 		cRefStartUrls() = ranges::views::all(
 			cRefStartUrls()
@@ -1324,6 +1332,7 @@ rpl::producer<bool> Application::passcodeLockValue() const {
 
 void Application::lockBySetupEmail() {
 	_setupEmailLock = true;
+	closeAdditionalWindows();
 	enumerateWindows([&](not_null<Window::Controller*> w) {
 		w->setupSetupEmailLock();
 	});
@@ -1334,6 +1343,7 @@ void Application::unlockSetupEmail() {
 	enumerateWindows([&](not_null<Window::Controller*> w) {
 		w->clearSetupEmailLock();
 	});
+	checkStartUrls();
 }
 
 bool Application::someSessionExists() const {

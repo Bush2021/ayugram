@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/reactions/history_view_reactions_list.h"
 #include "info/info_memento.h"
+#include "iv/iv_rich_message_html_export.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_action.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
@@ -608,11 +609,17 @@ bool AddRescheduleAction(
 			: itemDate + (firstItem->isScheduled() ? 0 : crl::time(600));
 		const auto repeatPeriod = firstItem->scheduleRepeatPeriod();
 
+		const auto topic = firstItem->topic();
 		const auto box = request.navigation->parentController()->show(
 			HistoryView::PrepareScheduleBox(
 				&request.navigation->session(),
 				request.navigation->uiShow(),
-				{ .type = sendMenuType, .effectAllowed = false },
+				{
+					.type = sendMenuType,
+					.barePeerId = firstItem->history()->peer->id.value,
+					.bareTopicRootId = topic ? topic->rootId().bare : 0,
+					.effectAllowed = false,
+				},
 				callback,
 				{ .scheduleRepeatPeriod = repeatPeriod },
 				date));
@@ -951,6 +958,16 @@ bool AddDeleteMessageAction(
 		}
 	});
 	if (item->isUploading()) {
+		if (item->media() && item->media()->allowsEditCaption()) {
+			menu->addAction(
+				tr::lng_context_upload_edit_caption(tr::now),
+				crl::guard(controller, [=] {
+					if (const auto item = owner->message(itemId)) {
+						list->showEditCaptionUploadLayer(item);
+					}
+				}),
+				&st::menuIconEdit);
+		}
 		menu->addAction(
 			tr::lng_context_cancel_upload(tr::now),
 			callback,
@@ -984,6 +1001,20 @@ void AddDownloadFilesAction(
 		return;
 	}
 	Menu::AddDownloadFilesAction(
+		menu,
+		request.navigation->parentController(),
+		request.selectedItems,
+		list);
+}
+
+void AddSaveRichHtmlAction(
+		not_null<Ui::PopupMenu*> menu,
+		const ContextMenuRequest &request,
+		not_null<ListWidget*> list) {
+	if (!request.overSelection || request.selectedItems.empty()) {
+		return;
+	}
+	Iv::AddSaveRichMessageHtmlAction(
 		menu,
 		request.navigation->parentController(),
 		request.selectedItems,
@@ -1108,6 +1139,7 @@ void AddMessageActions(
 	AddSendNowAction(menu, request, list);
 	AddDeleteAction(menu, request, list);
 	AddDownloadFilesAction(menu, request, list);
+	AddSaveRichHtmlAction(menu, request, list);
 	AddReportAction(menu, request, list);
 	if (request.item && request.selectedItems.empty()) {
 		AddEphemeralMessageActions(

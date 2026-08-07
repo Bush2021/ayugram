@@ -122,12 +122,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/cloud_password/settings_cloud_password_start.h"
 #include "settings/cloud_password/settings_cloud_password_email_confirm.h"
 #include "settings/sections/settings_main.h"
-#include "styles/style_chat.h"
 #include "settings/sections/settings_premium.h"
 #include "settings/sections/settings_privacy_security.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_window.h"
-#include "styles/style_boxes.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h" // st::boxLabel
 
@@ -2474,6 +2472,8 @@ bool SessionController::switchInlineQuery(
 		if (to.section == Section::Replies) {
 			const auto commentId = MsgId();
 			showRepliesForMessage(history, topicRootId, commentId, params);
+		} else if (const auto sublist = thread->asSublist()) {
+			showSublist(sublist, MsgId(), params);
 		} else {
 			showPeerHistory(history->peer, params);
 		}
@@ -2489,8 +2489,13 @@ bool SessionController::switchInlineQuery(
 		.key = thread,
 		.section = (thread->asTopic()
 			? Dialogs::EntryState::Section::Replies
+			: thread->asSublist()
+			? Dialogs::EntryState::Section::SavedSublist
 			: Dialogs::EntryState::Section::History),
-		.currentReplyTo = { .topicRootId = thread->topicRootId() },
+		.currentReplyTo = {
+			.topicRootId = thread->topicRootId(),
+			.monoforumPeerId = thread->monoforumPeerId(),
+		},
 	};
 	return switchInlineQuery(entryState, bot, query);
 }
