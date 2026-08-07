@@ -531,8 +531,8 @@ void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			const auto ids = owner->itemOrItsGroup(item);
 			for (const auto &fullId : ids) {
 				if (const auto current = owner->message(fullId)) {
-					current->destroy();
 					AyuState::hide(current);
+					current->destroy();
 				}
 			}
 			history->requestChatListMessage();
