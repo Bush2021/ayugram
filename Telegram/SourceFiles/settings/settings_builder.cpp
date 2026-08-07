@@ -10,7 +10,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
 #include "api/api_user_privacy.h"
-#include "ayu/ui/settings/settings_ayu_utils.h"
 #include "boxes/edit_privacy_box.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
@@ -22,6 +21,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 #include "styles/style_settings.h"
+
+// AyuGram includes
+#include "ayu/ui/settings/settings_ayu_utils.h"
+
 
 namespace Settings::Builder {
 namespace {

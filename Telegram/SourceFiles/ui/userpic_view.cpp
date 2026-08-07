@@ -11,10 +11,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/image/image_prepare.h"
 
+#include <cmath>
+
 // AyuGram includes
 #include "ayu/ui/ayu_userpic.h"
 
-#include <cmath>
 
 namespace Ui {
 namespace {

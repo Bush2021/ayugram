@@ -2356,19 +2356,19 @@ elseif (APPLE)
         find_program(PNG2ICNS png2icns)
         if (ICONUTIL)
             add_custom_command(
-                OUTPUT Icon.icns
+                OUTPUT AppIcon-Default.icns
                 COMMAND ${ICONUTIL}
                 ARGS
                     --convert icns
-                    --output Icon.icns
+                    --output AppIcon-Default.icns
                     ${icon_path}
             )
         elseif (PNG2ICNS)
             add_custom_command(
-                OUTPUT Icon.icns
+                OUTPUT AppIcon-Default.icns
                 COMMAND ${PNG2ICNS}
                 ARGS
-                    Icon.icns
+                    AppIcon-Default.icns
                     ${icon_path}/icon_16x16.png
                     ${icon_path}/icon_32x32.png
                     ${icon_path}/icon_128x128.png
@@ -2377,8 +2377,8 @@ elseif (APPLE)
             )
         endif()
         if (ICONUTIL OR PNG2ICNS)
-            set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-            target_add_resource(Telegram Icon.icns)
+            set_source_files_properties(AppIcon-Default.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+            target_add_resource(Telegram AppIcon-Default.icns)
         endif()
     endif()
 

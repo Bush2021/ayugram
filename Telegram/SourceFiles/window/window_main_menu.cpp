@@ -86,6 +86,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_ayu_icons.h"
 #include "lang_auto.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "styles/style_info.h"
+
 
 namespace Window {
 namespace {

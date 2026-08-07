@@ -78,7 +78,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "base/unixtime.h"
-#include "styles/style_menu_icons.h"
 #include "ayu/utils/telegram_helpers.h"
 #include <QApplication>
 #include <QBuffer>

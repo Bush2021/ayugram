@@ -12,8 +12,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "api/api_updates.h"
 #include "apiwrap.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
 #include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/random.h"
@@ -31,6 +29,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_polls.h"
 #include "ui/toast/toast.h"
 #include "window/window_session_controller.h"
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+
 
 namespace {
 

@@ -58,7 +58,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/round_rect.h"
 #include "data/components/ephemeral_messages.h"
 #include "data/components/sponsored_messages.h"
-#include "data/data_groups.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_todo_list.h"
 #include "data/data_forum.h"
@@ -72,6 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_iv.h"
 
 // AyuGram includes
+#include "data/data_groups.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "ayu/utils/telegram_helpers.h"

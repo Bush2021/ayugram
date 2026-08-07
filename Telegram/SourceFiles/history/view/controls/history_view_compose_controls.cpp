@@ -36,7 +36,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "data/components/ephemeral_messages.h"
 #include "data/notify/data_notify_settings.h"
-#include "data/data_ai_compose_tones.h"
 #include "data/data_changes.h"
 #include "data/data_drafts.h"
 #include "data/data_group_call.h"
@@ -127,6 +126,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 
 // AyuGram includes
+#include "data/data_ai_compose_tones.h"
 #include "ayu/ayu_settings.h"
 #include "history/history_item_components.h"
 

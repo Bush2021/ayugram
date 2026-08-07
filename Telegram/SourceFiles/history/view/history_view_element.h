@@ -11,8 +11,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/runtime_composer.h"
 #include "base/flags.h"
 #include "base/weak_ptr.h"
-#include "ui/effects/animations.h"
 #include "ui/userpic_view.h"
+
+// AyuGram includes
+#include "ui/effects/animations.h"
+
 
 class History;
 class HistoryBlock;

@@ -204,7 +204,7 @@ void CompleteDocumentDownload(
 			&& DocumentReady(document, state->path));
 	if (!ready) {
 		QFile::remove(state->path);
-		state->path = {};
+		state->path.clear();
 	} else if (!released) {
 		state->readyPath = state->path;
 	}
@@ -362,7 +362,7 @@ QString loadDocumentSync(
 		if (reserved) {
 			QFile::remove(registration.state->path);
 		}
-		registration.state->path = {};
+		registration.state->path.clear();
 		FinishDocumentDownload(data, registration.state);
 	});
 	auto path = LoadedDocumentPath(data);

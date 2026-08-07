@@ -52,11 +52,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h" // showAddContact()
 #include "base/unixtime.h"
 #include "styles/style_boxes.h"
-#include "styles/style_ayu_icons.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
+
+// AyuGram includes
+#include "styles/style_ayu_icons.h"
+
 
 namespace {
 

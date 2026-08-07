@@ -7,7 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/language_box.h"
 
+#include "base/platform/base_platform_info.h"
 #include "boxes/abstract_box.h"
+#include "boxes/premium_preview_box.h"
 #include "boxes/translate_box.h"
 #include "core/application.h"
 #include "data/data_peer_values.h"
@@ -15,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_instance.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "platform/platform_translate_provider.h"
 #include "settings/settings_common.h"
 #include "spellcheck/spellcheck_types.h"
 #include "storage/localstorage.h"

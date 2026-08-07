@@ -146,7 +146,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
 			<key>CFBundleURLIconFile</key>
-			<string>Icon.icns</string>
+			<string>AppIcon-Default.icns</string>
 			<key>CFBundleURLName</key>
 			<string>@bundle_identifier_plist@</string>
 			<key>CFBundleURLSchemes</key>

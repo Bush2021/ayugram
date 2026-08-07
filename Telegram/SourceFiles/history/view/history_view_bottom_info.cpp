@@ -39,7 +39,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "ayu/utils/telegram_helpers.h"
-#include "core/ui_integration.h"
 #include "styles/style_ayu_icons.h"
 
 

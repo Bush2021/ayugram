@@ -81,7 +81,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_ayu_styles.h"
-#include "window/window_session_controller.h"
 #include "data/data_user.h"
 
 
