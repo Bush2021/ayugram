@@ -55,6 +55,7 @@ std::unique_ptr<TranslateProvider> CreateTranslateProvider(
 	const auto provider = ResolveTranslateProvider();
 	switch (provider) {
 	case TranslationProvider::Google:
+	case TranslationProvider::OpenAI:
 	case TranslationProvider::Yandex:
 		return CreateAyuTranslateProvider(session, provider);
 	case TranslationProvider::Native:

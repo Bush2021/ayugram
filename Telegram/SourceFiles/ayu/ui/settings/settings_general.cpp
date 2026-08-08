@@ -6,25 +6,34 @@
 // Copyright @Radolyn, 2026
 #include "ayu/ui/settings/settings_general.h"
 
-#include "lang_auto.h"
-#include "ayu/ayu_settings.h"
+#include "base/platform/base_platform_info.h"
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
-#include "base/platform/base_platform_info.h"
+#include "ayu/ayu_settings.h"
 #include "core/application.h"
 #include "lang/lang_text_entity.h"
+#include "lang_auto.h"
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
-#include "styles/style_menu_icons.h"
-#include "styles/style_settings.h"
+#include "ui/layers/generic_box.h"
+#include "ui/rp_widget.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/toast/toast.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/fields/password_input.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
+#include "styles/style_layers.h"
+#include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
+
+#include <memory>
 
 namespace Settings {
 
@@ -32,6 +41,147 @@ using namespace Builder;
 using namespace AyuBuilder;
 
 namespace {
+
+[[nodiscard]] bool IsOpenAiProvider(TranslationProvider provider) {
+	return (provider == TranslationProvider::OpenAI);
+}
+
+void PrepareMultilineInput(not_null<Ui::InputField*> field) {
+	field->setMinHeight(field->st().heightMin * 4);
+	field->setMaxHeight(field->st().heightMin * 8);
+}
+
+void EditOpenAiTranslationSettings(
+		not_null<Window::SessionController*> controller) {
+	const auto settings = &AyuSettings::getInstance();
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto &current = settings->openAiTranslationSettings();
+		box->setTitle(tr::ayu_OpenAiTranslationSettings());
+		box->setWidth(st::boxWideWidth);
+
+		const auto model = box->addRow(object_ptr<Ui::InputField>(
+			box,
+			st::defaultInputField,
+			tr::ayu_OpenAiTranslationModel(),
+			current.model()));
+		const auto apiBaseOrEndpoint = box->addRow(object_ptr<Ui::InputField>(
+			box,
+			st::defaultInputField,
+			tr::ayu_OpenAiTranslationApiUrl(),
+			current.apiBaseOrEndpoint()));
+		Ui::AddDividerText(
+			box->verticalLayout(),
+			tr::ayu_OpenAiTranslationApiUrlAbout());
+		const auto apiKeyWrap = box->addRow(object_ptr<Ui::RpWidget>(box));
+		const auto apiKey = Ui::CreateChild<Ui::PasswordInput>(
+			apiKeyWrap,
+			st::defaultInputField,
+			tr::ayu_OpenAiTranslationApiKey(),
+			current.apiKey());
+		const auto apiKeyVisible = std::make_shared<bool>(false);
+		const auto apiKeyToggle = Ui::CreateChild<Ui::LinkButton>(
+			apiKeyWrap,
+			tr::lng_usernames_activate_confirm(tr::now));
+		const auto updateApiKeyLayout = [=] {
+			const auto width = apiKeyWrap->width();
+			const auto height = (apiKey->height() > apiKeyToggle->height())
+				? apiKey->height()
+				: apiKeyToggle->height();
+			const auto fieldWidth = (width > apiKeyToggle->width())
+				? (width - apiKeyToggle->width())
+				: 0;
+			apiKeyWrap->resize(width, height);
+			apiKey->resize(fieldWidth, apiKey->height());
+			apiKey->move(0, (height - apiKey->height()) / 2);
+			apiKeyToggle->moveToRight(0, (height - apiKeyToggle->height()) / 2);
+		};
+		const auto updateApiKeyVisibility = [=] {
+			apiKey->setEchoMode(*apiKeyVisible
+				? QLineEdit::Normal
+				: QLineEdit::Password);
+			apiKeyToggle->setText(*apiKeyVisible
+				? tr::lng_usernames_deactivate_confirm(tr::now)
+				: tr::lng_usernames_activate_confirm(tr::now));
+		};
+		updateApiKeyVisibility();
+		apiKeyToggle->setClickedCallback([=] {
+			*apiKeyVisible = !*apiKeyVisible;
+			updateApiKeyVisibility();
+		});
+		apiKey->heightValue(
+		) | rpl::on_next([=](int) {
+			updateApiKeyLayout();
+		}, apiKey->lifetime());
+		apiKeyWrap->widthValue(
+		) | rpl::on_next([=](int) {
+			updateApiKeyLayout();
+		}, apiKey->lifetime());
+		apiKeyToggle->widthValue(
+		) | rpl::on_next([=](int) {
+			updateApiKeyLayout();
+		}, apiKey->lifetime());
+		updateApiKeyLayout();
+
+		const auto systemPrompt = box->addRow(object_ptr<Ui::InputField>(
+			box,
+			st::defaultInputField,
+			Ui::InputField::Mode::MultiLine,
+			tr::ayu_OpenAiTranslationSystemPrompt(),
+			current.systemPrompt()));
+		PrepareMultilineInput(systemPrompt);
+
+		const auto promptTemplate = box->addRow(object_ptr<Ui::InputField>(
+			box,
+			st::defaultInputField,
+			Ui::InputField::Mode::MultiLine,
+			tr::ayu_OpenAiTranslationPrompt(),
+			current.promptTemplate()));
+		PrepareMultilineInput(promptTemplate);
+
+		Ui::AddSkip(box->verticalLayout());
+		Ui::AddDividerText(
+			box->verticalLayout(),
+			rpl::single(tr::ayu_OpenAiTranslationAbout(
+				tr::now,
+				lt_to,
+				QStringLiteral("{to}"),
+				lt_message_count,
+				QStringLiteral("{message_count}"),
+				lt_messages_json,
+				QStringLiteral("{messages_json}"))));
+
+		const auto reset = [=] {
+			model->setText(OpenAiTranslationSettings::DefaultModel());
+			apiBaseOrEndpoint->setText(
+				OpenAiTranslationSettings::DefaultApiBaseOrEndpoint());
+			apiKey->setText(QString());
+			*apiKeyVisible = false;
+			updateApiKeyVisibility();
+			systemPrompt->setText(
+				OpenAiTranslationSettings::DefaultSystemPrompt());
+			promptTemplate->setText(
+				OpenAiTranslationSettings::DefaultPromptTemplate());
+		};
+		const auto save = [=] {
+			settings->openAiTranslationSettings().apply(
+				model->getLastText(),
+				apiBaseOrEndpoint->getLastText(),
+				apiKey->getLastText(),
+				systemPrompt->getLastText(),
+				promptTemplate->getLastText());
+			box->closeBox();
+		};
+
+		box->setFocusCallback([=] {
+			model->setFocusFast();
+		});
+		box->addLeftButton(tr::ayu_BoxActionReset(), reset);
+		box->addButton(tr::lng_settings_save(), save);
+		box->addButton(tr::lng_cancel(), [=] {
+			box->closeBox();
+		});
+	}));
+}
 
 void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::lng_translate_settings_subtitle());
@@ -42,6 +192,7 @@ void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		std::pair(TranslationProvider::Telegram, QString("Telegram")),
 		std::pair(TranslationProvider::Google, QString("Google")),
 		std::pair(TranslationProvider::Yandex, QString("Yandex")),
+		std::pair(TranslationProvider::OpenAI, QString("OpenAI")),
 	};
 	const auto nativeAvailable = Platform::IsTranslateProviderAvailable();
 	auto availableOptions = options;
@@ -113,6 +264,28 @@ void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	if (button) {
 		ayu.addBetaBadge(button);
 	}
+
+	builder.addButton({
+		.id = u"ayu/openaiTranslationSettings"_q,
+		.title = tr::ayu_OpenAiTranslationSettings(),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->openAiTranslationSettings().modelValue()
+			| rpl::map([](const QString &model) {
+				const auto trimmed = model.trimmed();
+				return trimmed.isEmpty()
+					? OpenAiTranslationSettings::DefaultModel()
+					: trimmed;
+			}),
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()->sessionController()) {
+				EditOpenAiTranslationSettings(controller);
+			}
+		},
+		.shown = settings->translationProviderValue()
+			| rpl::map([](TranslationProvider provider) {
+				return IsOpenAiProvider(provider);
+			}),
+	});
 }
 
 void BuildShowPeerId(SectionBuilder &builder) {
