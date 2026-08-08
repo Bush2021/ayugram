@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_main_menu_helpers.h"
 
 #include "apiwrap.h"
+#include "ayu/ayu_build_info.h"
 #include "base/platform/base_platform_info.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -46,9 +47,14 @@ namespace Window {
 	if constexpr (!Platform::IsMacStoreBuild()
 		&& !Platform::IsWindowsStoreBuild()) {
 		Ui::InstallTooltip(label, [] {
-			return u"Build date: %1.\nQt version: %2."_q
+			auto result = u"Build date: %1.\nQt version: %2."_q
 				.arg(__DATE__)
 				.arg(QT_VERSION_STR);
+			const auto commit = QString::fromLatin1(AyuBuildCommit);
+			if (!commit.isEmpty()) {
+				result += u"\nCommit: %1"_q.arg(commit);
+			}
+			return result;
 		});
 	}
 	return label;
