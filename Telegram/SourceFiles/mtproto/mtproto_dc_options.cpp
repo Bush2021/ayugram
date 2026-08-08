@@ -672,8 +672,13 @@ auto DcOptions::lookup(
 	if (i == end(_data)) {
 		return result;
 	}
+	const auto skipIPv6ForDc5 = (dcId == 5);
 	for (const auto &endpoint : i->second) {
 		const auto flags = endpoint.flags;
+		if (skipIPv6ForDc5 && (flags & Flag::f_ipv6)) {
+			LOG(("MTP Info: Skipping IPv6 for DC5: %1:%2").arg(QString::fromStdString(endpoint.ip)).arg(endpoint.port));
+			continue;
+		}
 		if (type == DcType::Cdn && !(flags & Flag::f_cdn)) {
 			continue;
 		} else if (type != DcType::MediaCluster
