@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag, for example v7.0.4
+        description: Release tag, for example v7.0.9 or v7.0.9-r1
         required: true
         type: string
       prerelease:
@@ -60,8 +60,10 @@ jobs:
               --jq '.workflow_runs[0] // {}'
           }
 
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-            || fail "Tag must use the vMAJOR.MINOR.PATCH format."
+          [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-r[1-9][0-9]*)?$ ]] \
+            || fail "Tag must use the vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rN format."
+          release_version="${BASH_REMATCH[1]}"
+          release_label="${RELEASE_TAG#v}"
 
           mac_run="$(latest_successful_run mac.yml dev)"
           windows_run="$(latest_successful_run win.yml dev)"
@@ -94,7 +96,7 @@ jobs:
           version="$(awk '$1 == "AppVersionStr" { print $2 }' \
             <<< "$version_file")"
           [[ -n "$version" ]] || fail "Could not read AppVersionStr."
-          [[ "$RELEASE_TAG" == "v$version" ]] || fail \
+          [[ "$release_version" == "$version" ]] || fail \
             "Tag $RELEASE_TAG does not match AppVersionStr $version."
 
           tag_refs="$(gh api \
@@ -112,7 +114,7 @@ jobs:
           fi
 
           {
-            echo "version=$version"
+            echo "release_label=$release_label"
             echo "dev_sha=$windows_sha"
             echo "qt6_sha=$qt6_sha"
             echo "mac_id=$mac_id"
@@ -133,7 +135,7 @@ jobs:
       - name: Download and verify artifacts
         shell: bash
         env:
-          VERSION: ${{ steps.builds.outputs.version }}
+          RELEASE_LABEL: ${{ steps.builds.outputs.release_label }}
           MAC_RUN_ID: ${{ steps.builds.outputs.mac_id }}
           WINDOWS_RUN_ID: ${{ steps.builds.outputs.windows_id }}
           QT6_RUN_ID: ${{ steps.builds.outputs.qt6_id }}
@@ -184,15 +186,15 @@ jobs:
           download_artifact \
             "$MAC_RUN_ID" \
             "AyuGram" \
-            "release-assets/AyuGram_v${VERSION}_macOS_universal.zip"
+            "release-assets/AyuGram_v${RELEASE_LABEL}_macOS_universal.zip"
           download_artifact \
             "$WINDOWS_RUN_ID" \
             "AyuGram x64 Ninja Multi-Config" \
-            "release-assets/AyuGram_v${VERSION}_windows_x64.zip"
+            "release-assets/AyuGram_v${RELEASE_LABEL}_windows_x64.zip"
           download_artifact \
             "$QT6_RUN_ID" \
             "AyuGram x64 qt6 Ninja Multi-Config" \
-            "release-assets/AyuGram_v${VERSION}_windows_x64_Qt6_win10+.zip"
+            "release-assets/AyuGram_v${RELEASE_LABEL}_windows_x64_Qt6_win10+.zip"
 
           {
             echo
