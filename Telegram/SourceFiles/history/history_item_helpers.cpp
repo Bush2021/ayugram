@@ -1402,7 +1402,7 @@ void CheckPollVoteNotificationSchedule(
 }
 
 [[nodiscard]] TextWithEntities UnsupportedMessageText() {
-	const auto siteLink = u"https://t.me/AyuGramReleases"_q;
+	const auto siteLink = u"https://github.com/Bush2021/ayugram/releases"_q;
 	auto result = TextWithEntities{
 		tr::lng_message_unsupported(tr::now, lt_link, siteLink).replace("Telegram", "AyuGram")
 	};
@@ -1421,7 +1421,7 @@ HistoryMessageMarkupData UnsupportedMessageMarkup() {
 		Button::Type::Url,
 		tr::lng_update_telegram(tr::now).replace("Telegram", "AyuGram"),
 		Button::Visual(),
-		QByteArray("https://t.me/AyuGramReleases"));
+		QByteArray("https://github.com/Bush2021/ayugram/releases"));
 	markup.rows.push_back(std::move(row));
 	return markup;
 }
