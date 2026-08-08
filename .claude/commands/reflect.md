@@ -1,6 +1,6 @@
 ---
 description: Learn from corrections — examine staged vs unstaged diffs and optionally distill insights into AGENTS.md or REVIEW.md
-allowed-tools: Read, Edit, Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(ls:*), Bash(python3 .agents/skills/process-inbox/scripts/workspace.py:*), Bash(python .agents/skills/process-inbox/scripts/workspace.py:*), Bash(py -3 .agents/skills/process-inbox/scripts/workspace.py:*), AskUserQuestion
+allowed-tools: Read, Edit, Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(ls:*), AskUserQuestion
 ---
 
 # Reflect — Learn from Corrections
@@ -13,11 +13,10 @@ You are a reflection agent. Your job is to examine the difference between what a
 
 `$ARGUMENTS` = "$ARGUMENTS"
 
-If `$ARGUMENTS` is provided, it is a short or full task name from the external
-`ai-tdesktop` workflow. Resolve it with the workspace helper and read that
-task's durable context before judging the correction.
+If `$ARGUMENTS` is provided, treat it as optional user-supplied context for
+judging the correction.
 
-If `$ARGUMENTS` is empty, skip the task context step — just work from the diffs alone.
+If `$ARGUMENTS` is empty, work from the diffs alone.
 
 ## Context
 
@@ -26,7 +25,7 @@ The workflow is:
 2. The user reviewed and corrected the agent's work. These corrections are unstaged.
 3. You are now invoked to reflect on what went wrong and whether it reveals a pattern.
 
-## Step 1: Gather the Diffs and Task Context
+## Step 1: Gather the Diffs and Context
 
 Run these commands in parallel:
 
@@ -38,20 +37,13 @@ git status           # Which files are involved
 
 If either diff is empty, tell the user and stop. Both diffs must be non-empty for reflection to be meaningful.
 
-### Task context (only if `$ARGUMENTS` is non-empty)
-
-Resolve the task and read its context:
-
-1. Run `python3 .agents/skills/process-inbox/scripts/workspace.py resolve --name "$ARGUMENTS"` (use the host's Python 3 command).
-2. Read the resolved task's `task.md` and `work/context.md` from the returned AI slot worktree.
-3. When `project` is non-null, also read `projects/<project>/project.md`, or
-   `projects/archive/<project>/project.md` when the project has been archived.
-
-This helps you distinguish between:
+Use any non-empty `$ARGUMENTS` as additional context. This helps you distinguish between:
 - **Task-specific mistakes** — the agent misunderstood this particular feature's requirements or made a wrong choice within the specific problem. These are NOT documentation-worthy.
 - **General convention mistakes** — the agent did something that violates a pattern the codebase follows broadly, regardless of which feature is being implemented. These ARE potentially documentation-worthy.
 
-Having the task context makes this distinction much sharper. Without it, you might mistake a task-specific correction for a general pattern or vice versa.
+Additional context can make this distinction sharper. Without it, take extra
+care not to mistake a task-specific correction for a general pattern or vice
+versa.
 
 ## Step 2: Read the Current Guidelines
 

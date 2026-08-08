@@ -1,3 +1,7 @@
+Read @FORK.md for this project's fork-management rules (remotes, forked-submodule registry, ayu code surface, sync workflows).
+
+For fork-management tasks use the project skills under `.claude/commands/`: `/sync-tg`, `/sync-ayu`.
+
 # Agent Guide for Telegram Desktop
 
 This guide defines repository-wide instructions for coding agents working with the Telegram Desktop codebase.
@@ -25,7 +29,6 @@ wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- <command>
 - For WSL/Linux builds, use the Docker build entry point from the repository root: `Telegram/build/docker/centos_env/build_debug.sh`. The Docker daemon must be reachable from WSL; checking `docker info` is fine, but do not start a build unless the user asked for one.
 - Existing build outputs may be Linux binaries, for example `out/Debug/Telegram` as an ELF executable, not `Telegram.exe`. Verify the build tree before assuming which platform produced it.
 - Be careful with text file line endings. In a WSL/Linux checkout, files should remain LF-only unless the file already uses another convention. CRLF finishing applies only to native, non-WSL Windows runs/checkouts. Do not let PowerShell or Windows tools silently rewrite WSL files to CRLF. If a file becomes mixed, normalize it back to the convention appropriate for the current checkout, without adding a UTF-8 BOM.
-- When using the local `perform-task` skill from this WSL checkout, keep external AI task artifacts and edited project text files LF-only. Treat its Windows text-normalization phase as not applicable to WSL, except to record that line endings were checked and kept LF/no-BOM. Run CRLF normalization only in a native, non-WSL Windows checkout.
 
 ## Build System Structure
 
@@ -147,18 +150,10 @@ diagnosis or report the blocker. Do not loop clean rebuilds.
 
 ### Build output locks
 
-For builds owned by the autonomous `continue` / `perform-task` workflow, read
-and follow `.agents/shared/build-lock-recovery.md`. PDB, EXE, OBJ, and other
-build-output lock errors are recoverable: stop only the exact checkout
-executable or verified build-tree holders, delete only exact named artifacts
-inside that checkout's build tree, and retry within the bounded recovery
-budget. Never stop an installed Telegram client, another checkout, an IDE, or
-an unknown process.
-
-Outside that autonomous workflow, an exact checkout executable may be running
-because the user is testing it. Do not terminate it or delete locked build
-outputs without explicit permission. Report the exact locked path and ask the
-user to close that checkout's Telegram/debugger before rebuilding.
+An exact checkout executable may be running because the user is testing it.
+Do not terminate it or delete locked build outputs without explicit permission.
+Report the exact locked path and ask the user to close that checkout's
+Telegram or debugger before rebuilding.
 
 ## Best Practices
 
@@ -174,21 +169,11 @@ user to close that checkout's Telegram/debugger before rebuilding.
 ## Commits
 
 - Subject: one concise, plain-language line summarizing the change, ~50-60 characters, matching the style of recent `git log` subjects. This is usually the entire message.
-- For an `ai-tdesktop` task, start the subject with exactly `[ai] ` when the
-  retained task implementation changes permanent test-helper code, the agent
-  harness, or agent documentation in any way. This includes
-  `Telegram/SourceFiles/test/`, `.agents/`, `.claude/`, `AGENTS.md`,
-  `CLAUDE.md`, and files whose sole role is supporting those systems. Do not
-  count the disposable test overlay or external AI task artifacts. For every
-  other task, the subject must not contain `[ai]` anywhere.
-- For ordinary work not associated with an AI task, add a short plain-language body only when the subject can't carry it (what was done, not the technical how) — a line or two at most.
+- Add a short plain-language body only when the subject can't carry it (what
+  was done, not the technical how) — a line or two at most.
 - Never add a `Co-Authored-By:` line or any tool/assistant attribution trailer.
-- Never add `Autotask:`/attempt or other internal run markers. A commit owned by
-  an `ai-tdesktop` task has exactly three lines: the concise subject, a blank
-  line, and `Task: <task-id>`. Do not add a body. Keep rationale and
-  implementation notes out of the commit message; put a short durable note
-  under `tasks/<task-id>.md` only when useful. Do not copy commit hashes into
-  that note or any AI task artifact; the task id is the cross-repository link.
+- Never add `Autotask:`/attempt or other workflow markers. Commits should read
+  like normal project history.
 
 ## Local Storage Serialization
 
