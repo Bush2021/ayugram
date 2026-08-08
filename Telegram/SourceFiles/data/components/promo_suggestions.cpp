@@ -57,6 +57,10 @@ PromoSuggestions::PromoSuggestions(
 	) | rpl::on_next([=] {
 		refreshTopPromotion();
 	}, _lifetime);
+	AyuSettings::getInstance().adsModeChanges(
+	) | rpl::on_next([=](AdsMode) {
+		refreshTopPromotion();
+	}, _lifetime);
 }
 
 PromoSuggestions::~PromoSuggestions() = default;
@@ -65,6 +69,16 @@ void PromoSuggestions::refreshTopPromotion() {
 	if (_contactBirthdaysLastDayRequest != -1
 		&& _contactBirthdaysLastDayRequest != QDate::currentDate().day()) {
 		_refreshed.fire({});
+	}
+	if (AyuSettings::getInstance().disableAdsStrictly()) {
+		if (_topPromotionRequestId) {
+			_session->api().request(_topPromotionRequestId).cancel();
+			_topPromotionRequestId = 0;
+		}
+		_topPromotionKey = {};
+		_topPromotionNextRequestTime = 0;
+		setTopPromoted(nullptr, QString(), QString());
+		return;
 	}
 
 	const auto now = base::unixtime::now();
@@ -134,8 +148,7 @@ void PromoSuggestions::refreshTopPromotion() {
 					|= _dismissedSuggestions.emplace(qs(suggestion)).second;
 			}
 
-			const auto &settings = AyuSettings::getInstance();
-			if (settings.disableAds()) {
+			if (AyuSettings::getInstance().disableAds()) {
 				setTopPromoted(nullptr, QString(), QString());
 				return;
 			}
