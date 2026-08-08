@@ -393,7 +393,7 @@ MainMenu::MainMenu(
 
 	_telegram->setMarkedText(tr::link(
 		u"AyuGram Desktop"_q,
-		u"https://ayugram.one"_q));
+		u"https://github.com/Bush2021/ayugram"_q));
 	_telegram->setLinksTrusted();
 	// The canary version is too long for the "Version {version}" form.
 	_version->setMarkedText(

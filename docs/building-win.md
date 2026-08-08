@@ -44,7 +44,7 @@ Run both `Clone source code and prepare libraries` and `Build the project` secti
 
 In the initialized terminal, go to ***BuildPath*** and run
 
-    git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
+    git clone --recursive https://github.com/Bush2021/ayugram.git tdesktop
     tdesktop\Telegram\build\prepare\win.bat
 
 ## Build the project

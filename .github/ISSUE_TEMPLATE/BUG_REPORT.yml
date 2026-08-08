@@ -49,7 +49,7 @@ body:
       label: Installation source
       multiple: false
       options:
-        - Binary from GitHub / @AyuGramReleases channel
+        - Binary from Bush GitHub Releases
         - Arch Linux (ayugram-desktop / ayugram-desktop-git)
         - Arch Linux (ayugram-desktop-bin)
         - flatpak by 0FL01
