@@ -912,6 +912,12 @@ void StickersListWidget::fillSelectedSearchShortcut() {
 		return;
 	}
 	const auto set = it->second.get();
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.showOnlyAddedEmojisAndStickers()
+		&& !SetInMyList(set->flags)) {
+		_searchSelectedSetId = 0;
+		return;
+	}
 	const auto skipPremium = !session().premiumPossible();
 	auto elements = PrepareStickers(
 		set->stickers.empty() ? set->covers : set->stickers,
