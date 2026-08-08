@@ -60,6 +60,7 @@ usedPrefix = os.path.realpath(os.path.join(libsDir, 'local'))
 optionsList = [
     'qt6',
     'skip-release',
+    'skip-debug',
     'build-stackwalk',
     'qt-asserts',
 ]
@@ -251,6 +252,11 @@ def filterByPlatform(commands):
             #     inscope = True
             if 'release' in scopes:
                 if 'skip-release' in options:
+                    inscope = False
+                elif len(scopes) == 1:
+                    continue
+            if 'debug' in scopes:
+                if 'skip-debug' in options:
                     inscope = False
                 elif len(scopes) == 1:
                     continue
@@ -1675,7 +1681,7 @@ release:
 win_asserts:
     SET ASSERTS=-force-asserts
 win:
-    """ + removeDir('"%LIBS_DIR%\\Qt' + qt + '"') + """
+    """ + (('SET CONFIGURATIONS=-release\n    ') if 'skip-debug' in options else '') + removeDir('"%LIBS_DIR%\\Qt' + qt + '"') + """
     SET MOZJPEG_DIR=%LIBS_DIR%\\mozjpeg
     SET OPENSSL_DIR=%LIBS_DIR%\\openssl3
     SET OPENSSL_LIBS_DIR=%OPENSSL_DIR%\\out
@@ -1722,8 +1728,10 @@ win:
         -D LCMS2_INCLUDE_DIR="%LCMS2_DIR%\\include" ^
         -D LCMS2_LIBRARIES="%LCMS2_DIR%\\out\\Release\\src\\liblcms2.a"
 
+debug:
     cmake --build . --config Debug
     cmake --install . --config Debug
+win:
     cmake --build .
     cmake --install .
 """)
@@ -1750,7 +1758,9 @@ win:
         -DTG_OWT_LIBVPX_INCLUDE_PATH=$LIBVPX_PATH \
         -DTG_OWT_OPENH264_INCLUDE_PATH=$OPENH264_PATH \
         -DTG_OWT_FFMPEG_INCLUDE_PATH=$FFMPEG_PATH
+debug:
     cmake --build out --config Debug
+win:
 release:
     cmake --build out --config Release
 mac:
