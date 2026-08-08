@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/application.h"
 
+#include "ayu/ayu_settings.h"
 #include "data/data_abstract_structure.h"
 #include "data/data_channel.h"
 #include "data/data_forum.h"
@@ -505,6 +506,11 @@ void Application::startDomain() {
 
 void Application::startSettingsAndBackground() {
 	Local::rewriteSettingsIfNeeded();
+	auto &openAiSettings = AyuSettings::getInstance().openAiTranslationSettings();
+	if (openAiSettings.loadApiKey(settings())) {
+		saveSettings();
+		openAiSettings.finishApiKeyMigration();
+	}
 	Window::Theme::Background()->start();
 	checkSystemDarkMode();
 	Ui::SetScreenReaderModeDisabled(
