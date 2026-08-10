@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/session/session_show.h"
 #include "main/main_session.h"
 #include "mtproto/mtproto_config.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/chat/attach/attach_bot_webview.h"
 #include "ui/effects/radial_animation.h"
 #include "ui/text/text_utilities.h"
@@ -1179,6 +1180,45 @@ bool LocationPicker::venuesFromCache(
 void LocationPicker::venuesRequest(
 		Core::GeoLocation location,
 		QString query) {
+	if (_venuesDisclosureDeclined) {
+		venuesApplyResults({});
+		return;
+	} else if (!_venuesDisclosureAccepted) {
+		_pendingVenuesLocation = location;
+		_pendingVenuesQuery = query;
+		if (_venuesDisclosureShown) {
+			return;
+		}
+		_venuesDisclosureShown = true;
+		const auto username = _session->serverConfig().venueSearchUsername;
+		_window->showBox(
+			Ui::MakeConfirmBox({
+				.text = tr::lng_maps_venues_disclosure(
+					tr::now,
+					lt_bot,
+					tr::bold(u"@"_q + username),
+					tr::marked),
+				.confirmed = crl::guard(this, [=](Fn<void()> close) {
+					_venuesDisclosureAccepted = true;
+					_venuesDisclosureShown = false;
+					venuesRequest(
+						_pendingVenuesLocation,
+						base::take(_pendingVenuesQuery));
+					close();
+				}),
+				.cancelled = crl::guard(this, [=](Fn<void()> close) {
+					_venuesDisclosureShown = false;
+					_venuesDisclosureDeclined = true;
+					_pendingVenuesQuery.clear();
+					venuesApplyResults({});
+					close();
+				}),
+				.confirmText = tr::lng_maps_venues_disclosure_confirm(),
+			}),
+			LayerOption::KeepOther,
+			anim::type::normal);
+		return;
+	}
 	const auto normalized = NormalizeVenuesQuery(query);
 	if (AreTheSame(_venuesRequestLocation, location)
 		&& _venuesRequestQuery == normalized) {

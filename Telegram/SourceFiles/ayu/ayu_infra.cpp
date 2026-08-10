@@ -23,10 +23,9 @@
 namespace AyuInfra {
 
 void initLang() {
-	QString id = Lang::GetInstance().id();
-	QString baseId = Lang::GetInstance().baseId();
+	const auto id = Lang::GetInstance().id();
+	const auto baseId = Lang::GetInstance().baseId();
 	if (id.isEmpty()) {
-		LOG(("Language is not loaded"));
 		return;
 	}
 	AyuLanguage::init();

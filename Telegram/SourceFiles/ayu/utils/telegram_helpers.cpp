@@ -43,10 +43,12 @@
 #include "main/main_session.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_info.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/emoji_config.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
+#include "window/window_session_controller.h"
 
 #include <atomic>
 #include <functional>
@@ -1440,14 +1442,12 @@ void getUserRegistrationDateInner(
 	}).handleAllErrors().send();
 }
 
-void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)> callback) {
+void requestUserRegistrationDate(
+		not_null<UserData*> user,
+		ID botId,
+		const QString &botUsername,
+		Fn<void(TextWithEntities)> callback) {
 	const auto session = &user->session();
-	const auto selfId = getDialogIdFromPeer(session->user());
-	const auto isSupporter = isSupporterPeer(selfId) || isExteraPeer(selfId);
-
-	const auto botId = isSupporter ? regDateBotId : regDateBotFallbackId;
-	const auto botUsername = isSupporter ? regDateBotUsername : regDateBotFallbackUsername;
-
 	if (session->data().userLoaded(botId)) {
 		getUserRegistrationDateInner(user, botId, callback);
 	} else {
@@ -1455,11 +1455,42 @@ void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)
 			QString::number(botId),
 			botUsername,
 			session,
-			[=](const QString &title, PeerData *data)
-			{
+			[=](const QString &, PeerData *) {
 				getUserRegistrationDateInner(user, botId, callback);
 			});
 	}
+}
+
+void getUserRegistrationDate(
+		not_null<Window::SessionController*> controller,
+		not_null<UserData*> user,
+		Fn<void(TextWithEntities)> callback) {
+	const auto session = &user->session();
+	const auto selfId = getDialogIdFromPeer(session->user());
+	const auto usePrimaryBot = isSupporterPeer(selfId) || isExteraPeer(selfId);
+	const auto botId = usePrimaryBot ? regDateBotId : regDateBotFallbackId;
+	const auto botUsername = usePrimaryBot
+		? regDateBotUsername
+		: regDateBotFallbackUsername;
+	const auto query = u"regdate "_q + QString::number(getBareID(user));
+	controller->show(Ui::MakeConfirmBox({
+		.text = tr::ayu_RegistrationDateDisclosure(
+			tr::now,
+			lt_query,
+			tr::bold(query),
+			lt_bot,
+			tr::bold(u"@"_q + botUsername),
+			tr::marked),
+		.confirmed = [=](Fn<void()> close) {
+			close();
+			requestUserRegistrationDate(
+				user,
+				botId,
+				botUsername,
+				callback);
+		},
+		.confirmText = tr::ayu_RegistrationDateDisclosureConfirm(),
+	}));
 }
 
 void getChannelJoinOrCreateDate(not_null<ChannelData*> channel, Fn<void(TextWithEntities)> callback) {
@@ -1512,11 +1543,14 @@ void getChatCreateDate(not_null<ChatData*> chat, Fn<void(TextWithEntities)> call
 	}
 }
 
-void getRegistrationDate(not_null<PeerData*> peer, Fn<void(TextWithEntities)> callback) {
-	if (const auto user = peer->asUser()) {
-		getUserRegistrationDate(user, callback);
-	} else if (const auto channel = peer->asChannel()) {
+void getRegistrationDate(
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		Fn<void(TextWithEntities)> callback) {
+	if (const auto channel = peer->asChannel()) {
 		getChannelJoinOrCreateDate(channel, callback);
+	} else if (const auto user = peer->asUser()) {
+		getUserRegistrationDate(controller, user, callback);
 	} else if (const auto chat = peer->asChat()) {
 		getChatCreateDate(chat, callback);
 	} else {

@@ -904,6 +904,35 @@ void GifsListWidget::searchForGifs(const QString &query) {
 		cancelGifsSearch();
 		return;
 	}
+	if (!_gifSearchDisclosureAccepted) {
+		_pendingGifSearchQuery = query;
+		if (_gifSearchDisclosureShown) {
+			return;
+		}
+		_gifSearchDisclosureShown = true;
+		const auto username = session().serverConfig().gifSearchUsername;
+		_show->showBox(Ui::MakeConfirmBox({
+			.text = tr::lng_gifs_search_disclosure(
+				tr::now,
+				lt_bot,
+				tr::bold(u"@"_q + username),
+				tr::marked),
+			.confirmed = crl::guard(this, [=](Fn<void()> close) {
+				_gifSearchDisclosureAccepted = true;
+				_gifSearchDisclosureShown = false;
+				searchForGifs(base::take(_pendingGifSearchQuery));
+				close();
+			}),
+			.cancelled = crl::guard(this, [=](Fn<void()> close) {
+				_gifSearchDisclosureShown = false;
+				_pendingGifSearchQuery.clear();
+				_search->cancel();
+				close();
+			}),
+			.confirmText = tr::lng_gifs_search_disclosure_confirm(),
+		}));
+		return;
+	}
 
 	if (_inlineQuery != query) {
 		_search->setLoading(false);

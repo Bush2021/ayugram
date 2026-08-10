@@ -253,6 +253,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_saved_gif_limit_more#one" = "An older GIF was replaced with this one.\nYou can {link} to {count} GIF.";
 "lng_saved_gif_limit_more#other" = "An older GIF was replaced with this one.\nYou can {link} to {count} GIFs.";
 "lng_saved_gif_limit_link" = "increase the limit";
+"lng_gifs_search_disclosure" = "GIF search uses the Telegram-configured bot {bot}. Your search text and the current chat will be sent to this bot. The bot is not necessarily operated by Telegram.";
+"lng_gifs_search_disclosure_confirm" = "Search GIFs";
 
 "lng_caption_limit_title" = "Limit Reached";
 "lng_caption_limit1#one" = "Sorry, you can't use more than **{count}** character in media captions.";
@@ -5260,6 +5262,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_maps_no_places" = "No places found";
 "lng_maps_choose_to_search" = "Choose location to see places nearby.";
 "lng_maps_venues_source" = "Powered by Foursquare";
+"lng_maps_venues_disclosure" = "Venue suggestions use the Telegram-configured bot {bot}. Your selected location and any venue search text will be sent to this bot. The bot is not necessarily operated by Telegram.";
+"lng_maps_venues_disclosure_confirm" = "Enable Venue Search";
 "lng_live_location" = "Live Location";
 "lng_live_location_now" = "updated just now";
 "lng_live_location_minutes#one" = "updated {count} minute ago";
@@ -8706,6 +8710,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_QuickAdminShortcuts" = "Quick Admin Shortcuts";
 "ayu_DisableGreetingSticker" = "Disable Greeting Sticker";
 "ayu_TranslationProvider" = "Translation Provider";
+"ayu_TranslationConsent" = "Message text, source language, and target language will be sent to {provider} for translation. Activate this provider?";
+"ayu_OpenAiTranslationConsent" = "Message text, source language, and target language will be sent to {provider} at the configured host {host} for translation. Activate this provider?";
+"ayu_TranslationConsentConfirm" = "Activate";
+"ayu_FetchMissingMusicCovers" = "Fetch Missing Music Covers from Apple";
+"ayu_FetchMissingMusicCoversDescription" = "When enabled, tracks without Telegram-provided artwork send their title and performer to Apple's iTunes Search service. Apple may receive your IP address and request metadata.";
 "ayu_OpenAiTranslationSettings" = "OpenAI Settings";
 "ayu_OpenAiTranslationModel" = "Model";
 "ayu_OpenAiTranslationApiUrl" = "API URL";
@@ -8998,6 +9007,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CreationDateSelfApproximately" = "You created your account approximately on **{item}**.";
 "ayu_CreationDateSelfEarlier" = "You created your account earlier than **{item}**.";
 "ayu_CreationDateSelfLater" = "You created your account later than **{item}**.";
+"ayu_RegistrationDateDisclosure" = "AyuGram will send {query} to {bot} to estimate this account's registration date. The bot will see your Telegram account and the target user ID.";
+"ayu_RegistrationDateDisclosureConfirm" = "Look Up Date";
 "ayu_JoinDateChat" = "You joined **{item1}** on **{item2}**.";
 "ayu_JumpToBeginning" = "To Beginning";
 "ayu_ExpireMediaContextMenuText" = "Burn";

@@ -162,6 +162,11 @@ private:
 	UserData *_venuesBot = nullptr;
 	mtpRequestId _venuesBotRequestId = 0;
 	mtpRequestId _venuesRequestId = 0;
+	bool _venuesDisclosureAccepted = false;
+	bool _venuesDisclosureShown = false;
+	bool _venuesDisclosureDeclined = false;
+	Core::GeoLocation _pendingVenuesLocation;
+	QString _pendingVenuesQuery;
 	Core::GeoLocation _venuesRequestLocation;
 	QString _venuesRequestQuery;
 	QString _venuesInitialQuery;

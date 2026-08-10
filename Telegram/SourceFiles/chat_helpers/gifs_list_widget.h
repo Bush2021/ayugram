@@ -217,6 +217,9 @@ private:
 	PeerData *_inlineQueryPeer = nullptr;
 	QString _inlineQuery, _inlineNextQuery, _inlineNextOffset;
 	mtpRequestId _inlineRequestId = 0;
+	bool _gifSearchDisclosureAccepted = false;
+	bool _gifSearchDisclosureShown = false;
+	QString _pendingGifSearchQuery;
 
 	rpl::event_stream<FileChosen> _fileChosen;
 	rpl::event_stream<PhotoChosen> _photoChosen;
