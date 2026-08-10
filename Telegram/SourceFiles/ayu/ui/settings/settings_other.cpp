@@ -9,7 +9,6 @@
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/donate_qr_box.h"
-#include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
 #include "boxes/abstract_box.h"
@@ -37,7 +36,6 @@
 namespace Settings {
 
 using namespace Builder;
-using namespace AyuBuilder;
 
 namespace {
 
@@ -175,24 +173,6 @@ void BuildDonations(SectionBuilder &builder) {
 	});
 }
 
-void BuildCrashReporting(SectionBuilder &builder, AyuSectionBuilder &ayu) {
-#ifndef TDESKTOP_DISABLE_AUTOUPDATE
-	builder.addSkip();
-	builder.addSubsectionTitle(tr::ayu_CategoryOther());
-
-	ayu.addSettingToggle({
-		.id = u"ayu/crashReporting"_q,
-		.altIds = { u"ayu/crashlytics"_q },
-		.title = tr::ayu_CrashReporting(),
-		.getter = &AyuSettings::crashReporting,
-		.setter = &AyuSettings::setCrashReporting,
-		.icon = { &st::menuIconReport },
-	});
-	builder.addSkip();
-	builder.addDividerText(tr::ayu_CrashReportingDescription());
-#endif
-}
-
 void BuildOtherThings(SectionBuilder &builder) {
 	const auto controller = builder.controller();
 
@@ -231,11 +211,8 @@ const auto kMeta = BuildHelper({
 	.title = &tr::ayu_CategoryOther,
 	.icon = &st::menuIconFave,
 }, [](SectionBuilder &builder) {
-	auto ayu = AyuSectionBuilder(builder);
-
 	builder.addSkip();
 	BuildDonations(builder);
-	BuildCrashReporting(builder, ayu);
 	BuildOtherThings(builder);
 });
 

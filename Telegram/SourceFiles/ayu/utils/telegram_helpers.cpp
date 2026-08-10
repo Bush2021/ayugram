@@ -15,9 +15,6 @@
 #include "ayu/data/entities.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
-#include "ayu/ui/boxes/donate_info_box.h"
-#include "ayu/ui/toasts.h"
-#include "ayu/utils/rc_manager.h"
 #include "core/core_settings.h"
 #include "core/application.h"
 #include "base/unixtime.h"
@@ -47,30 +44,78 @@
 #include "styles/style_ayu_styles.h"
 #include "styles/style_info.h"
 #include "ui/emoji_config.h"
-#include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
-#include "window/window_controller.h"
 
 #include <atomic>
 #include <functional>
 #include <latch>
+#include <unordered_set>
 #include <QTimer>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 
 namespace {
 
+const auto kExteraPeers = std::unordered_set<ID>{
+	139303278,
+	168769611,
+	668557709,
+	880708503,
+	963080346,
+	1156270028,
+	1172503281,
+	1282540315,
+	1348136086,
+	1374434073,
+	1434550607,
+	1524581881,
+	1559501352,
+	1571726392,
+	1632728092,
+	1725670701,
+	1752394339,
+	1754537498,
+	1773117711,
+	1794457129,
+	1815864846,
+	1877362358,
+	1905581924,
+	1947958814,
+	1976430343,
+	2130395384,
+	2135966128,
+	2331068091,
+	2401498637,
+	2562664432,
+	2564770112,
+	2685666919,
+	3116497667,
+	3212977677,
+	3572293253,
+	5079320635,
+	5118627360,
+	5184725450,
+	5330087923,
+	5800413909,
+	6007644928,
+	7380551229,
+	7738913005,
+	7818249287,
+	8083933640,
+	8512951856,
+};
+
 constexpr auto usernameResolverBotId = 7424190611L;
 const auto usernameResolverBotUsername = QString("tgdb_search_bot");
 const auto usernameResolverEmpty = QString("Error, username or id invalid/not found.");
 
 constexpr auto regDateBotId = 8083294286L;
-const auto regDateBotUsername = QString("exteraAuthBot");
+const auto regDateBotUsername = u"exteraAuthBot"_q;
 
 constexpr auto regDateBotFallbackId = 6247153446L;
-const auto regDateBotFallbackUsername = QString("ayugrambot");
+const auto regDateBotFallbackUsername = u"ayugrambot"_q;
 
 const auto kZalgoPattern = QStringLiteral(
 	"\\p{Mn}{3,}|[\\x{202A}-\\x{202E}\\x{2066}-\\x{2069}\\x{200E}\\x{200F}\\x{061C}]");
@@ -175,41 +220,26 @@ ID getBareID(not_null<PeerData*> peer) {
 }
 
 bool isExteraPeer(ID peerId) {
-	return RCManager::getInstance().developers().contains(peerId) || RCManager::getInstance().channels().
-		contains(peerId);
+	return kExteraPeers.contains(peerId);
 }
 
-bool isSupporterPeer(ID peerId) {
-	return RCManager::getInstance().supporters().contains(peerId) || RCManager::getInstance().supporterChannels().
-		contains(peerId);
+bool isSupporterPeer(ID) {
+	return false;
 }
 
-bool isCustomBadgePeer(ID peerId) {
-	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
+bool isCustomBadgePeer(ID) {
+	return false;
 }
 
-CustomBadge getCustomBadge(ID peerId) {
-	const auto &badges = RCManager::getInstance().supporterCustomBadges();
-	if (const auto it = badges.find(peerId); it != badges.end()) {
-		return it->second;
-	}
+CustomBadge getCustomBadge(ID) {
 	return {};
 }
 
 [[nodiscard]] Info::Profile::Badge::Content ComputeExteraBadgeContent(
 		not_null<PeerData*> peer) {
-	if (isCustomBadgePeer(getBareID(peer))) {
-		return Info::Profile::Badge::Content{
-			.badge = Info::Profile::BadgeType::ExteraCustom,
-			.emojiStatusId = getCustomBadge(getBareID(peer)).emojiStatusId,
-		};
-	} else if (isExteraPeer(getBareID(peer))) {
+	if (isExteraPeer(getBareID(peer))) {
 		return Info::Profile::Badge::Content{
 			.badge = Info::Profile::BadgeType::Extera,
-		};
-	} else if (isSupporterPeer(getBareID(peer))) {
-		return Info::Profile::Badge::Content{
-			.badge = Info::Profile::BadgeType::ExteraSupporter,
 		};
 	}
 	return {};
@@ -220,50 +250,22 @@ rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<Pe
 }
 
 Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
-	return [=]
-	{
+	return [=] {
+		if (!isExteraPeer(getBareID(peer))) {
+			return;
+		}
 		const auto badge = ComputeExteraBadgeContent(peer);
-		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
-		const auto isExtera = isExteraPeer(getBareID(peer));
-		const auto isSupporter = isSupporterPeer(getBareID(peer));
-
-		TextWithEntities text;
-		if (isCustomBadge) {
-			const auto custom = getCustomBadge(getBareID(peer));
-			text = custom.text.isEmpty()
-					   ? (isExtera
-							  ? tr::ayu_DeveloperPopup(
-								  tr::now,
-								  lt_item,
-								  TextWithEntities{peer->name()},
-								  tr::rich)
-							  : tr::ayu_SupporterPopup(
-								  tr::now,
-								  lt_item,
-								  TextWithEntities{peer->name()},
-								  tr::rich))
-					   : tr::rich(custom.text);
-		} else if (isExtera) {
-			text = peer->isUser()
-					   ? tr::ayu_DeveloperPopup(
-						   tr::now,
-						   lt_item,
-						   TextWithEntities{peer->name()},
-						   tr::rich)
-					   : tr::ayu_OfficialResourcePopup(
-						   tr::now,
-						   lt_item,
-						   TextWithEntities{peer->name()},
-						   tr::rich);
-		} else if (isSupporter) {
-			text = tr::ayu_SupporterPopup(
+		const auto text = peer->isUser()
+			? tr::ayu_DeveloperPopup(
+				tr::now,
+				lt_item,
+				TextWithEntities{peer->name()},
+				tr::rich)
+			: tr::ayu_OfficialResourcePopup(
 				tr::now,
 				lt_item,
 				TextWithEntities{peer->name()},
 				tr::rich);
-		} else {
-			return;
-		}
 
 		auto config = Ui::Toast::Config{
 			.text = text,
@@ -272,24 +274,7 @@ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
 			.adaptive = true,
 			.duration = 3 * crl::time(1000),
 		};
-		if (badge.badge == Info::Profile::BadgeType::ExteraSupporter) {
-			Ayu::Ui::ShowToastWithAction(
-				std::move(config),
-				tr::lng_collectible_learn_more(tr::now),
-				[=] {
-					const auto window = Core::App().activeWindow();
-					const auto controller = window
-						? window->sessionController()
-						: nullptr;
-					if (!controller) {
-						return;
-					}
-					controller->show(Box(Ui::FillDonateInfoBox, controller));
-					window->activate();
-				});
-		} else {
-			Ui::Toast::Show(std::move(config));
-		}
+		Ui::Toast::Show(std::move(config));
 	};
 }
 

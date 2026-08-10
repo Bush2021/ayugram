@@ -7,7 +7,6 @@
 #include "ayu/ui/boxes/donate_info_box.h"
 
 #include "lang_auto.h"
-#include "ayu/utils/rc_manager.h"
 #include "core/ui_integration.h"
 #include "data/data_session.h"
 #include "info/channel_statistics/earn/earn_icons.h"
@@ -176,9 +175,9 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 		.margin = st::channelEarnCurrencyLearnMargins
 	});
 
-	const auto dollarAmount = RCManager::getInstance().donateAmountUsd().prepend("$");
-	const auto tonAmount = RCManager::getInstance().donateAmountTon();
-	const auto rubleAmount = RCManager::getInstance().donateAmountRub().append("₽");
+	const auto dollarAmount = u"$5.00"_q;
+	const auto tonAmount = u"3.50"_q;
+	const auto rubleAmount = u"386₽"_q;
 
 	const auto innerText = TextWithEntities{}.append(tonSymbol).append(tonAmount).append(", ").append(rubleAmount);
 	const auto str = tr::ayu_SupportBoxMakeDonationInfo(
@@ -200,7 +199,7 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 
 	Ui::AddSkip(box->verticalLayout());
 
-	const auto username = RCManager::getInstance().donateUsername();
+	const auto username = u"@ayugramOwner"_q;
 	auto usernameTrimmed = username;
 	if (usernameTrimmed.startsWith('@')) {
 		usernameTrimmed.remove(0, 1);
