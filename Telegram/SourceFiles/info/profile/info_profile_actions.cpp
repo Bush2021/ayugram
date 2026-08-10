@@ -1417,6 +1417,7 @@ void AddRegistrationOrCreationButton(
 	registrationDateButton->setClickedCallback([=] {
 		const auto weak = QPointer<Ui::IconButton>(registrationDateButton);
 		getRegistrationDate(
+			controller,
 			peer,
 			[=](const TextWithEntities &result) {
 				if (result.empty() || !weak) {

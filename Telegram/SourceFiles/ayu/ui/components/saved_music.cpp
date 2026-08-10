@@ -258,7 +258,7 @@ void AyuMusicButton::makeCover() {
 
 			auto cover = GetCurrentCover(mediaView, QSize(size, size));
 
-			if (cover.noCover) {
+			if (cover.noCover && settings.fetchMissingMusicCovers()) {
 				const auto pix = Ayu::Ui::Itunes::FetchCover(performerText, titleText, size);
 				if (!pix.isNull()) {
 					const auto img = Image(pix.toImage());

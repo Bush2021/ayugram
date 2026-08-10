@@ -17,9 +17,10 @@
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/boxes/single_choice_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/rp_widget.h"
-#include "ui/boxes/single_choice_box.h"
 #include "ui/toast/toast.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
@@ -33,6 +34,8 @@
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 
+#include <QtCore/QUrl>
+
 #include <memory>
 
 namespace Settings {
@@ -44,6 +47,79 @@ namespace {
 
 [[nodiscard]] bool IsOpenAiProvider(TranslationProvider provider) {
 	return (provider == TranslationProvider::OpenAI);
+}
+
+[[nodiscard]] bool IsExternalTranslationProvider(
+		TranslationProvider provider) {
+	return (provider == TranslationProvider::Google)
+		|| (provider == TranslationProvider::Yandex)
+		|| (provider == TranslationProvider::OpenAI);
+}
+
+[[nodiscard]] QString TranslationProviderName(
+		TranslationProvider provider) {
+	switch (provider) {
+	case TranslationProvider::Google: return u"Google"_q;
+	case TranslationProvider::Yandex: return u"Yandex"_q;
+	case TranslationProvider::OpenAI: return u"OpenAI"_q;
+	case TranslationProvider::Telegram: return u"Telegram"_q;
+	case TranslationProvider::Native: return u"Native"_q;
+	}
+	Unexpected("TranslationProvider value.");
+}
+
+[[nodiscard]] QString OpenAiConfiguredHost() {
+	const auto endpoint = AyuSettings::getInstance()
+		.openAiTranslationSettings()
+		.apiBaseOrEndpoint()
+		.trimmed();
+	auto url = QUrl(endpoint);
+	if (url.host().isEmpty()) {
+		url = QUrl(u"https://"_q + endpoint);
+	}
+	if (url.host().isEmpty()) {
+		return endpoint;
+	}
+	const auto port = url.port();
+	return (port > 0)
+		? url.host() + u":"_q + QString::number(port)
+		: url.host();
+}
+
+[[nodiscard]] TextWithEntities TranslationProviderConsent(
+		TranslationProvider provider) {
+	const auto name = TranslationProviderName(provider);
+	if (provider == TranslationProvider::OpenAI) {
+		return tr::ayu_OpenAiTranslationConsent(
+			tr::now,
+			lt_provider,
+			tr::bold(name),
+			lt_host,
+			tr::bold(OpenAiConfiguredHost()),
+			tr::marked);
+	}
+	return tr::ayu_TranslationConsent(
+		tr::now,
+		lt_provider,
+		tr::bold(name),
+		tr::marked);
+}
+
+void SelectTranslationProvider(
+		not_null<Window::SessionController*> controller,
+		TranslationProvider provider) {
+	if (!IsExternalTranslationProvider(provider)) {
+		AyuSettings::getInstance().setTranslationProvider(provider);
+		return;
+	}
+	controller->show(Ui::MakeConfirmBox({
+		.text = TranslationProviderConsent(provider),
+		.confirmed = [=](Fn<void()> close) {
+			AyuSettings::getInstance().setTranslationProvider(provider);
+			close();
+		},
+		.confirmText = tr::ayu_TranslationConsentConfirm(),
+	}));
 }
 
 void PrepareMultilineInput(not_null<Ui::InputField*> field) {
@@ -240,7 +316,7 @@ void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 						[=](not_null<Ui::GenericBox*> box) {
 							const auto save = [=](int index) {
 								const auto option = availableOptions[index].first;
-								AyuSettings::getInstance().setTranslationProvider(option);
+								SelectTranslationProvider(controller, option);
 
 								if constexpr (Platform::IsMac()) {
 									if (option == TranslationProvider::Native) {
@@ -408,6 +484,13 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::improveLinkPreviews,
 		.setter = &AyuSettings::setImproveLinkPreviews,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/fetchMissingMusicCovers"_q,
+		.title = tr::ayu_FetchMissingMusicCovers(),
+		.getter = &AyuSettings::fetchMissingMusicCovers,
+		.setter = &AyuSettings::setFetchMissingMusicCovers,
+	});
+	builder.addDividerText(tr::ayu_FetchMissingMusicCoversDescription());
 	ayu.addCollapsibleToggle({
 		.id = u"ayu/confirmations"_q,
 		.title = tr::ayu_ConfirmationsTitle(),

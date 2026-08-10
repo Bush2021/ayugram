@@ -1228,6 +1228,12 @@ void AyuSettings::setAdaptiveCoverColor(bool val) {
 	save();
 }
 
+void AyuSettings::setFetchMissingMusicCovers(bool val) {
+	if (_fetchMissingMusicCovers.current() == val) return;
+	_fetchMissingMusicCovers = val;
+	save();
+}
+
 void AyuSettings::setImproveLinkPreviews(bool val) {
 	if (_improveLinkPreviews.current() == val) return;
 	_improveLinkPreviews = val;
@@ -1348,6 +1354,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"translationProvider", s._translationProvider.current()},
 		{"openAiTranslationSettings", s._openAiTranslationSettings},
 		{"adaptiveCoverColor", s._adaptiveCoverColor.current()},
+		{"fetchMissingMusicCovers", s._fetchMissingMusicCovers.current()},
 		{"improveLinkPreviews", s._improveLinkPreviews.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
@@ -1460,6 +1467,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 		j["openAiTranslationSettings"].get_to(s._openAiTranslationSettings);
 	}
 	s._adaptiveCoverColor = j.value("adaptiveCoverColor", defaults._adaptiveCoverColor.current());
+	s._fetchMissingMusicCovers = j.value("fetchMissingMusicCovers", defaults._fetchMissingMusicCovers.current());
 	s._improveLinkPreviews = j.value("improveLinkPreviews", defaults._improveLinkPreviews.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());

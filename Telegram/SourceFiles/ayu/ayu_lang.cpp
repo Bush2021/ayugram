@@ -12,8 +12,10 @@
 #include "lang/lang_instance.h"
 #include "storage/localstorage.h"
 
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 
 // hard-coded languages
 std::map<QString, QString> langMapping = {
@@ -32,6 +34,8 @@ constexpr auto postfixes = {
 	"many",
 	"other"
 };
+
+constexpr auto kLanguageRefreshSeconds = 24 * 60 * 60;
 
 AyuLanguage *AyuLanguage::instance = nullptr;
 
@@ -105,6 +109,27 @@ void AyuLanguage::saveCachedLanguage(const QByteArray &json, const QString &lang
 void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
 	auto finalLangPackId = langMapping.contains(id) ? langMapping[id] : id;
 	_currentLangId = finalLangPackId.isEmpty() ? baseId : finalLangPackId;
+	if (_currentLangId.isEmpty()) {
+		return;
+	}
+
+	const auto cachePath = getCachePath(_currentLangId);
+	const auto refreshPath = cachePath + u".refresh"_q;
+	const auto cache = QFileInfo(cachePath);
+	const auto refresh = QFileInfo(refreshPath);
+	const auto refreshedAt = refresh.exists()
+		? refresh.lastModified()
+		: cache.lastModified();
+	if (refreshedAt.isValid()
+		&& refreshedAt.secsTo(QDateTime::currentDateTime())
+			< kLanguageRefreshSeconds) {
+		return;
+	}
+	QDir().mkpath(getCacheDir());
+	auto marker = QFile(refreshPath);
+	if (marker.open(QIODevice::WriteOnly)) {
+		marker.close();
+	}
 
 	if (Core::App().settings().proxy().isEnabled()) {
 		const auto proxy = Core::App().settings().proxy().selected();

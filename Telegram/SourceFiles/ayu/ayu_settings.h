@@ -423,6 +423,7 @@ public:
 	[[nodiscard]] bool roundConfirmation() const { return _roundConfirmation.current(); }
 	[[nodiscard]] TranslationProvider translationProvider() const { return _translationProvider.current(); }
 	[[nodiscard]] bool adaptiveCoverColor() const { return _adaptiveCoverColor.current(); }
+	[[nodiscard]] bool fetchMissingMusicCovers() const { return _fetchMissingMusicCovers.current(); }
 	[[nodiscard]] bool improveLinkPreviews() const { return _improveLinkPreviews.current(); }
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
@@ -510,6 +511,7 @@ public:
 	void setRoundConfirmation(bool val);
 	void setTranslationProvider(TranslationProvider val);
 	void setAdaptiveCoverColor(bool val);
+	void setFetchMissingMusicCovers(bool val);
 	void setImproveLinkPreviews(bool val);
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
@@ -679,6 +681,8 @@ public:
 	[[nodiscard]] rpl::producer<TranslationProvider> translationProviderChanges() const { return _translationProvider.changes(); }
 	[[nodiscard]] rpl::producer<bool> adaptiveCoverColorValue() const { return _adaptiveCoverColor.value(); }
 	[[nodiscard]] rpl::producer<bool> adaptiveCoverColorChanges() const { return _adaptiveCoverColor.changes(); }
+	[[nodiscard]] rpl::producer<bool> fetchMissingMusicCoversValue() const { return _fetchMissingMusicCovers.value(); }
+	[[nodiscard]] rpl::producer<bool> fetchMissingMusicCoversChanges() const { return _fetchMissingMusicCovers.changes(); }
 	[[nodiscard]] rpl::producer<bool> improveLinkPreviewsValue() const { return _improveLinkPreviews.value(); }
 	[[nodiscard]] rpl::producer<bool> improveLinkPreviewsChanges() const { return _improveLinkPreviews.changes(); }
 	[[nodiscard]] rpl::producer<int> avatarCornersValue() const { return _avatarCorners.value(); }
@@ -778,6 +782,7 @@ private:
 	rpl::variable<bool> _roundConfirmation = false;
 	rpl::variable<TranslationProvider> _translationProvider = TranslationProvider::Telegram;
 	rpl::variable<bool> _adaptiveCoverColor = true;
+	rpl::variable<bool> _fetchMissingMusicCovers = false;
 	rpl::variable<bool> _improveLinkPreviews = false;
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
