@@ -118,6 +118,16 @@ template <typename T>
 	});
 }
 
+[[nodiscard]] bool HasUnsupportedTimeToLive(const MTPMessageMedia &media) {
+	return media.match([](const MTPDmessageMediaPhoto &data) {
+		return data.vttl_seconds().has_value();
+	}, [](const MTPDmessageMediaDocument &data) {
+		return data.vttl_seconds().has_value() && data.is_video();
+	}, [](const auto &) {
+		return false;
+	});
+}
+
 template <typename T>
 [[nodiscard]] PreparedServiceText PrepareErrorText(const T &data) {
 	if constexpr (!std::is_same_v<T, MTPDmessageActionEmpty>) {
@@ -548,7 +558,7 @@ HistoryItem::HistoryItem(
 		createComponents(data);
 		if (media) {
 			setMedia(*media);
-			if (checked == MediaCheckResult::HasUnsupportedTimeToLive) {
+			if (HasUnsupportedTimeToLive(*media)) {
 				media->match(
 					[&](const MTPDmessageMediaPhoto &media)
 					{

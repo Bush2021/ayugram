@@ -408,7 +408,7 @@ HistoryItem *EphemeralMessages::applyNew(const MTPDephemeralMessage &data) {
 					? MessageFlag::InvertMedia
 					: MessageFlag())
 				| (data.is_noforwards()
-					? MessageFlag::NoForwards
+					? MessageFlag::AyuNoForwards
 					: MessageFlag())
 				| (fromId ? MessageFlag::HasFromId : MessageFlag())
 				| (replyTo.messageId

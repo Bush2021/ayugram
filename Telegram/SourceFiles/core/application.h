@@ -356,9 +356,6 @@ public:
 
 	void preventOrInvoke(Fn<void()> &&callback);
 
-	void enumerateWindows(
-		Fn<void(not_null<Window::Controller*>)> callback) const;
-
 	// Global runtime variables.
 	void setScreenIsLocked(bool locked);
 	bool screenIsLocked() const;
