@@ -5,10 +5,12 @@ allowed-tools: Bash, Read, Edit, Grep, AskUserQuestion
 
 # Sync AyuGram
 
-Read and follow `.agents/skills/sync-ayu/SKILL.md` exactly. Do not substitute a conventional rebase.
+## Outcome
 
-The required workflow classifies intent from history and the final tree, scans the latest Ayu implementation and newly added related surfaces before every topic, preserves durable merge-only resolutions, reconciles fork submodules, and verifies the reconstructed result without building.
+Reconstruct `dev` on current `ayu/dev` as a curated, minimal history that preserves durable Bush intent and Ayu's newer behavior. Reconcile forked submodules and `vs2026` without building or publishing unapproved history rewrites.
 
-Reconstruction does not authorize product-policy changes. Preserve the fork's final release, cleanup, credential-lifecycle, network, default, and UI behavior unless the user explicitly requests a change.
+## Contract
 
-Never push merely because reconstruction succeeded. Immediately before every rewritten submodule, `dev`, or `vs2026` push, require explicit approval for that exact ordered batch. Use freshly observed exact `--force-with-lease` values, stop after the first failure, and read every advertised ref back.
+Read and follow `.agents/skills/sync-ayu/SKILL.md` as the canonical workflow. Also load the repository guidance it names. This is intent reconstruction, not a conventional rebase or chronological replay. Choose commands from the evidence and current repository state.
+
+The skill's product-policy, ownership, backup, validation, exact-lease, approval, publication-order, and completion requirements are mandatory. Obtain fresh approval for the exact external rewrite batch immediately before publication.

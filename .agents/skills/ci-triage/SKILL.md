@@ -5,30 +5,20 @@ description: Diagnose the newest failing GitHub Actions run for this repository 
 
 # Triage CI
 
-Let the user choose the GitHub access method when they express a preference. Otherwise, choose among the available tools based on the task and current access. Keep the repository unchanged.
+## Outcome
 
-## 1. Select the failure
+Identify the first causal failure in the newest relevant failed GitHub Actions run. Explain what failed, classify its ownership, and recommend the smallest justified next step. Leave both the repository and GitHub unchanged.
 
-List the five or more newest workflow runs and select the newest failed run. If the result is ambiguous, retrieve structured fields and identify the run by its database ID, conclusion, workflow, branch, commit, and creation time. If no failed run appears, report that fact instead of guessing.
+## Judgment
 
-## 2. Read actual failed logs
+- Honor the user's preferred GitHub access method. Otherwise use the best available source of structured run data and complete logs.
+- Identify the run precisely. If there is no failure or the intended run is ambiguous, report that instead of guessing.
+- Read the actual failed job or matrix log. Summaries, annotations, and job names are navigation aids, not sufficient evidence.
+- Trace backward from cascaded errors to the first actionable cause.
+- Classify the cause as upstream, fork regression, CI configuration, transient infrastructure, or unresolved.
+- Verify upstream claims against current upstream source, commits, workflows, or runs.
+- Stop at unresolved when the evidence cannot support a stronger conclusion.
 
-Retrieve and read the failed matrix job log itself. Do not diagnose from the workflow summary, annotations, or job title alone. If the initial output is truncated or incomplete, identify the failed job and retrieve its relevant log through any available GitHub access method.
+## Completion contract
 
-## 3. Identify the root cause
-
-Trace the first causal error rather than the final cascade. Classify it as one of:
-
-- Telegram or AyuGram upstream regression.
-- A regression introduced by this fork's patch.
-- Transient infrastructure failure such as DNS, network, runner, service, or cache instability.
-- Repository or CI configuration failure.
-- Unresolved when the available evidence is insufficient.
-
-Support the classification with exact log evidence. For any upstream claim, inspect the actual upstream source, commits, workflows, or runs through an available access method; do not rely on memory.
-
-## 4. Report the next step
-
-If the failure is transient, say why and stop. Otherwise propose the smallest plausible fix and a focused local verification command. Respect `AGENTS.md`: do not run a project build unless the user separately confirms that they want one.
-
-Do not edit files, commit, rerun workflows, or push unless the user explicitly asks in a follow-up.
+Report the run and failed job, the root cause with concise log evidence, the classification and confidence, and the smallest next step. Include focused verification for a non-transient fix. Do not edit files, rerun workflows, commit, push, or build. A build still requires separate user confirmation under `AGENTS.md`.

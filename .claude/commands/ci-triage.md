@@ -1,9 +1,12 @@
 ---
 description: Diagnose the latest failing CI run
-allowed-tools: Bash, Read, Edit, Grep, AskUserQuestion
+allowed-tools: Bash, Read, Grep, AskUserQuestion
 ---
-1. `gh run list --limit 5` and pick the newest failure
-2. `gh run view <id> --log-failed` — read the ACTUAL matrix job log, not the summary
-3. Identify root cause; distinguish upstream regression vs. our patch vs. transient (DNS/cache)
-4. If transient, say so and stop. Otherwise propose a minimal fix and a local verification command
-5. Never push without asking
+
+# Outcome
+
+Diagnose the newest relevant failing CI run from its actual failed-job evidence. Return the root cause, ownership classification, and smallest justified next step without changing local or remote state.
+
+## Contract
+
+Read and follow `.agents/skills/ci-triage/SKILL.md` as the canonical workflow. Choose the available tools and commands that best fit the current GitHub access and failure shape. The skill's evidence, read-only, stop, and completion requirements are mandatory. Its implementation details are not a fixed command sequence.

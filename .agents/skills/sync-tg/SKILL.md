@@ -5,116 +5,36 @@ description: Merge Telegram Desktop upstream tg/dev into local dev while preserv
 
 # Sync Telegram Desktop
 
-Read `AGENTS.md` and `FORK.md` before acting. Work in the current checkout. Preserve both upstream behavior and the AyuGram code surface. Do not build the project.
+## Outcome
 
-## 1. Check preconditions
+Merge current `tg/dev` into `dev` without losing Telegram changes or the AyuGram fork. Leave every submodule at an intentional commit, keep `vs2026` as a thin branch on the new `dev`, and clearly distinguish local completion from publication. Do not build.
 
-Run these checks in parallel where practical:
+Read `AGENTS.md` and `FORK.md` first. Treat `FORK.md` as the source of truth for remotes, protected fork surfaces, forked submodules, and branch roles.
 
-- Require `git status --porcelain` to be empty.
-- Require `git submodule status` to contain no line beginning with `+`, `-`, or `U`.
-- Require `git branch --show-current` to be `dev`.
+## Safety boundary
 
-Stop on any failure. Do not stash, reset, clean, or alter unrelated work.
+- Start only from clean `dev` with all submodules initialized and aligned. Stop rather than stash, reset, clean, or disturb unrelated work.
+- Capture enough of the starting fork surface to prove afterward that every change there is intentional.
+- Never use `git submodule update --remote`.
+- Any external write requires explicit approval immediately before it. A force-push must use an exact lease and identify the remote and ref being rewritten.
 
-## 2. Snapshot the fork surface
+## Merge judgment
 
-Create a unique directory under the system temporary directory. Record its exact path for cleanup. Save the current `HEAD` and the output of:
+- Perform a real merge from `tg/dev` into `dev`.
+- Preserve both features in shared conflicts. Adapt AyuGram code to Telegram's newer APIs and structure instead of restoring stale whole files or reverting upstream behavior.
+- Preserve AyuGram identity and branding. Take Telegram's current version and beta values.
+- For each registered forked submodule, decide from ancestry and repository ownership. Keep the fork pointer when it already carries the required upstream history. If the fork itself must advance, update and verify that fork before recording its new commit in the parent.
+- Let non-forked submodules follow Telegram's intended commits after verifying ambiguous ancestry.
+- Stage only paths whose resolution has been inspected.
 
-```bash
-git ls-tree -r HEAD -- \
-  Telegram/SourceFiles/ayu \
-  Telegram/lib_ui Telegram/lib_tl Telegram/codegen Telegram/lib_icu cmake \
-  Telegram/Resources/art/ayu Telegram/Resources/icons/ayu Telegram/Resources/qrc/ayu
-```
+## Verification and publication
 
-Use PowerShell for shell variables and temporary-path handling on Windows.
+The merge is locally complete only when:
 
-## 3. Fetch and merge
+- the merge contains the intended Telegram parent and preserves the AyuGram behavior;
+- every protected-surface difference from the starting snapshot is reviewed and intentional;
+- all submodules are clean, aligned with their recorded commits, and forked pointers belong to the intended fork histories;
+- the parent worktree is clean and the checkout has returned to `dev`;
+- `vs2026` has been rebased onto the finalized `dev` while retaining only its Visual Studio compatibility delta.
 
-Run:
-
-```bash
-git fetch tg
-git merge tg/dev
-```
-
-For a clean merge, continue with verification. For conflicts, resolve them by category.
-
-## 4. Resolve conflicts
-
-### Forked submodule SHAs
-
-For each of the five forked paths in `FORK.md`, inspect the actual repositories and compare both candidate SHAs. Fetch its configured desktop-app upstream and inspect `HEAD..upstream/<branch>`.
-
-- If desktop-app upstream has new commits, rebase the registered fork branch onto that upstream. Resolve fork-internal conflicts. Before force-pushing, show the exact fork remote and branch and obtain explicit user confirmation. Use `--force-with-lease`, then stage the new submodule SHA at the main-repository root.
-- Otherwise, keep the local main-repository side with `git checkout --ours <path>` and stage that path.
-
-Never replace a registered fork SHA with an unverified desktop-app-only SHA.
-
-### Non-forked submodule SHAs
-
-Take Telegram upstream's bumped SHA with `git checkout --theirs <path>` and stage it. If either side's ordering is unclear, inspect both candidate SHAs before choosing.
-
-Never run `git submodule update --remote`.
-
-### AyuGram files
-
-For conflicts under the AyuGram code surface in `FORK.md`, keep both features. Preserve the AyuGram behavior while adapting it to Telegram upstream API and structural changes. Do not revert upstream changes merely to retain old AyuGram code.
-
-### Version and branding files
-
-For conflicts in `Telegram/SourceFiles/core/version.h`, `Telegram/Resources/winrc/Telegram.rc`, and `Telegram/Resources/winrc/Updater.rc`:
-
-- Keep AyuGram branding: the `...D666` `AppId`, `AppNameOld`, `AppName`, `AppFile`, `CompanyName "Radolyn Labs"`, `FileDescription`, `ProductName`, and existing `LegalCopyright`.
-- Take Telegram upstream's `AppVersion`, `AppVersionStr`, `FileVersion`, and `ProductVersion` numbers.
-- Take upstream's `AppBetaVersion` unchanged, whether true or false.
-
-### Other files
-
-Perform a standard three-way merge and preserve both features in shared hunks. Stage only resolved paths. Finish with `git merge --continue`.
-
-## 5. Verify the fork surface
-
-Re-run the `git ls-tree` snapshot command against merged `HEAD` and compare it with the saved snapshot. Show every difference and require explicit confirmation that each one is intentional.
-
-## 6. Verify submodules
-
-- Require `git submodule status` to contain no `+`, `-`, or `U` state.
-- Verify every forked submodule SHA belongs to the intended fork history.
-- For non-forked submodules with a `+` or `-` working-tree state, run `git submodule update --init <exact-paths>` to match the recorded SHAs. Never stage a `+` state without first proving that its working-tree SHA is intended.
-
-Remove only the exact temporary directory created by this run after verification.
-
-## 7. Publish dev only with confirmation
-
-State that the merge is local. Ask whether the user wants Codex to run:
-
-```bash
-git push origin dev
-```
-
-Do not push without explicit confirmation.
-
-## 8. Update vs2026
-
-After `dev` is finalized, run:
-
-```bash
-git checkout vs2026
-git rebase dev
-```
-
-Ask for explicit confirmation before `git push --force-with-lease origin vs2026`. Return to `dev` after the branch work, whether the user approves the push or leaves it local.
-
-## 9. Offer CI dispatch
-
-Ask whether to trigger these workflows with `gh`:
-
-```bash
-gh workflow run mac.yml --ref dev
-gh workflow run win.yml --ref dev
-gh workflow run win.yml --ref vs2026
-```
-
-Run them only after explicit confirmation. Report the dispatched runs or any `gh` errors. Do not substitute a local build.
+Publish only the parts the user approves. Treat pushes of forked submodules, `dev`, and the rewritten `vs2026` as separate external effects. Offer the repository's macOS and Windows workflow dispatches after publication, but run them only with fresh approval. Report which branches and workflows remain local, published, dispatched, or unverified.
