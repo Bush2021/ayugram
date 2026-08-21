@@ -3307,12 +3307,12 @@ void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 		addEditContactAction(user);
 		addDeleteContactAction(user);
 	}
+	if (CanReportBot(user)) {
+		addBotCommandActions(user);
+		_wrap->add(CreateSkipWidget(_wrap, st::infoBlockButtonSkip));
+		addReportAction();
+	}
 	if (!user->isSelf() && !user->isSupport() && !user->isVerifyCodes()) {
-		if (user->isBot()) {
-			addBotCommandActions(user);
-			_wrap->add(CreateSkipWidget(_wrap, st::infoBlockButtonSkip));
-			addReportAction();
-		}
 		addBlockAction(user);
 	}
 }

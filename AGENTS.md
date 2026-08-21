@@ -82,7 +82,19 @@ cmake --build "l:\Telegram\tx64\out" --config Debug --target Telegram
 ### macOS
 - Requires Xcode
 - Dependencies: `../Libraries/local/Qt-*`
-- Set `QT` environment variable: `export QT=6.8`
+- First-time configure of a new `out/` tree: set the `QT` environment variable
+  to the Qt version this checkout actually has, for example `export QT=6.11.1`
+  when `../Libraries/local/Qt-6.11.1` is the installed one. The value names a
+  directory, so it is the checkout's version, not a constant.
+- Reconfiguring an existing `out/` tree: do **not** export `QT`. Run
+  `env -u QT cmake -S . -B out` instead. `cmake/external/qt/package.cmake`
+  writes an exported `QT` into the `qt_requested` cache entry with `FORCE`, so
+  it overwrites the version the tree was already configured with instead of
+  being ignored. A value that disagrees with the configured tree then fails the
+  regeneration, and the generated project keeps the source list it was last
+  generated with: newly added sources are never compiled — which surfaces later
+  as undefined-symbol link errors rather than as a configure error — and newly
+  added `.style` modules leave the generated `style_*.h` includes stale.
 
 ### Linux
 - Build dependencies in `../Libraries`
@@ -190,9 +202,11 @@ Both app-level (`Core::Settings`) and session-level (`Main::SessionSettings`) us
 
 ## Coding Style
 
-**Do NOT write comments in code:**
+**Do NOT write useless comments in code:**
 
 This is important! Do not write single-line comments that describe what the next line does - they are bloat. Comments are allowed ONLY to describe complex algorithms in detail, when the explanation requires at least 4-5 lines. Self-documenting code with clear variable and function names is preferred.
+
+Do not remove existing comments just to satisfy this rule. Preserve comments unless your change makes them incorrect or truly obsolete; when moving or refactoring code, move the useful comment with it. Inline comments that label positional arguments for generated or schema-driven APIs (for example TL/MTP constructors) are useful because the field names are not visible in the call itself.
 
 ```cpp
 // BAD - don't do this:
@@ -214,6 +228,8 @@ if (user->isPremium()) {
 ```
 
 **Style and formatting rules** are in `REVIEW.md` — see that file for empty-line-before-closing-brace, operator placement in multi-line expressions, if-with-initializer, and other mechanical style rules.
+
+**Never discard a result with a cast:** `static_cast<void>(...)` and `(void)expr` are banned; instead of silencing `[[nodiscard]]`, fix the design.
 
 **Use `auto` for type deduction:**
 
