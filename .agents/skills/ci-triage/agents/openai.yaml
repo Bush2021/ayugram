@@ -1,4 +1,4 @@
 interface:
   display_name: "CI Triage"
-  short_description: "Diagnose the latest failing GitHub Actions run"
-  default_prompt: "Use $ci-triage to diagnose the latest failing CI run and recommend the smallest fix."
+  short_description: "Diagnose the latest failing GitHub Actions run, fix it, and re-trigger CI"
+  default_prompt: "Use $ci-triage to diagnose the latest failing CI run, fix it, push the fix, and re-trigger the CI matrix."
