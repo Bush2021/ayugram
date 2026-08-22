@@ -196,9 +196,9 @@ void NotifyDocumentLoadFailed(
 namespace Test {
 
 void NotifyDocumentSave(
-		not_null<DocumentData*>,
-		const QString &,
-		bool) {
+	not_null<DocumentData*>,
+	const QString &,
+	bool) {
 }
 
 void NotifyDocumentLoadFailed(not_null<DocumentData*>, bool) {

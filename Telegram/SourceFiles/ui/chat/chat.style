@@ -650,7 +650,7 @@ whoReadMenu: PopupMenu(popupMenuExpandedSeparator) {
 }
 whoReadDropdownMenu: DropdownMenu(dropdownMenuWithIcons) {
 	wrap: InnerDropdown(defaultInnerDropdown) {
-		scrollPadding: margins(0px, 6px, 0px, 4px);
+		scrollPadding: margins(0px, 8px, 0px, 8px);
 	}
 	menu: Menu(menuWithIcons) {
 		separator: expandedMenuSeparator;
@@ -800,10 +800,12 @@ historySponsorInfoItem: FlatLabel(defaultFlatLabel) {
 		font: font(12px);
 	}
 	minWidth: 136px;
-	maxHeight: 120px;
 }
 historySponsorInfoItemDark: FlatLabel(historySponsorInfoItem) {
 	textFg: mediaviewControlFg;
+}
+historySponsorInfoMenu: PopupMenu(popupMenuExpandedSeparator) {
+	maxHeight: 420px;
 }
 historyHasCustomEmoji: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {

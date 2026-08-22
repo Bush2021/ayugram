@@ -52,12 +52,10 @@ constexpr auto kBatchResolveFallback = 10 * crl::time(1000);
 constexpr auto kMaxSavedWindows = 64;
 constexpr auto kMaxSavedChats = 64;
 constexpr auto kMaxClosedWindows = 16;
-constexpr auto kMaxIgnoredOffers = 3;
 constexpr auto kVersion = 3;
 constexpr auto kPrefKey = std::string_view("windows_state");
 constexpr auto kRestoreKey = std::string_view("windows_state.restore");
 constexpr auto kAskedKey = std::string_view("windows_state.asked");
-constexpr auto kIgnoredKey = std::string_view("windows_state.ignored");
 
 [[nodiscard]] bool ValidType(int type) {
 	switch (SeparateType(type)) {
@@ -360,10 +358,13 @@ void SavedWindows::setRestoreOnLaunch(bool restore) {
 void SavedWindows::markAsked(bool restore) {
 	_app->settings().writePref<bool>(kAskedKey, true);
 	_app->settings().writePref<bool>(kRestoreKey, restore);
-	_app->settings().clearPref(kIgnoredKey);
 }
 
 void SavedWindows::attachToWindow(not_null<Controller*> window) {
+	if (!_restoring && _hideOffer) {
+		hideOffer();
+		stashUndecided();
+	}
 	scheduleSave();
 	window->sessionControllerValue(
 	) | rpl::on_next([=](SessionController *controller) {
@@ -386,6 +387,11 @@ void SavedWindows::scheduleSave() {
 
 void SavedWindows::writeNow() {
 	_saveTimer.cancel();
+	if (!_restoring && !restoreOnLaunch()) {
+		// Not restored windows are not offered on the next launch.
+		_toRestore.clear();
+		_undecided.clear();
+	}
 	save();
 }
 
@@ -502,7 +508,7 @@ void RaiseAboveSiblings(not_null<QWidget*> card) {
 	}
 }
 
-OfferCard *ShowRestoreOffer(
+[[nodiscard]] Fn<void()> ShowRestoreOffer(
 		not_null<Controller*> window,
 		Fn<void(OfferChoice)> chosen) {
 	const auto controller = window->sessionController();
@@ -519,12 +525,15 @@ OfferCard *ShowRestoreOffer(
 		body,
 		object_ptr<OfferCard>(body));
 	const auto card = wrap->entity();
-	card->chosen(
-	) | rpl::on_next([=](OfferChoice choice) {
+	const auto close = [=] {
 		wrap->hide(anim::type::normal);
 		base::call_delayed(st::fadeWrapDuration, wrap, [=] {
 			wrap->deleteLater();
 		});
+	};
+	card->chosen(
+	) | rpl::on_next([=](OfferChoice choice) {
+		close();
 		notify(choice);
 	}, wrap->lifetime());
 	rpl::combine(
@@ -576,7 +585,10 @@ OfferCard *ShowRestoreOffer(
 			});
 		}
 	}, wrap->lifetime());
-	return card;
+	return crl::guard(wrap, [=] {
+		*notified = true;
+		close();
+	});
 }
 
 } // namespace
@@ -673,18 +685,10 @@ void SavedWindows::maybeOfferRestore() {
 	if (!window || !window->sessionController()) {
 		return;
 	}
-	if (!_offerCounted) {
-		const auto ignored = _app->settings().readPref<int>(kIgnoredKey, 0);
-		if (ignored >= kMaxIgnoredOffers) {
-			markAsked(false);
-			discardRestore();
-			return;
-		}
-		_offerCounted = true;
-		_app->settings().writePref<int>(kIgnoredKey, ignored + 1);
-	}
 	_offered = true;
-	ShowRestoreOffer(window, crl::guard(this, [=](OfferChoice choice) {
+	_hideOffer = ShowRestoreOffer(window, crl::guard(this, [=](
+			OfferChoice choice) {
+		_hideOffer = nullptr;
 		switch (choice) {
 		case OfferChoice::Always:
 			markAsked(true);
@@ -692,7 +696,6 @@ void SavedWindows::maybeOfferRestore() {
 			beginRestore();
 			break;
 		case OfferChoice::Once:
-			_app->settings().clearPref(kIgnoredKey);
 			beginRestore();
 			break;
 		case OfferChoice::Never:
@@ -713,6 +716,12 @@ void SavedWindows::maybeOfferRestore() {
 	}));
 }
 
+void SavedWindows::hideOffer() {
+	if (const auto hide = base::take(_hideOffer)) {
+		hide();
+	}
+}
+
 bool SavedWindows::worthOffering() const {
 	return (_toRestore.size() > 1);
 }
@@ -721,6 +730,7 @@ void SavedWindows::beginRestore() {
 	if (_restoring || Core::Quitting()) {
 		return;
 	}
+	hideOffer();
 	_restoring = true;
 	if (!_undecided.empty()) {
 		_toRestore.insert(
@@ -733,6 +743,7 @@ void SavedWindows::beginRestore() {
 }
 
 void SavedWindows::discardRestore() {
+	hideOffer();
 	_toRestore.clear();
 	_undecided.clear();
 	_restoreFinished = true;

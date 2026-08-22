@@ -969,10 +969,9 @@ void InnerWidget::fillRecentPosts(not_null<Ui::VerticalLayout*> container) {
 rpl::producer<> InnerWidget::menuFilledChanges() const {
 	auto loaded = _loaded.events(
 	) | rpl::filter(rpl::mappers::_1) | rpl::to_empty;
-	if (!ExportAvailable(_state.stats)) {
-		return loaded;
-	}
-	return rpl::single(rpl::empty) | rpl::then(std::move(loaded));
+	return ExportAvailable(_state.stats)
+		? (rpl::single(rpl::empty) | rpl::then(std::move(loaded)))
+		: (std::move(loaded) | rpl::type_erased);
 }
 
 void InnerWidget::fillMenu(const Ui::Menu::MenuCallback &addAction) {
