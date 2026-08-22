@@ -44,11 +44,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QScreen>
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
-
-
 namespace Media {
 namespace View {
 namespace {
@@ -988,12 +983,6 @@ void Pip::setupPanel() {
 	_panel.setAspectRatio(FlipSizeByRotation(size, _rotation));
 	_panel.setPosition(Deserialize(_delegate->pipLoadGeometry()));
 	_panel.widget()->show();
-
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(_panel.widget());
-	} else {
-		AyuFeatures::StreamerMode::showWidgetWindow(_panel.widget());
-	}
 
 	_panel.saveGeometryRequests(
 	) | rpl::on_next([=] {

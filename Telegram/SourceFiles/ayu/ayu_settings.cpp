@@ -10,7 +10,6 @@
 #include "tray.h"
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 #include "ayu/ui/ayu_logo.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -1257,7 +1256,6 @@ void AyuSettings::setSingleCornerRadius(bool val) {
 void AyuSettings::setStreamerMode(bool val) {
 	if (_streamerMode.current() == val) return;
 	_streamerMode = val;
-	AyuFeatures::StreamerMode::apply(val);
 	save();
 }
 

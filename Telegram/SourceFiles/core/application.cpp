@@ -111,7 +111,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_infra.h"
 #include "ayu/ayu_settings.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 
 
 namespace Core {
@@ -194,6 +193,8 @@ Application::Application()
 	_platformIntegration->init();
 
 	_screenshotProtection->addReason(passcodeLockValue());
+	_screenshotProtection->addReason(
+		AyuSettings::getInstance().streamerModeValue());
 
 	passcodeLockChanges(
 	) | rpl::on_next([=](bool locked) {
@@ -607,10 +608,6 @@ void Application::processCreatedWindow(
 	}
 	window->openInMediaViewRequests(
 	) | rpl::start_to_stream(_openInMediaViewRequests, window->lifetime());
-
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(window->widget());
-	}
 }
 
 void Application::startMediaView() {

@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/local_url_handlers.h"
 #include "core/file_utilities.h"
 #include "core/application.h"
+#include "core/core_screenshot_protection.h"
 #include "core/bank_card_click_handler.h"
 #include "core/sandbox.h"
 #include "core/click_handler_types.h"
@@ -40,9 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QLocale>
 
 // AyuGram includes
-#include "ayu/ayu_settings.h"
 #include "ayu/ayu_url_handlers.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 
 
 namespace Core {
@@ -478,8 +477,8 @@ rpl::producer<> UiIntegration::forcePopupMenuHideRequests() {
 }
 
 void UiIntegration::preparePopupMenu(not_null<QWidget*> widget) {
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(widget);
+	if (Core::App().screenshotProtection().active()) {
+		Platform::SetWindowScreenshotProtection(widget, true);
 	}
 }
 

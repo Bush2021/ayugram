@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/premium_preview_box.h"
 #include "calls/calls_instance.h"
 #include "core/application.h"
+#include "core/core_screenshot_protection.h"
 #include "core/click_handler_types.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
@@ -135,9 +136,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <kurlmimedata.h>
 
 // AyuGram includes
-#include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 
 
 namespace Media {
@@ -925,6 +924,11 @@ OverlayWidget::OverlayWidget()
 	_window->winIdValue(
 	) | rpl::on_next([=] {
 		Platform::SetWindowScreenshotProtection(_window, _screenshotProtected);
+	}, lifetime());
+
+	Core::App().screenshotProtection().activeValue(
+	) | rpl::on_next([=] {
+		refreshScreenshotProtection();
 	}, lifetime());
 
 	_window->screenValue(
@@ -4504,12 +4508,6 @@ void OverlayWidget::activate() {
 	setFocus();
 	QApplication::setActiveWindow(_window);
 	setFocus();
-
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(_window);
-	} else {
-		AyuFeatures::StreamerMode::showWidgetWindow(_window);
-	}
 }
 
 void OverlayWidget::show(OpenRequest request) {
@@ -6063,7 +6061,9 @@ void OverlayWidget::setSystemMediaControls(
 }
 
 bool OverlayWidget::contentNeedsScreenshotProtection() const {
-	if (const auto story = _stories ? _stories->story() : nullptr) {
+	if (Core::App().screenshotProtection().active()) {
+		return true;
+	} else if (const auto story = _stories ? _stories->story() : nullptr) {
 		return story->forbidsForward();
 	}
 	return (_history && !_history->peer->allowsForwarding())
