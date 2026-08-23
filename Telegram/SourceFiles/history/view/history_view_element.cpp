@@ -2627,8 +2627,10 @@ void Element::recountThreadBarInBlocks() {
 	if (barThread && !Has<ForumThreadBar>()) {
 		AddComponents(ForumThreadBar::Bit());
 		Get<ForumThreadBar>()->init(parentChat, barThread);
+		setPendingResize();
 	} else if (!barThread && Has<ForumThreadBar>()) {
 		RemoveComponents(ForumThreadBar::Bit());
+		setPendingResize();
 	}
 }
 

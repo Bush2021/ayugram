@@ -47,9 +47,14 @@ namespace Window {
 	if constexpr (!Platform::IsMacStoreBuild()
 		&& !Platform::IsWindowsStoreBuild()) {
 		Ui::InstallTooltip(label, [] {
-			auto result = u"Build date: %1.\nQt version: %2."_q
-				.arg(__DATE__)
-				.arg(QT_VERSION_STR);
+			auto result = QString();
+			if constexpr (Platform::IsLinux()) {
+				result = u"Qt version: %1."_q.arg(QT_VERSION_STR);
+			} else {
+				result = u"Build date: %1.\nQt version: %2."_q
+					.arg(__DATE__)
+					.arg(QT_VERSION_STR);
+			}
 			const auto commit = QString::fromLatin1(AyuBuildCommit);
 			if (!commit.isEmpty()) {
 				result += u"\nCommit: %1"_q.arg(commit);
