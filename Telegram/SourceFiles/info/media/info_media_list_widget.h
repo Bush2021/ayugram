@@ -225,6 +225,11 @@ private:
 	void start();
 	int recountHeight();
 	void refreshHeight();
+	void refreshHeightAfterRemoval();
+	void removeLayoutFromSections(not_null<BaseLayout*> layout);
+	bool removeItemFromSection(
+		not_null<const HistoryItem*> item,
+		std::vector<ListSection>::iterator i);
 	void subscribeToSession(
 		not_null<Main::Session*> session,
 		rpl::lifetime &lifetime);
@@ -367,6 +372,7 @@ private:
 	void updateReorder(const QPoint &globalPos);
 	void finishReorder();
 	void cancelReorder();
+	void dropReorderState();
 	void updateShiftAnimations();
 	[[nodiscard]] int itemIndexFromPoint(QPoint point) const;
 	[[nodiscard]] QRect itemGeometryByIndex(int index);

@@ -18,7 +18,7 @@ namespace Ui {
 namespace {
 
 constexpr auto kMarqueeDelay = crl::time(500);
-constexpr auto kMaxFrameDelta = crl::time(17);
+constexpr auto kFrameDelta = crl::time(16);
 
 } // namespace
 
@@ -34,10 +34,25 @@ MarqueeLabel::MarqueeLabel(
 	) | rpl::on_next([=](const QString &value) {
 		setText(value);
 	}, lifetime());
+
+	anim::Disables(
+	) | rpl::on_next([=](bool) {
+		refreshMarqueeState();
+	}, lifetime());
+
+	style::PaletteChanged(
+	) | rpl::on_next([=] {
+		invalidateCache();
+		update();
+	}, lifetime());
 }
 
 void MarqueeLabel::setTextColorOverride(std::optional<QColor> color) {
+	if (_textColorOverride == color) {
+		return;
+	}
 	_textColorOverride = color;
+	invalidateCache();
 	update();
 }
 
@@ -56,6 +71,7 @@ QString MarqueeLabel::accessibilityName() {
 void MarqueeLabel::setText(const QString &text) {
 	_text.setText(_st.style, text, NameTextOptions());
 	accessibilityNameChanged();
+	invalidateCache();
 	_offset = 0.;
 	_delay = kMarqueeDelay;
 	_lastUpdate = crl::now();
@@ -73,18 +89,29 @@ int MarqueeLabel::resizeGetHeight(int newWidth) {
 	return _st.maxHeight ? std::min(full, _st.maxHeight) : full;
 }
 
+void MarqueeLabel::showEvent(QShowEvent *e) {
+	refreshMarqueeState();
+}
+
+void MarqueeLabel::hideEvent(QHideEvent *e) {
+	refreshMarqueeState();
+}
+
 void MarqueeLabel::refreshMarqueeState() {
 	const auto was = _overflown;
 	_overflown = (_availableTextWidth > 0)
 		&& (_text.maxWidth() > _availableTextWidth);
-	if (_overflown && !_marquee.animating()) {
+	const auto scroll = _overflown && isVisible() && !anim::Disabled();
+	if (scroll && !_marquee.animating()) {
 		_offset = 0.;
 		_delay = kMarqueeDelay;
 		_lastUpdate = crl::now();
+		_lastFrame = 0;
 		_marquee.start();
-	} else if (!_overflown && _marquee.animating()) {
+	} else if (!scroll && _marquee.animating()) {
 		_marquee.stop();
 		_offset = 0.;
+		update();
 	}
 	if (was != _overflown) {
 		update();
@@ -92,7 +119,7 @@ void MarqueeLabel::refreshMarqueeState() {
 }
 
 bool MarqueeLabel::marqueeStep(crl::time now) {
-	const auto dt = std::min(now - _lastUpdate, kMaxFrameDelta);
+	const auto dt = std::min(now - _lastUpdate, kFrameDelta);
 	_lastUpdate = now;
 	if (_delay > 0) {
 		_delay -= dt;
@@ -114,7 +141,10 @@ bool MarqueeLabel::marqueeStep(crl::time now) {
 		_offset = 0.;
 		_delay = kMarqueeDelay;
 	}
-	update();
+	if (now - _lastFrame >= kFrameDelta) {
+		_lastFrame = now;
+		update();
+	}
 	return true;
 }
 
@@ -143,65 +173,103 @@ void MarqueeLabel::paintEvent(QPaintEvent *e) {
 	});
 }
 
-void MarqueeLabel::paintMarquee(Painter &p) {
+void MarqueeLabel::invalidateCache() {
+	_tape = QImage();
+	_frameOffset = std::nullopt;
+}
+
+void MarqueeLabel::validateTape() {
+	const auto ratio = style::DevicePixelRatio();
+	const auto natural = _text.maxWidth();
+	const auto size = QSize(natural + st::marqueeLabelGap, height());
+	if (_tape.size() == size * ratio) {
+		return;
+	}
+	_frameOffset = std::nullopt;
+	_tape = QImage(size * ratio, QImage::Format_ARGB32_Premultiplied);
+	_tape.setDevicePixelRatio(ratio);
+	_tape.fill(Qt::transparent);
+	auto q = Painter(&_tape);
+	if (_textColorOverride) {
+		q.setPen(*_textColorOverride);
+	} else {
+		q.setPen(_st.textFg);
+	}
+	q.setTextPalette(_st.palette);
+	_text.draw(q, {
+		.position = { 0, 0 },
+		.availableWidth = natural,
+		.palette = &_st.palette,
+		.now = crl::now(),
+	});
+}
+
+void MarqueeLabel::validateFades() {
+	const auto ratio = style::DevicePixelRatio();
+	const auto fade = st::marqueeLabelFade;
+	const auto size = QSize(fade, height());
+	if (_fadeRight.size() == size * ratio) {
+		return;
+	}
+	_frameOffset = std::nullopt;
+	const auto prepare = [&](int fromAlpha, int tillAlpha) {
+		auto result = QImage(
+			size * ratio,
+			QImage::Format_ARGB32_Premultiplied);
+		result.setDevicePixelRatio(ratio);
+		result.fill(Qt::transparent);
+		auto q = QPainter(&result);
+		auto gradient = QLinearGradient(0, 0, fade, 0);
+		gradient.setColorAt(0., QColor(255, 255, 255, fromAlpha));
+		gradient.setColorAt(1., QColor(255, 255, 255, tillAlpha));
+		q.fillRect(QRect(QPoint(), size), gradient);
+		return result;
+	};
+	_fadeLeft = prepare(255, 0);
+	_fadeRight = prepare(0, 255);
+}
+
+void MarqueeLabel::validateFrame(float64 offset) {
 	const auto ratio = style::DevicePixelRatio();
 	const auto full = size() * ratio;
 	if (_frame.size() != full) {
 		_frame = QImage(full, QImage::Format_ARGB32_Premultiplied);
 		_frame.setDevicePixelRatio(ratio);
+		_frameOffset = std::nullopt;
 	}
+	validateTape();
+	validateFades();
+	if (_frameOffset == offset) {
+		return;
+	}
+	_frameOffset = offset;
+
+	const auto fade = st::marqueeLabelFade;
+	const auto total = float64(_text.maxWidth() + st::marqueeLabelGap);
 	_frame.fill(Qt::transparent);
-	{
-		auto q = Painter(&_frame);
-		if (_textColorOverride) {
-			q.setPen(*_textColorOverride);
-		} else {
-			q.setPen(_st.textFg);
-		}
-		q.setTextPalette(_st.palette);
-		const auto natural = _text.maxWidth();
-		const auto gap = st::marqueeLabelGap;
-		const auto now = crl::now();
-		q.save();
-		q.translate(-_offset, 0);
-		_text.draw(q, {
-			.position = { 0, 0 },
-			.availableWidth = natural,
-			.palette = &_st.palette,
-			.now = now,
-		});
-		if (_offset > 0.) {
-			q.translate(natural + gap, 0);
-			_text.draw(q, {
-				.position = { 0, 0 },
-				.availableWidth = natural,
-				.palette = &_st.palette,
-				.now = now,
-			});
-		}
-		q.restore();
-		q.setCompositionMode(QPainter::CompositionMode_DestinationOut);
-		const auto fade = st::marqueeLabelFade;
-		const auto ramp = float64(st::marqueeLabelFadeRamp);
-		const auto total = float64(natural + gap);
-		const auto leftOpacity = (_offset < ramp)
-			? (_offset / ramp)
-			: (_offset > total - ramp)
-			? (1. - (_offset - (total - ramp)) / ramp)
-			: 1.;
-		if (leftOpacity > 0.) {
-			auto gradient = QLinearGradient(0, 0, fade, 0);
-			gradient.setColorAt(
-				0.,
-				QColor(255, 255, 255, anim::interpolate(0, 255, leftOpacity)));
-			gradient.setColorAt(1., QColor(255, 255, 255, 0));
-			q.fillRect(QRect(0, 0, fade, height()), gradient);
-		}
-		auto gradient = QLinearGradient(width() - fade, 0, width(), 0);
-		gradient.setColorAt(0., QColor(255, 255, 255, 0));
-		gradient.setColorAt(1., QColor(255, 255, 255, 255));
-		q.fillRect(QRect(width() - fade, 0, fade, height()), gradient);
+	auto q = QPainter(&_frame);
+	q.drawImage(QPointF(-offset, 0), _tape);
+	if (offset + width() > total) {
+		q.drawImage(QPointF(total - offset, 0), _tape);
 	}
+	q.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+	const auto ramp = float64(st::marqueeLabelFadeRamp);
+	const auto leftOpacity = (offset < ramp)
+		? (offset / ramp)
+		: (offset > total - ramp)
+		? (1. - (offset - (total - ramp)) / ramp)
+		: 1.;
+	if (leftOpacity > 0.) {
+		q.setOpacity(leftOpacity);
+		q.drawImage(QPointF(0, 0), _fadeLeft);
+		q.setOpacity(1.);
+	}
+	q.drawImage(QPointF(width() - fade, 0), _fadeRight);
+}
+
+void MarqueeLabel::paintMarquee(Painter &p) {
+	const auto ratio = style::DevicePixelRatio();
+	validateFrame(std::round(_offset * ratio) / ratio);
 	p.drawImage(0, 0, _frame);
 }
 

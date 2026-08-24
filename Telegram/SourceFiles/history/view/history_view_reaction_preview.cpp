@@ -62,6 +62,7 @@ struct PreviewOverlayState {
 	base::unique_qptr<Ui::AbstractButton> background;
 	base::unique_qptr<Ui::FlatLabel> label;
 	Fn<void()> extraHide;
+	bool hiding = false;
 	rpl::lifetime shutdownGuard;
 
 	void clear() {
@@ -79,6 +80,72 @@ struct PreviewOverlay {
 	Fn<void()> hideAll;
 };
 
+struct PreviewNearAnchorArgs {
+	QPoint anchor;
+	QSize outer;
+	QSize content;
+	QSize menu;
+	QMargins menuPadding;
+	int gap = 0;
+};
+
+struct PreviewPlacement {
+	QPoint contentShift;
+	QPoint menuPosition;
+};
+
+// Content and menu move as one block, anchored like a context menu.
+[[nodiscard]] PreviewPlacement PlacePreviewNearAnchor(
+		PreviewNearAnchorArgs args) {
+	const auto anchor = args.anchor;
+	const auto outer = args.outer;
+	const auto content = args.content;
+	const auto gap = args.gap;
+	const auto available = Rect(outer) - Margins(st::reactionPreviewEdgeSkip);
+	const auto panel = QSize(
+		args.menu.width() - rect::m::sum::h(args.menuPadding),
+		args.menu.height() - rect::m::sum::v(args.menuPadding));
+	const auto width = std::max(content.width(), panel.width());
+	const auto height = content.height() + gap + panel.height();
+	const auto fit = [](int position, int size, int from, int till) {
+		return (size >= till - from)
+			? (from + (till - from - size) / 2)
+			: std::clamp(position, from, till - size);
+	};
+	const auto right = rect::right(available);
+	const auto bottom = rect::bottom(available);
+	const auto left = (anchor.x() + panel.width() > right)
+		? (anchor.x() - panel.width())
+		: anchor.x();
+	const auto top = (anchor.y() + panel.height() > bottom)
+		? (anchor.y() - panel.height())
+		: anchor.y();
+	const auto contentAndGap = content.height() + gap;
+	const auto panelAndGap = panel.height() + gap;
+	const auto above = fit(top - contentAndGap, height, available.top(), bottom)
+		+ contentAndGap;
+	const auto below = fit(top, height, available.top(), bottom);
+	const auto contentAbove = (std::abs(above - top) <= std::abs(below - top));
+	const auto blockLeft = fit(
+		left - (width - panel.width()) / 2,
+		width,
+		available.left(),
+		right);
+	const auto contentLeft = blockLeft + (width - content.width()) / 2;
+	const auto panelLeft = blockLeft + (width - panel.width()) / 2;
+	const auto panelTop = contentAbove ? above : below;
+	const auto contentTop = contentAbove
+		? (panelTop - contentAndGap)
+		: (panelTop + panelAndGap);
+	return {
+		.contentShift = QPoint(
+			contentLeft - (outer.width() - content.width()) / 2,
+			contentTop - (outer.height() - content.height()) / 2),
+		.menuPosition = QPoint(panelLeft, panelTop)
+			- rect::m::pos::tl(args.menuPadding),
+	};
+}
+
 template <typename MediaData>
 [[nodiscard]] PreviewOverlay CreatePreviewOverlay(
 		not_null<Window::SessionController*> controller,
@@ -93,6 +160,10 @@ template <typename MediaData>
 	state->mediaPreview->setCustomDuration(st::defaultToggle.duration);
 	state->clickable = base::make_unique_q<Ui::AbstractButton>(mainwidget);
 	const auto hideAll = [=] {
+		if (state->hiding) {
+			return;
+		}
+		state->hiding = true;
 		state->clickable->setAttribute(Qt::WA_TransparentForMouseEvents);
 		state->mediaPreview->hidePreview();
 		if (state->extraHide) {
@@ -129,13 +200,17 @@ Fn<void()> SetupPreviewMenu(
 		not_null<Window::SessionController*> controller,
 		const PreviewOverlay &overlay,
 		const style::DropdownMenu &menuSt,
-		Fn<void(not_null<Ui::DropdownMenu*>)> fillMenu) {
+		Fn<void(not_null<Ui::DropdownMenu*>)> fillMenu,
+		std::optional<QPoint> anchor = std::nullopt) {
 	const auto &state = overlay.state;
 	const auto mainwidget = controller->widget()->bodyWidget();
 	if (fillMenu) {
 		state->mediaPreview->setHideEmoji(true);
 		auto menu = object_ptr<Ui::DropdownMenu>(mainwidget, menuSt);
 		menu->setAutoHiding(false);
+		// The hidden callback comes after the menu drops its content.
+		menu->setHideStartCallback(
+			crl::guard(state->clickable.get(), overlay.hideAll));
 		menu->setHiddenCallback(
 			crl::guard(state->clickable.get(), overlay.hideAll));
 		fillMenu(menu.data());
@@ -165,13 +240,26 @@ Fn<void()> SetupPreviewMenu(
 		}
 		menuRaw->showFast();
 		const auto gap = st::defaultMenu.itemPadding.top();
-		const auto menuH = menuRaw->height();
-		const auto shift = -(gap + menuH) / 2;
-		mediaPreviewRaw->setContentShift(shift);
+		if (anchor) {
+			const auto placement = PlacePreviewNearAnchor({
+				.anchor = *anchor,
+				.outer = size,
+				.content = mediaPreviewRaw->contentSize(),
+				.menu = menuRaw->size(),
+				.menuPadding = menuRaw->st().padding,
+				.gap = gap,
+			});
+			mediaPreviewRaw->setContentShift(placement.contentShift);
+			wrapRaw->move(placement.menuPosition);
+		} else {
+			const auto shift = -(gap + menuRaw->height()) / 2;
+			mediaPreviewRaw->setContentShift({ 0, shift });
 
-		const auto menuX = (size.width() - menuRaw->width()) / 2;
-		const auto menuY = mediaPreviewRaw->contentBottom() + gap;
-		wrapRaw->move(menuX, menuY);
+			const auto contentHeight = mediaPreviewRaw->contentSize().height();
+			wrapRaw->move(
+				(size.width() - menuRaw->width()) / 2,
+				(size.height() + contentHeight) / 2 + shift + gap);
+		}
 		wrapRaw->show(anim::type::normal);
 		wrapRaw->raise();
 	};
@@ -220,7 +308,8 @@ bool ShowReactionPreview(
 		FullMsgId origin,
 		Data::ReactionId reactionId,
 		bool emojiPreview,
-		Fn<void(ReactionPreviewMenu)> setupMenu) {
+		Fn<void(ReactionPreviewMenu)> setupMenu,
+		std::optional<QPoint> menuAnchorGlobal) {
 	auto document = (DocumentData*)(nullptr);
 	if (const auto custom = reactionId.custom()) {
 		document = controller->session().data().document(custom);
@@ -244,6 +333,10 @@ bool ShowReactionPreview(
 				callback();
 			}
 		};
+		const auto anchor = menuAnchorGlobal
+			? std::make_optional(
+				mainwidget->mapFromGlobal(*menuAnchorGlobal))
+			: std::nullopt;
 		*layout = SetupPreviewMenu(
 			controller,
 			overlay,
@@ -261,7 +354,8 @@ bool ShowReactionPreview(
 					.refreshGeometry = refreshGeometry,
 					.hide = overlay.hideAll,
 				});
-			});
+			},
+			anchor);
 		return true;
 	}
 

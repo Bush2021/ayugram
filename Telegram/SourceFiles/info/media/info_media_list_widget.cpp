@@ -199,8 +199,19 @@ void ListWidget::start() {
 		if (_overLayout == layout) {
 			_overLayout = nullptr;
 		}
+		if (_reorderState.item == layout) {
+			dropReorderState();
+		}
+		if (!_shiftAnimations.empty()) {
+			// Shift animation callbacks capture layout pointers, so
+			// they must be dropped while all the layouts are alive.
+			_shiftAnimations.clear();
+			_activeShiftAnimations = 0;
+			resetAllItemShifts();
+		}
 		_heavyLayouts.remove(layout);
 		_rowsScrollCache.invalidate(GetLayoutCacheKey(layout));
+		removeLayoutFromSections(layout);
 	}, lifetime());
 
 	_provider->refreshed(
@@ -517,27 +528,15 @@ void ListWidget::restart() {
 }
 
 void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
-	if (!_provider->isMyItem(item)) {
-		return;
-	}
-
+	// The provider may handle this removal first and stop counting the
+	// item as its own (downloads), so the item pointers must be dropped
+	// before the membership check, only the sections work depends on it.
 	if (_contextItem == item) {
 		_contextItem = nullptr;
 	}
 
 	if (_reorderState.item && _reorderState.item->getItem() == item) {
-		_reorderState = {};
-	}
-
-	auto needHeightRefresh = false;
-	const auto sectionIt = findSectionByItem(item);
-	if (sectionIt != _sections.end()) {
-		if (sectionIt->removeItem(item)) {
-			if (sectionIt->empty()) {
-				_sections.erase(sectionIt);
-			}
-			needHeightRefresh = true;
-		}
+		dropReorderState();
 	}
 
 	if (isItemLayout(item, _overLayout)) {
@@ -557,22 +556,66 @@ void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
 		removeItemSelection(i);
 	}
 
-	if (needHeightRefresh) {
-		const auto provider = globalMediaProvider();
-		const auto globalMediaMusic = provider
-			&& (provider->type() == Type::MusicFile);
-		if (globalMediaMusic) {
-			_globalMediaSliceRefreshInProgress = true;
-			_globalMediaSliceView = std::nullopt;
-		}
-		refreshHeight();
-		if (globalMediaMusic) {
-			_globalMediaSliceRefreshInProgress = false;
-			_globalMediaSliceViewChanges.fire_copy(
-				_globalMediaSliceView);
-		}
+	if (!_provider->isMyItem(item)) {
+		return;
+	}
+
+	const auto sectionIt = findSectionByItem(item);
+	if (sectionIt != _sections.end()
+		&& removeItemFromSection(item, sectionIt)) {
+		refreshHeightAfterRemoval();
 	}
 	mouseActionUpdate(_mousePosition);
+}
+
+void ListWidget::refreshHeightAfterRemoval() {
+	const auto provider = globalMediaProvider();
+	const auto globalMediaMusic = provider
+		&& (provider->type() == Type::MusicFile);
+	if (globalMediaMusic) {
+		_globalMediaSliceRefreshInProgress = true;
+		_globalMediaSliceView = std::nullopt;
+	}
+	refreshHeight();
+	if (globalMediaMusic) {
+		_globalMediaSliceRefreshInProgress = false;
+		_globalMediaSliceViewChanges.fire_copy(
+			_globalMediaSliceView);
+	}
+}
+
+void ListWidget::removeLayoutFromSections(not_null<BaseLayout*> layout) {
+	// Providers destroy layouts before any sections refresh reaches us,
+	// sometimes with only a postponed refresh scheduled (downloads), so
+	// the sections must forget the layout right away, otherwise a paint
+	// before that refresh would use the destroyed layout.
+	const auto item = layout->getItem();
+	for (auto i = begin(_sections); i != end(_sections); ++i) {
+		if (removeItemFromSection(item, i)) {
+			refreshHeightAfterRemoval();
+			return;
+		}
+	}
+}
+
+bool ListWidget::removeItemFromSection(
+		not_null<const HistoryItem*> item,
+		std::vector<Section>::iterator i) {
+	if (!i->removeItem(item)) {
+		return false;
+	}
+	if (_reorderState.section == &*i) {
+		// The reorder indices into this section just became stale.
+		dropReorderState();
+	}
+	if (i->empty()) {
+		if (_reorderState.section) {
+			// Erasing shifts the sections the pointer points into.
+			dropReorderState();
+		}
+		_sections.erase(i);
+	}
+	return true;
 }
 
 auto ListWidget::collectSelectedItems() const -> SelectedItems {
@@ -2788,6 +2831,18 @@ void ListWidget::cancelReorder() {
 	finishShiftAnimations();
 	_mouseAction = MouseAction::None;
 	update();
+}
+
+void ListWidget::dropReorderState() {
+	// Unlike cancelReorder(), this must not use finishShiftAnimations(),
+	// which starts callbacks capturing layout pointers that may be about
+	// to be destroyed.
+	_reorderState = {};
+	_returnAnimation.stop();
+	if (_mouseAction == MouseAction::PrepareReorder
+		|| _mouseAction == MouseAction::Reordering) {
+		_mouseAction = MouseAction::None;
+	}
 }
 
 void ListWidget::updateShiftAnimations() {

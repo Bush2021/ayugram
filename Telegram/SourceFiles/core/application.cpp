@@ -192,8 +192,9 @@ Application::Application()
 
 	_platformIntegration->init();
 
-	_screenshotProtection->addReason(
-		AyuSettings::getInstance().streamerModeValue());
+	_screenshotProtection->addContentReason(
+		AyuSettings::getInstance().streamerModeValue(),
+		_lifetime);
 
 	passcodeLockChanges(
 	) | rpl::on_next([=](bool locked) {

@@ -43,12 +43,18 @@ protected:
 	int resizeGetHeight(int newWidth) override;
 	void paintEvent(QPaintEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
+	void showEvent(QShowEvent *e) override;
+	void hideEvent(QHideEvent *e) override;
 
 private:
 	void setText(const QString &text);
 	void refreshMarqueeState();
 	bool marqueeStep(crl::time now);
 	void paintMarquee(Painter &p);
+	void invalidateCache();
+	void validateTape();
+	void validateFades();
+	void validateFrame(float64 offset);
 
 	const style::FlatLabel &_st;
 	Text::String _text;
@@ -57,8 +63,13 @@ private:
 	base::unique_qptr<PopupMenu> _menu;
 
 	QImage _frame;
+	QImage _tape;
+	QImage _fadeLeft;
+	QImage _fadeRight;
+	std::optional<float64> _frameOffset;
 	Animations::Basic _marquee;
 	crl::time _lastUpdate = 0;
+	crl::time _lastFrame = 0;
 	crl::time _delay = 0;
 	float64 _offset = 0.;
 	int _availableTextWidth = 0;
