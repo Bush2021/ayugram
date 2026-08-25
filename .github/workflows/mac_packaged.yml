@@ -42,7 +42,7 @@ jobs:
           brew update
           brew upgrade || true
           brew install autoconf automake boost cmake libtool ninja pkg-config python $libs
-          sudo xcode-select -s /Applications/Xcode_26.3.0.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
 
           xcodebuild -version > CACHE_KEY.txt
@@ -67,6 +67,7 @@ jobs:
         with:
           path: ${{ env.LibrariesPath }}/local/rnnoise
           key: ${{ runner.OS }}-rnnoise-${{ env.RNNOISE }}-${{ env.CACHE_KEY }}
+
       - name: RNNoise.
         if: steps.cache-rnnoise.outputs.cache-hit != 'true'
         run: |
@@ -85,6 +86,7 @@ jobs:
         with:
           path: ${{ env.LibrariesPath }}/local/tg_owt
           key: ${{ runner.OS }}-webrtc-${{ env.WEBRTC }}-${{ env.CACHE_KEY }}
+
       - name: WebRTC.
         if: steps.cache-webrtc.outputs.cache-hit != 'true'
         run: |
@@ -103,6 +105,7 @@ jobs:
         with:
           path: ${{ env.LibrariesPath }}/local/tde2e
           key: ${{ runner.OS }}-tde2e-${{ env.TDE2E }}-${{ env.CACHE_KEY }}
+
       - name: TDE2E.
         if: steps.cache-tde2e.outputs.cache-hit != 'true'
         run: |
@@ -156,6 +159,7 @@ jobs:
           cd $REPO_NAME/build/Release
           mkdir -p artifact
           mv AyuGram.app artifact/
+
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
