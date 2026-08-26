@@ -1566,10 +1566,13 @@ void HistoryWidget::initExpandButton() {
 }
 
 void HistoryWidget::offerRichPaste(not_null<const QMimeData*> data) {
-	if (!_history
-		|| !canShowRichEditor()
-		|| editingMessage()
-		|| !ChatHelpers::MimeDataLosesRichFormatting(&session(), data)) {
+	if (!_history || !canShowRichEditor() || editingMessage()) {
+		return;
+	}
+	const auto decision = ChatHelpers::MimeDataRichPasteOffer(
+		&session(),
+		data);
+	if (!decision) {
 		return;
 	}
 	const auto copy = ChatHelpers::CloneMimeData(data);
@@ -1586,8 +1589,25 @@ void HistoryWidget::offerRichPaste(not_null<const QMimeData*> data) {
 			.session = &session(),
 			.parent = _scroll.data(),
 			.cancel = _field->changes(),
+			.offer = decision->offer,
 			.action = crl::guard(this, [=] {
-				if (_field->getTextWithTags() == now) {
+				const auto unchanged = (_field->getTextWithTags() == now);
+				if (decision->offer == ChatHelpers::RichPasteOffer::Field) {
+					if (!unchanged) {
+						return;
+					}
+					const auto &markdown = decision->markdown;
+					const auto from = std::min(position, anchor);
+					_field->setTextWithTags(ChatHelpers::TextWithTagsReplaced(
+						was,
+						from,
+						std::max(position, anchor),
+						markdown));
+					_field->setCursorPosition(
+						from + int(markdown.text.size()));
+					return;
+				}
+				if (unchanged) {
 					_field->setTextWithTags(was);
 					auto cursor = _field->textCursor();
 					cursor.setPosition(anchor);

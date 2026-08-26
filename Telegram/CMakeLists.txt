@@ -1180,6 +1180,10 @@ PRIVATE
     history/view/media/history_view_unsupported_notice.h
     history/view/media/history_view_userpic_suggestion.cpp
     history/view/media/history_view_userpic_suggestion.h
+    history/view/media/history_view_video_message_seek.cpp
+    history/view/media/history_view_video_message_seek.h
+    history/view/media/history_view_video_status.cpp
+    history/view/media/history_view_video_status.h
     history/view/media/history_view_web_page.cpp
     history/view/media/history_view_web_page.h
     history/view/reactions/history_view_reactions.cpp
@@ -1742,6 +1746,8 @@ PRIVATE
     menu/menu_item_download_files.h
     menu/menu_item_rate_transcribe_session.cpp
     menu/menu_item_rate_transcribe_session.h
+    menu/menu_mark_as_read.cpp
+    menu/menu_mark_as_read.h
     menu/menu_mute.cpp
     menu/menu_mute.h
     menu/menu_send.cpp

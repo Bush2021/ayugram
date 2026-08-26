@@ -23,12 +23,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/widgets/labels.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/text/text_utilities.h"
-#include "ui/ui_utility.h"
 #include "window/window_media_preview.h"
 #include "window/window_session_controller.h"
 #include "styles/style_chat.h"
@@ -62,7 +62,6 @@ struct PreviewOverlayState {
 	base::unique_qptr<Ui::AbstractButton> background;
 	base::unique_qptr<Ui::FlatLabel> label;
 	Fn<void()> extraHide;
-	bool hiding = false;
 	rpl::lifetime shutdownGuard;
 
 	void clear() {
@@ -80,70 +79,17 @@ struct PreviewOverlay {
 	Fn<void()> hideAll;
 };
 
-struct PreviewNearAnchorArgs {
-	QPoint anchor;
-	QSize outer;
-	QSize content;
-	QSize menu;
-	QMargins menuPadding;
-	int gap = 0;
-};
-
-struct PreviewPlacement {
-	QPoint contentShift;
-	QPoint menuPosition;
-};
-
-// Content and menu move as one block, anchored like a context menu.
-[[nodiscard]] PreviewPlacement PlacePreviewNearAnchor(
-		PreviewNearAnchorArgs args) {
-	const auto anchor = args.anchor;
-	const auto outer = args.outer;
-	const auto content = args.content;
-	const auto gap = args.gap;
-	const auto available = Rect(outer) - Margins(st::reactionPreviewEdgeSkip);
-	const auto panel = QSize(
-		args.menu.width() - rect::m::sum::h(args.menuPadding),
-		args.menu.height() - rect::m::sum::v(args.menuPadding));
-	const auto width = std::max(content.width(), panel.width());
-	const auto height = content.height() + gap + panel.height();
-	const auto fit = [](int position, int size, int from, int till) {
-		return (size >= till - from)
-			? (from + (till - from - size) / 2)
-			: std::clamp(position, from, till - size);
-	};
-	const auto right = rect::right(available);
-	const auto bottom = rect::bottom(available);
-	const auto left = (anchor.x() + panel.width() > right)
-		? (anchor.x() - panel.width())
-		: anchor.x();
-	const auto top = (anchor.y() + panel.height() > bottom)
-		? (anchor.y() - panel.height())
-		: anchor.y();
-	const auto contentAndGap = content.height() + gap;
-	const auto panelAndGap = panel.height() + gap;
-	const auto above = fit(top - contentAndGap, height, available.top(), bottom)
-		+ contentAndGap;
-	const auto below = fit(top, height, available.top(), bottom);
-	const auto contentAbove = (std::abs(above - top) <= std::abs(below - top));
-	const auto blockLeft = fit(
-		left - (width - panel.width()) / 2,
-		width,
-		available.left(),
-		right);
-	const auto contentLeft = blockLeft + (width - content.width()) / 2;
-	const auto panelLeft = blockLeft + (width - panel.width()) / 2;
-	const auto panelTop = contentAbove ? above : below;
-	const auto contentTop = contentAbove
-		? (panelTop - contentAndGap)
-		: (panelTop + panelAndGap);
-	return {
-		.contentShift = QPoint(
-			contentLeft - (outer.width() - content.width()) / 2,
-			contentTop - (outer.height() - content.height()) / 2),
-		.menuPosition = QPoint(panelLeft, panelTop)
-			- rect::m::pos::tl(args.menuPadding),
-	};
+[[nodiscard]] DocumentData *LookupReactionDocument(
+		not_null<Window::SessionController*> controller,
+		const Data::ReactionId &reactionId) {
+	auto &owner = controller->session().data();
+	if (const auto custom = reactionId.custom()) {
+		return owner.document(custom);
+	} else if (const auto resolved
+			= owner.reactions().lookupTemporary(reactionId)) {
+		return resolved->selectAnimation;
+	}
+	return nullptr;
 }
 
 template <typename MediaData>
@@ -160,10 +106,6 @@ template <typename MediaData>
 	state->mediaPreview->setCustomDuration(st::defaultToggle.duration);
 	state->clickable = base::make_unique_q<Ui::AbstractButton>(mainwidget);
 	const auto hideAll = [=] {
-		if (state->hiding) {
-			return;
-		}
-		state->hiding = true;
 		state->clickable->setAttribute(Qt::WA_TransparentForMouseEvents);
 		state->mediaPreview->hidePreview();
 		if (state->extraHide) {
@@ -196,21 +138,18 @@ template <typename MediaData>
 	return { state, hideAll };
 }
 
-Fn<void()> SetupPreviewMenu(
+void SetupPreviewMenu(
 		not_null<Window::SessionController*> controller,
 		const PreviewOverlay &overlay,
-		const style::DropdownMenu &menuSt,
-		Fn<void(not_null<Ui::DropdownMenu*>)> fillMenu,
-		std::optional<QPoint> anchor = std::nullopt) {
+		Fn<void(not_null<Ui::DropdownMenu*>)> fillMenu) {
 	const auto &state = overlay.state;
 	const auto mainwidget = controller->widget()->bodyWidget();
 	if (fillMenu) {
 		state->mediaPreview->setHideEmoji(true);
-		auto menu = object_ptr<Ui::DropdownMenu>(mainwidget, menuSt);
+		auto menu = object_ptr<Ui::DropdownMenu>(
+			mainwidget,
+			st::dropdownMenuWithIcons);
 		menu->setAutoHiding(false);
-		// The hidden callback comes after the menu drops its content.
-		menu->setHideStartCallback(
-			crl::guard(state->clickable.get(), overlay.hideAll));
 		menu->setHiddenCallback(
 			crl::guard(state->clickable.get(), overlay.hideAll));
 		fillMenu(menu.data());
@@ -228,51 +167,24 @@ Fn<void()> SetupPreviewMenu(
 	};
 
 	const auto mediaPreviewRaw = state->mediaPreview.get();
-	const auto updateLayout = [=] {
-		const auto size = mainwidget->size();
+	mainwidget->sizeValue() | rpl::on_next([=](QSize size) {
 		mediaPreviewRaw->setGeometry(Rect(size));
 
-		const auto menuRaw = wrapRaw ? wrapRaw->entity() : nullptr;
-		if (!menuRaw || menuRaw->empty()) {
-			return;
-		} else if (wrapRaw->isHidden()) {
-			Ui::SendPendingMoveResizeEvents(wrapRaw);
-		}
-		menuRaw->showFast();
-		const auto gap = st::defaultMenu.itemPadding.top();
-		if (anchor) {
-			const auto placement = PlacePreviewNearAnchor({
-				.anchor = *anchor,
-				.outer = size,
-				.content = mediaPreviewRaw->contentSize(),
-				.menu = menuRaw->size(),
-				.menuPadding = menuRaw->st().padding,
-				.gap = gap,
-			});
-			mediaPreviewRaw->setContentShift(placement.contentShift);
-			wrapRaw->move(placement.menuPosition);
-		} else {
-			const auto shift = -(gap + menuRaw->height()) / 2;
-			mediaPreviewRaw->setContentShift({ 0, shift });
+		if (wrapRaw) {
+			const auto menuRaw = wrapRaw->entity();
+			menuRaw->showFast();
+			const auto gap = st::defaultMenu.itemPadding.top();
+			const auto menuH = menuRaw->height();
+			const auto shift = -(gap + menuH) / 2;
+			mediaPreviewRaw->setContentShift(shift);
 
-			const auto contentHeight = mediaPreviewRaw->contentSize().height();
-			wrapRaw->move(
-				(size.width() - menuRaw->width()) / 2,
-				(size.height() + contentHeight) / 2 + shift + gap);
+			const auto menuX = (size.width() - menuRaw->width()) / 2;
+			const auto menuY = mediaPreviewRaw->contentBottom() + gap;
+			wrapRaw->move(menuX, menuY);
+			wrapRaw->show(anim::type::normal);
+			wrapRaw->raise();
 		}
-		wrapRaw->show(anim::type::normal);
-		wrapRaw->raise();
-	};
-	mainwidget->sizeValue() | rpl::on_next([=](QSize) {
-		updateLayout();
 	}, mediaPreviewRaw->lifetime());
-	if (wrapRaw) {
-		wrapRaw->entity()->sizeValue(
-		) | rpl::skip(1) | rpl::on_next([=](QSize) {
-			updateLayout();
-		}, wrapRaw->lifetime());
-	}
-	return updateLayout;
 }
 
 } // namespace
@@ -285,7 +197,6 @@ bool ShowStickerPreview(
 	SetupPreviewMenu(
 		controller,
 		CreatePreviewOverlay(controller, origin, document),
-		st::dropdownMenuWithIcons,
 		std::move(fillMenu));
 	return true;
 }
@@ -298,7 +209,6 @@ bool ShowPhotoPreview(
 	SetupPreviewMenu(
 		controller,
 		CreatePreviewOverlay(controller, origin, photo),
-		st::dropdownMenuWithIcons,
 		std::move(fillMenu));
 	return true;
 }
@@ -307,17 +217,8 @@ bool ShowReactionPreview(
 		not_null<Window::SessionController*> controller,
 		FullMsgId origin,
 		Data::ReactionId reactionId,
-		bool emojiPreview,
-		Fn<void(ReactionPreviewMenu)> setupMenu,
-		std::optional<QPoint> menuAnchorGlobal) {
-	auto document = (DocumentData*)(nullptr);
-	if (const auto custom = reactionId.custom()) {
-		document = controller->session().data().document(custom);
-	} else if (const auto resolved
-			= controller->session().data().reactions().lookupTemporary(
-				reactionId)) {
-		document = resolved->selectAnimation;
-	}
+		bool emojiPreview) {
+	const auto document = LookupReactionDocument(controller, reactionId);
 	if (!document) {
 		return false;
 	}
@@ -325,41 +226,8 @@ bool ShowReactionPreview(
 	const auto &state = overlay.state;
 
 	const auto mainwidget = controller->widget()->bodyWidget();
-
-	if (setupMenu) {
-		const auto layout = std::make_shared<Fn<void()>>();
-		const auto refreshGeometry = [=] {
-			if (const auto callback = *layout) {
-				callback();
-			}
-		};
-		const auto anchor = menuAnchorGlobal
-			? std::make_optional(
-				mainwidget->mapFromGlobal(*menuAnchorGlobal))
-			: std::nullopt;
-		*layout = SetupPreviewMenu(
-			controller,
-			overlay,
-			st::whoReadDropdownMenu,
-			[&](not_null<Ui::DropdownMenu*> menu) {
-				const auto maxHeight = st::whoReadDropdownMenuMaxHeight;
-				menu->setMaxHeight(std::clamp(
-					(mainwidget->height()
-						- st::maxStickerSize
-						- st::whoReadDropdownMenuSkip * 2),
-					maxHeight / 4,
-					maxHeight));
-				setupMenu({
-					.menu = menu,
-					.refreshGeometry = refreshGeometry,
-					.hide = overlay.hideAll,
-				});
-			},
-			anchor);
-		return true;
-	}
-
 	const auto shadowExtend = st::boxRoundShadow.extend;
+
 	if (reactionId.custom() && document->sticker()) {
 		const auto setId = document->sticker()->set;
 		const auto packName
@@ -446,6 +314,87 @@ bool ShowReactionPreview(
 			backgroundRaw->raise();
 		}
 	}, mediaPreviewRaw->lifetime());
+	return true;
+}
+
+bool AttachReactionPreviewToMenu(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<Window::SessionController*> controller,
+		QPoint desiredPosition,
+		FullMsgId origin,
+		const Data::ReactionId &reactionId) {
+	const auto document = LookupReactionDocument(controller, reactionId);
+	if (!document) {
+		return false;
+	}
+	const auto size = st::reactionPreviewInMenuSize;
+	const auto skip = st::reactionPreviewInMenuSkip;
+	menu->setAdditionalMenuPadding(
+		QMargins(0, size + skip, 0, 0),
+		QMargins());
+	if (!menu->prepareGeometryFor(desiredPosition)) {
+		return false;
+	}
+	const auto preview = Ui::CreateChild<Window::MediaPreviewWidget>(
+		menu.get(),
+		controller);
+	preview->setAttribute(Qt::WA_TransparentForMouseEvents);
+	preview->setPaintBackground(false);
+	preview->setHideEmoji(true);
+	preview->setMaxContentSize(size);
+	preview->setCustomDuration(menu->st().showDuration);
+	preview->showPreview(origin, document);
+
+	// Menu hides children, so widget's own pause release never runs.
+	const auto weak = base::make_weak(controller);
+	QObject::connect(menu.get(), &QObject::destroyed, [weak] {
+		if (const auto strong = weak.get()) {
+			strong->disableGifPauseReason(
+				Window::GifPauseReason::MediaPreview);
+		}
+	});
+
+	const auto background = menu->useTransparency()
+		? nullptr
+		: Ui::CreateChild<Ui::RpWidget>(menu.get());
+	if (background) {
+		background->setAttribute(Qt::WA_TransparentForMouseEvents);
+		const auto bg = menu->st().menu.itemBg;
+		background->paintOn([=](QPainter &p) {
+			p.fillRect(background->rect(), bg);
+		});
+		background->show();
+		background->lower();
+	}
+
+	menu->sizeValue() | rpl::on_next([=](QSize outer) {
+		const auto padding = menu->preparedPadding();
+		const auto left = padding.left();
+		const auto width = outer.width() - left - padding.right();
+		if (background) {
+			background->setGeometry(left, 0, width, padding.top());
+		}
+		preview->setGeometry(left, padding.top() - skip - size, width, size);
+	}, preview->lifetime());
+
+	using ShowState = Ui::PopupMenu::ShowState;
+	menu->showStateValue() | rpl::on_next([=](ShowState state) {
+		if (state.toggling) {
+			preview->hide();
+			if (background) {
+				background->hide();
+			}
+			return;
+		}
+		if (background && background->isHidden()) {
+			background->show();
+		}
+		if (preview->isHidden()) {
+			preview->show();
+		}
+		preview->raise();
+	}, preview->lifetime());
+
 	return true;
 }
 

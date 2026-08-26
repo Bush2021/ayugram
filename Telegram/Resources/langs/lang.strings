@@ -5517,6 +5517,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_gift_send" = "Send Another Gift";
 "lng_context_charge_fee" = "Charge Fee";
 "lng_context_remove_fee" = "Remove Fee";
+"lng_context_monoforum_ban" = "Ban user from channel";
+"lng_context_monoforum_unban" = "Unban user in channel";
 "lng_context_fee_now" = "{name} pays {amount} per message.";
 "lng_context_fee_free" = "{name} can send messages for free.";
 
@@ -8742,12 +8744,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_rich_paste_toast" = "Pasted as plain text";
 "lng_rich_paste_toast_editor" = "Restore formatting in editor";
+"lng_rich_paste_toast_editor_markdown" = "Apply Markdown formatting in editor";
+"lng_rich_paste_toast_field" = "Apply Markdown formatting";
 "lng_rich_paste_toast_markdown" = "Pasted with Markdown formatting";
 "lng_rich_paste_toast_plain" = "Paste as plain text instead";
 "lng_rich_paste_toast_premium" = "{link} to preserve formatting when pasting.";
 "lng_rich_paste_toast_premium_link" = "Subscribe to Premium";
 "lng_rich_paste_toast_open" = "Open";
 "lng_rich_paste_toast_undo" = "Undo";
+"lng_rich_paste_toast_apply" = "Apply";
 
 // Keys finished
 
