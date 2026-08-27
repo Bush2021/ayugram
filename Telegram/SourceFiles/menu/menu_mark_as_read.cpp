@@ -7,7 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "menu/menu_mark_as_read.h"
 
-#include "base/options.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
@@ -28,23 +29,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h"
 
 namespace MarkAsReadMenu {
-
-const char kOptionMarkAsReadMutedChats[] = "mark-as-read-muted-chats";
-
 namespace {
 
 constexpr auto kMaxUnreadWithoutConfirmation = 1000;
 
-base::options::toggle MarkAsReadMutedChats({
-	.id = kOptionMarkAsReadMutedChats,
-	.name = "Mark muted chats as read",
-	.description = "Let \"Mark all chats as read\" read muted chats as well.",
-});
-
 [[nodiscard]] MarkAsReadMuted MarkAsReadMutedMode() {
-	return MarkAsReadMutedChats.value()
+	return Core::App().settings().includeMutedCounter()
 		? MarkAsReadMuted::Include
 		: MarkAsReadMuted::Skip;
+}
+
+[[nodiscard]] bool SkipMutedThread(not_null<Data::Thread*> thread) {
+	return thread->muted() && !thread->chatListUnreadState().mentions;
 }
 
 [[nodiscard]] Dialogs::UnreadState MarkAsReadUnreadState(
@@ -55,7 +51,8 @@ base::options::toggle MarkAsReadMutedChats({
 		const auto history = row->history();
 		if (!history) {
 			continue;
-		} else if ((muted == MarkAsReadMuted::Skip) && history->muted()) {
+		} else if ((muted == MarkAsReadMuted::Skip)
+			&& SkipMutedThread(history)) {
 			continue;
 		}
 		result += history->chatListUnreadState();
@@ -87,7 +84,7 @@ void MarkAsReadThread(
 		history->owner().histories().readInbox(history);
 	};
 	if (!IsUnreadThread(thread)
-		|| ((muted == MarkAsReadMuted::Skip) && thread->muted())) {
+		|| ((muted == MarkAsReadMuted::Skip) && SkipMutedThread(thread))) {
 		return;
 	} else if (const auto forum = thread->asForum()) {
 		forum->enumerateTopics([=](not_null<Data::ForumTopic*> topic) {
@@ -124,6 +121,9 @@ void AddAllChatsAction(
 		std::shared_ptr<Ui::Show> show,
 		const Ui::Menu::MenuCallback &addAction) {
 	const auto owner = &session->data();
+	if (!owner->unreadWithMentionsBadge()) {
+		return;
+	}
 	const auto muted = MarkAsReadMutedMode();
 	const auto unreadState = MarkAsReadAllChatsState(owner, muted);
 	if (!unreadState.messages && !unreadState.marks && !unreadState.chats) {
@@ -191,10 +191,7 @@ void AddChatListAction(
 		const Ui::Menu::MenuCallback &addAction,
 		Fn<Dialogs::UnreadState()> customUnreadState) {
 	// There is no async to make weak from controller.
-	const auto muted = MarkAsReadMutedMode();
-	const auto unreadState = (muted == MarkAsReadMuted::Skip)
-		? MarkAsReadUnreadState(list(), muted)
-		: customUnreadState
+	const auto unreadState = customUnreadState
 		? customUnreadState()
 		: list()->unreadState();
 	if (!unreadState.messages && !unreadState.marks && !unreadState.chats) {
@@ -204,7 +201,7 @@ void AddChatListAction(
 	auto callback = [=] {
 		if (unreadState.messages > kMaxUnreadWithoutConfirmation) {
 			auto boxCallback = [=](Fn<void()> &&close) {
-				MarkAsReadChatList(list(), muted);
+				MarkAsReadChatList(list());
 				close();
 			};
 			controller->show(
@@ -214,7 +211,7 @@ void AddChatListAction(
 				}),
 				Ui::LayerOption::CloseOther);
 		} else {
-			MarkAsReadChatList(list(), muted);
+			MarkAsReadChatList(list());
 		}
 	};
 	addAction(
