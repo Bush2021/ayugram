@@ -6735,10 +6735,10 @@ int Message::resizeContentGetHeight(int newWidth) {
 			appearing->geometryValid = false;
 			appearing->textWidth = textWidth;
 		}
-		// This may invalidate composer structure by removing TextAppearing.
-		if (!textAppearValidate(appearing)) {
-			appearing = nullptr;
-		}
+		// This may invalidate composer structure: by removing TextAppearing,
+		// or by adding / removing rich page components inside validateText().
+		// Either way the pointer must be taken again.
+		appearing = textAppearValidate() ? Get<TextAppearing>() : nullptr;
 	}
 
 	const auto reactionsInBubble = _reactions && embedReactionsInBubble();
@@ -6917,9 +6917,14 @@ void Message::invalidateTextDependentCache() {
 	_bubbleTextualWidthCache = 0;
 }
 
-bool Message::textAppearValidate(not_null<TextAppearing*> appearing) {
+bool Message::textAppearValidate() {
 	while (true) {
-		if (!textAppearCheckLine(appearing)) {
+		if (!textAppearCheckLine()) {
+			return false;
+		}
+		// textAppearCheckLine() may have reallocated the composer block.
+		const auto appearing = Get<TextAppearing>();
+		if (!appearing) {
 			return false;
 		} else if (!appearing->use
 			|| appearing->widthAnimation.animating()
@@ -6933,21 +6938,39 @@ bool Message::textAppearValidate(not_null<TextAppearing*> appearing) {
 	}
 }
 
-bool Message::textAppearCheckLine(not_null<TextAppearing*> appearing) {
+bool Message::textAppearCheckLine() {
+	auto appearing = Get<TextAppearing>();
+	if (!appearing) {
+		return false;
+	}
 	const auto recount = !appearing->geometryValid;
 	if (recount) {
 		appearing->geometryValid = true;
+
+		// validateText() can add or remove runtime components, which
+		// reallocates the composer data block and frees the old one, so
+		// every TextAppearing pointer taken before it is dangling after.
 		validateText();
+		appearing = Get<TextAppearing>();
+		if (!appearing) {
+			return false;
+		}
 		if (const auto rich = richpage()) {
 			const auto articleWidth = richPageWidthFor(appearing->textWidth);
 			appearing->lines = rich->article.countRevealLinesGeometry(
 				articleWidth);
 			if (appearing->lines.empty()) {
+				// textHeightFor() calls validateText() as well.
 				const auto height = textHeightFor(appearing->textWidth);
+				const auto width = std::max(textRealWidth(), 1);
+				appearing = Get<TextAppearing>();
+				if (!appearing) {
+					return false;
+				}
 				if (height > 0) {
 					appearing->lines.push_back({
 						.left = 0,
-						.width = std::max(textRealWidth(), 1),
+						.width = width,
 						.bottom = height,
 						.rtl = false,
 						.baseline = height,
@@ -7119,6 +7142,9 @@ int Message::textAppearTargetHeight(
 
 void Message::textAppearWidthCallback() {
 	const auto appearing = Get<TextAppearing>();
+	if (!appearing) {
+		return;
+	}
 	const auto now = int(base::SafeRound(
 		appearing->widthAnimation.value(appearing->targetLineWidth)));
 	if (now != appearing->revealedLineWidth) {
@@ -7138,11 +7164,14 @@ void Message::textAppearWidthCallback() {
 		}
 		repaint();
 	}
-	textAppearValidate(appearing);
+	textAppearValidate();
 }
 
 void Message::textAppearHeightCallback() {
 	const auto appearing = Get<TextAppearing>();
+	if (!appearing) {
+		return;
+	}
 	const auto now = int(base::SafeRound(
 		appearing->heightAnimation.value(appearing->targetHeight)));
 	if (const auto delta = now - appearing->shownHeight) {
@@ -7151,7 +7180,7 @@ void Message::textAppearHeightCallback() {
 		history()->viewHeightAdjusted(this, delta);
 		repaint();
 	}
-	textAppearValidate(appearing);
+	textAppearValidate();
 }
 
 int Message::bottomInfoHeight() const {

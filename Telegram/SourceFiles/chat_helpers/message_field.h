@@ -241,3 +241,5 @@ void FrozenInfoBox(
 [[nodiscard]] Ui::InputField::MimeDataHook WrappedMessageFieldMimeHook(
 	Ui::InputField::MimeDataHook original,
 	not_null<Ui::InputField*> field);
+
+[[nodiscard]] bool PasteAsPlainTextRequested();
