@@ -196,6 +196,8 @@ protected:
 
 private:
 	void refreshTitleWidget();
+	void setupCanaryTitleLabel();
+	[[nodiscard]] QString nativeTitleSuffix() const;
 	void updateMinimumSize();
 	void updatePalette();
 

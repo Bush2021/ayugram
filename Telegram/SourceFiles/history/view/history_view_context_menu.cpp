@@ -2811,7 +2811,7 @@ void ShowWhoReactedMenu(
 			state->addedToBottom,
 			appendBottom);
 		if (creating) {
-			if (AttachReactionPreviewToMenu(
+			if (!(*menu)->empty() && AttachReactionPreviewToMenu(
 					not_null(menu->get()),
 					controller,
 					position,

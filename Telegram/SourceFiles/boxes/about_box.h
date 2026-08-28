@@ -20,3 +20,4 @@ void ArchiveHintBox(
 	Fn<void()> onUnarchive);
 
 QString currentVersionText();
+QString currentVersionShortText();
