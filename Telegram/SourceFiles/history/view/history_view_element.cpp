@@ -2395,6 +2395,7 @@ bool Element::computeIsAttachToPrevious(not_null<Element*> previous) {
 		const auto item = view->data();
 		return !item->isService()
 			&& !item->isEmpty()
+			&& !item->isSponsored()
 			&& !item->isPostHidingAuthor()
 			&& !item->isGuestChatBotMessage()
 			&& (!item->history()->peer->isMegagroup()
