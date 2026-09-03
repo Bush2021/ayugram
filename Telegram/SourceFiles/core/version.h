@@ -22,8 +22,8 @@ constexpr auto AppId = "{53F49750-6209-4FBF-9CA8-7A333C87D666}"_cs;
 constexpr auto AppNameOld = "AyuGram for Windows"_cs;
 constexpr auto AppName = "AyuGram Desktop"_cs;
 constexpr auto AppFile = "AyuGram"_cs;
-constexpr auto AppVersion = 7001004;
-constexpr auto AppVersionStr = "7.1.4";
+constexpr auto AppVersion = 7002005;
+constexpr auto AppVersionStr = "7.2.5";
 
 constexpr auto AppBetaVersion = false;
 constexpr auto AppAlphaVersion = TDESKTOP_ALPHA_VERSION;

@@ -2201,7 +2201,10 @@ void StickersListWidget::paintSticker(
 		&& !sticker.lottie
 		&& media->loaded()) {
 		setupLottie(set, section, index);
-	} else if (isWebm && !sticker.webm && media->loaded()) {
+	} else if (isWebm
+		&& !sticker.webm
+		&& !sticker.webm.isBad()
+		&& media->loaded()) {
 		setupWebm(set, section, index);
 	}
 

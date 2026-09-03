@@ -2117,12 +2117,18 @@ PRIVATE
     support/support_templates.h
     tde2e/tde2e_integration.cpp
     tde2e/tde2e_integration.h
+    test/test_activation.cpp
+    test/test_activation.h
     test/test_agent.cpp
     test/test_agent.h
+    test/test_box_button.cpp
+    test/test_box_button.h
     test/test_capture.cpp
     test/test_capture.h
     test/test_custom_emoji.cpp
     test/test_custom_emoji.h
+    test/test_gated_stage.cpp
+    test/test_gated_stage.h
     test/test_history_fixtures.cpp
     test/test_history_fixtures.h
     test/test_hover.cpp
@@ -2135,6 +2141,8 @@ PRIVATE
     test/test_layer_root.h
     test/test_log.cpp
     test/test_log.h
+    test/test_log_lines.cpp
+    test/test_log_lines.h
     test/test_menu.cpp
     test/test_menu.h
     test/test_messages.cpp
@@ -2145,13 +2153,19 @@ PRIVATE
     test/test_panel.h
     test/test_probe.cpp
     test/test_probe.h
+    test/test_rpc_retry.cpp
+    test/test_rpc_retry.h
     test/test_runner.cpp
     test/test_runner.h
     test/test_scenario.cpp
     test/test_style.cpp
     test/test_style.h
+    test/test_text_reads.cpp
+    test/test_text_reads.h
     test/test_transfer.cpp
     test/test_transfer.h
+    test/test_via_window.cpp
+    test/test_via_window.h
     test/test_widgets.cpp
     test/test_widgets.h
     ui/boxes/edit_invite_link_session.cpp
