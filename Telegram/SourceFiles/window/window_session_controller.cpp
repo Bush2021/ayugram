@@ -146,6 +146,12 @@ base::options::toggle OptionExternalMediaViewer({
 	.description = "Use system media viewer instead of the internal one.",
 });
 
+[[nodiscard]] bool HasSavingRestriction(HistoryItem *item) {
+	return item
+		&& (item->forbidsSaving()
+			|| !item->history()->peer->allowsForwarding());
+}
+
 class MainWindowShow final : public ChatHelpers::Show {
 public:
 	explicit MainWindowShow(not_null<SessionController*> controller);
@@ -3383,8 +3389,10 @@ void SessionController::hideLayer(anim::type animated) {
 
 bool SessionController::openPhotoExternal(
 		not_null<PhotoData*> photo,
-		Data::FileOrigin origin) {
-	if (!OptionExternalMediaViewer.value()) {
+		Data::FileOrigin origin,
+		HistoryItem *item) {
+	if (!OptionExternalMediaViewer.value()
+		|| HasSavingRestriction(item)) {
 		return false;
 	}
 	const auto media = photo->createMediaView();
@@ -3423,7 +3431,7 @@ void SessionController::openPhoto(
 	const auto origin = item
 		? Data::FileOrigin(item->fullId())
 		: Data::FileOrigin();
-	if (openPhotoExternal(photo, origin)) {
+	if (openPhotoExternal(photo, origin, item)) {
 		return;
 	}
 	_window->openInMediaView(Media::View::OpenRequest(
@@ -3443,7 +3451,7 @@ void SessionController::openPhoto(
 			peerToUser(peer->id),
 			photo->id))
 		: Data::FileOrigin(Data::FileOriginPeerPhoto(peer->id));
-	if (openPhotoExternal(photo, origin)) {
+	if (openPhotoExternal(photo, origin, nullptr)) {
 		return;
 	}
 	_window->openInMediaView(Media::View::OpenRequest(this, photo, peer));
@@ -3459,7 +3467,9 @@ void SessionController::openDocument(
 	if (openSharedStory(item) || openFakeItemStory(message.id, stories)) {
 		return;
 	} else if (showInMediaView) {
-		if (OptionExternalMediaViewer.value() && !document->isTheme()) {
+		if (OptionExternalMediaViewer.value()
+			&& !document->isTheme()
+			&& !HasSavingRestriction(item)) {
 			const auto filepath = document->filepath();
 			if (filepath.isEmpty()) {
 				if (document->loadedInMediaCache()) {

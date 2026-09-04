@@ -103,7 +103,6 @@ implib() {
 implib /usr/lib64/libgtk-3.so
 implib /usr/lib64/libgdk-3.so
 implib /usr/lib64/libgdk_pixbuf-2.0.so
-implib /usr/lib64/libpango-1.0.so
 implib /usr/lib64/libvdpau.so
 implib /usr/lib64/libva-x11.so
 implib /usr/lib64/libva-drm.so
@@ -161,7 +160,7 @@ RUN <<EOF
 git init patches
 cd patches
 git remote add origin https://github.com/desktop-app/patches.git
-git fetch --depth=1 origin 73a88cdaa13995c8666c956b80e2129ee9b6b34d
+git fetch --depth=1 origin c2cc44fca4a8d0e20d1ef0f40884d717c750f0a4
 git reset --hard FETCH_HEAD
 rm -rf .git
 EOF
@@ -762,6 +761,7 @@ cd FFmpeg
 	--enable-decoder=wmavoice \
 	--enable-encoder=aac \
 	--enable-encoder=libopenh264 \
+	--enable-encoder=libvpx_vp9 \
 	--enable-encoder=libopus \
 	--enable-encoder=pcm_s16le \
 	--enable-filter=atempo \
@@ -789,7 +789,8 @@ cd FFmpeg
 	--enable-muxer=mp4 \
 	--enable-muxer=ogg \
 	--enable-muxer=opus \
-	--enable-muxer=wav
+	--enable-muxer=wav \
+	--enable-muxer=webm
 make -j$(nproc)
 make DESTDIR=/usr/src/ffmpeg-cache install
 cd ..
@@ -879,7 +880,7 @@ COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-QT=6.11.1
+QT=6.11.2
 git clone -b v$QT --depth=1 https://github.com/qt/qt5.git
 cd qt5
 git submodule update --init --recursive --depth=1 \
