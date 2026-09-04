@@ -48,16 +48,37 @@ jobs:
             exit 1
           }
 
+          # The Actions run listing is served from a search index that can
+          # answer with a stale page, putting an old run at the head of the
+          # list. A single-item query then selects a build from an outdated
+          # commit. Ask for a full page, repeat the query, and keep the
+          # newest run seen across every attempt instead.
           latest_successful_run() {
             local workflow="$1"
             local branch="$2"
-            gh api --method GET \
-              "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
-              -f branch="$branch" \
-              -f event=workflow_dispatch \
-              -f status=success \
-              -f per_page=1 \
-              --jq '.workflow_runs[0] // {}'
+            local attempt page pages=""
+            for attempt in 1 2 3; do
+              if page="$(gh api --method GET \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs" \
+                -f branch="$branch" \
+                -f event=workflow_dispatch \
+                -f status=success \
+                -f per_page=30 \
+                --jq '.workflow_runs')"
+              then
+                pages+="$page"$'\n'
+              fi
+            done
+            if [[ -z "$pages" ]]; then
+              echo "::error::Could not list $workflow runs on $branch." >&2
+              exit 1
+            fi
+            jq -s --arg branch "$branch" '
+              add // []
+              | map(select(
+                  .conclusion == "success" and .head_branch == $branch))
+              | if length == 0 then {} else max_by(.created_at) end' \
+              <<< "$pages"
           }
 
           [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-r[1-9][0-9]*)?$ ]] \
