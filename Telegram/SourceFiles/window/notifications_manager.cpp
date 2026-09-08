@@ -1406,13 +1406,10 @@ Window::SessionController *Manager::openNotificationMessage(
 	}
 	const auto window = separate
 		? separate->sessionController()
-		: openSeparated
-		? [&] {
-			const auto window = Core::App().ensureSeparateWindowFor(
-				separateId,
-				itemId);
-			return window ? window->sessionController() : nullptr;
-		}()
+		: (openSeparated && CanShowSeparateWindow(separateId))
+		? Core::App().ensureSeparateWindowFor(
+			separateId,
+			itemId)->sessionController()
 		: history->session().tryResolveWindow();
 	if (window) {
 		window->widget()->showFromTray();
