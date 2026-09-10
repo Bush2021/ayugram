@@ -148,6 +148,7 @@ public:
 	void idSearchReceived(const std::vector<not_null<PeerData*>> &results);
 
 	[[nodiscard]] FilterId filterId() const;
+	void switchToFilter(FilterId filterId);
 
 	void clearSelection();
 
@@ -341,7 +342,6 @@ private:
 	void refreshWithCollapsedRows(bool toTop = false);
 	bool needCollapsedRowsRefresh() const;
 	bool chooseCollapsedRow(Qt::KeyboardModifiers modifiers);
-	void switchToFilter(FilterId filterId);
 	bool chooseHashtag();
 	ChosenRow computeChosenRow() const;
 	bool isRowActive(not_null<Row*> row, const RowDescriptor &entry) const;
@@ -614,7 +614,7 @@ private:
 	[[nodiscard]] bool hasChatTypeFilter() const;
 
 	void saveChatsFilterScrollState(FilterId filterId);
-	void restoreChatsFilterScrollState(FilterId filterId);
+	bool restoreChatsFilterScrollState(FilterId filterId);
 
 	[[nodiscard]] not_null<Ui::QuickActionContext*> ensureQuickAction(
 		int64 key);

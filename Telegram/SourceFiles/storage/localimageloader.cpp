@@ -528,6 +528,7 @@ FileLoadTask::FileLoadTask(Args &&args)
 , _forceFile(args.forceFile)
 , _sendLargePhotos(args.sendLargePhotos)
 , _animationJob(std::move(args.animationJob))
+, _animationAsGif(args.animationAsGif)
 , _archive(std::move(args.archive)) {
 	Expects(_to.options.scheduled
 		|| _to.options.shortcutId
@@ -626,10 +627,9 @@ bool FileLoadTask::CheckForSong(
 	return true;
 }
 
-bool FileLoadTask::CheckForVideo(
+bool FileLoadTask::IsVideoFile(
 		const QString &filepath,
-		const QByteArray &content,
-		std::unique_ptr<Ui::PreparedFileInformation> &result) {
+		const QString &filemime) {
 	static const auto mimes = {
 		u"video/mp4"_q,
 		u"video/quicktime"_q,
@@ -640,7 +640,14 @@ bool FileLoadTask::CheckForVideo(
 		u".m4v"_q,
 		u".webm"_q,
 	};
-	if (!CheckMimeOrExtensions(filepath, result->filemime, mimes, extensions)) {
+	return CheckMimeOrExtensions(filepath, filemime, mimes, extensions);
+}
+
+bool FileLoadTask::CheckForVideo(
+		const QString &filepath,
+		const QByteArray &content,
+		std::unique_ptr<Ui::PreparedFileInformation> &result) {
+	if (!IsVideoFile(filepath, result->filemime)) {
 		return false;
 	}
 
@@ -759,10 +766,11 @@ void FileLoadTask::process(ProcessArgs &&args) {
 				Ui::PreparedFileInformation>();
 			information->filemime = "video/mp4";
 			information->media = Ui::PreparedFileInformation::Video{
-				.isGifv = true,
+				.isGifv = _animationAsGif,
 				.supportsStreaming = true,
 				.duration = still->duration,
 				.thumbnail = std::move(preview),
+				.modifications = { .gif = _animationAsGif },
 			};
 			_information = std::move(information);
 			_content = QByteArray();

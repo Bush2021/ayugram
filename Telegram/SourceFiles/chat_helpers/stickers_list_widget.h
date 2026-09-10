@@ -105,6 +105,7 @@ public:
 		StickersListDescriptor &&descriptor);
 
 	rpl::producer<FileChosen> chosen() const;
+	[[nodiscard]] rpl::producer<> photoRequests() const;
 	rpl::producer<> scrollUpdated() const;
 	rpl::producer<TabbedSelector::Action> choosingUpdated() const;
 
@@ -233,6 +234,14 @@ private:
 			return !(*this == other);
 		}
 	};
+	struct OverPhotoButton {
+		inline bool operator==(OverPhotoButton other) const {
+			return true;
+		}
+		inline bool operator!=(OverPhotoButton other) const {
+			return !(*this == other);
+		}
+	};
 	using OverState = std::variant<
 		v::null_t,
 		OverSticker,
@@ -240,7 +249,8 @@ private:
 		OverButton,
 		OverSearchShortcut,
 		OverSearchBack,
-		OverGroupAdd>;
+		OverGroupAdd,
+		OverPhotoButton>;
 
 	struct SectionInfo {
 		int section = 0;
@@ -311,6 +321,9 @@ private:
 	void readVisibleFeatured(int visibleTop, int visibleBottom);
 
 	void paintStickers(Painter &p, QRect clip);
+	void paintPhotoButton(Painter &p, QRect clip);
+	[[nodiscard]] int photoRowHeight() const;
+	[[nodiscard]] QRect photoButtonRect() const;
 	void paintMegagroupEmptySet(Painter &p, int y, bool buttonSelected);
 	void paintSticker(
 		Painter &p,
@@ -497,6 +510,11 @@ private:
 	QRect _megagroupSetButtonRect;
 	std::unique_ptr<Ui::RippleAnimation> _megagroupSetButtonRipple;
 
+	Ui::RoundRect _photoButtonBg;
+	QString _photoButtonText;
+	int _photoButtonTextWidth = 0;
+	std::unique_ptr<Ui::RippleAnimation> _photoButtonRipple;
+
 	QString _addText;
 	int _addWidth;
 	QString _installedText;
@@ -535,6 +553,7 @@ private:
 	bool _searchLoading = false;
 
 	rpl::event_stream<FileChosen> _chosen;
+	rpl::event_stream<> _photoRequests;
 	rpl::event_stream<> _scrollUpdated;
 	rpl::event_stream<TabbedSelector::Action> _choosingUpdated;
 

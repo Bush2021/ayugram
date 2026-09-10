@@ -1493,7 +1493,9 @@ void SendFilesBox::pushBlock(int from, int till) {
 			&_list.files[index],
 			st::sendMediaPreviewSize,
 			std::move(done),
-			PhotoSideLimit(true));
+			PhotoSideLimit(true),
+			QSize(),
+			true);
 	};
 	const auto replaceAttachment = [=, show = _show](int index) {
 		applyBlockChanges();
@@ -2687,7 +2689,9 @@ void SendFilesBox::send(
 				return;
 			}
 		}
-		Storage::ApplyModifications(_list, true);
+		const auto animated = (_limits & SendFilesAllow::Gifs)
+			|| (_limits & SendFilesAllow::Videos);
+		Storage::ApplyModifications(_list, animated);
 		saveSendWaySettings(_wayRemember && _wayRemember->checked());
 		options.invertCaption = _invertCaption;
 		options.price = hasPrice() ? _price.current() : 0;
