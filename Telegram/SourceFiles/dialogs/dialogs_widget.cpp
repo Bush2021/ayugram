@@ -2605,7 +2605,7 @@ void Widget::switchToChatsFilter(FilterId id) {
 	const auto slideLeft = (indexOf(id) < indexOf(was));
 	const auto duration = _chatsFilterSwipeSwitch
 		? st::dialogsFilterSwipeSlideDuration
-		: st::slideDuration;
+		: st::dialogsFilterSlideDuration;
 	_chatsFilterSlideCanvas = nullptr;
 	auto wasCache = grabForChatsFilterSlide();
 	_inner->switchToFilter(id);
@@ -2798,7 +2798,8 @@ void Widget::scrollToDefault(bool verytop) {
 	startScrollUpButtonAnimation(false);
 
 	const auto scroll = [=] {
-		const auto animated = qRound(_scrollToAnimation.value(scrollTo));
+		const auto animated
+			= int(base::SafeRound(_scrollToAnimation.value(scrollTo)));
 		const auto animatedDelta = animated - scrollTo;
 		const auto realDelta = _scroll->scrollTop() - scrollTo;
 		if (base::OppositeSigns(realDelta, animatedDelta)) {
@@ -4659,7 +4660,9 @@ void Widget::updateControlsGeometry() {
 		+ st::dialogsFilterPadding.x();
 	const auto filterRight = st::dialogsFilterSkip
 		+ st::dialogsFilterPadding.x();
-	const auto filterWidth = qMax(ratiow, smallw) - filterLeft - filterRight;
+	const auto filterWidth = std::max(ratiow, smallw)
+		- filterLeft
+		- filterRight;
 	const auto filterAreaHeight = st::topBarHeight;
 	_searchControls->setGeometry(0, filterAreaTop, ratiow, filterAreaHeight);
 	if (_subsectionTopBar) {
