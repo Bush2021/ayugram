@@ -75,7 +75,11 @@ struct Errors {
 		return Errors{ status, toast };
 	};
 	const auto peer = history->peer;
-	if (const auto user = peer->asUser()) {
+	if (peer->isSecretChat()) {
+		return result(
+			tr::lng_filters_link_private_status(tr::now),
+			tr::lng_filters_link_private_error(tr::now));
+	} else if (const auto user = peer->asUser()) {
 		return user->isBot()
 			? result(
 				tr::lng_filters_link_bot_status(tr::now),

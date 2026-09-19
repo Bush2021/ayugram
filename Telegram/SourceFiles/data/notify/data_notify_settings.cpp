@@ -69,7 +69,7 @@ constexpr auto kMaxNotifyCheckDelay = 24 * 3600 * crl::time(1000);
 } // namespace
 
 DefaultNotify DefaultNotifyType(not_null<const PeerData*> peer) {
-	return peer->isUser()
+	return (peer->isUser() || peer->isSecretChat())
 		? DefaultNotify::User
 		: (peer->isChat() || peer->isMegagroup())
 		? DefaultNotify::Group
@@ -91,6 +91,17 @@ NotifySettings::NotifySettings(not_null<Session*> owner)
 }
 
 void NotifySettings::request(not_null<PeerData*> peer) {
+	if (peer->isSecretChat()) {
+		if (peer->notify().settingsUnknown()) {
+			peer->notify().resetToDefault();
+			updateLocal(peer);
+		}
+		if (defaultSettings(DefaultNotify::User).settingsUnknown()) {
+			peer->session().api().requestNotifySettings(
+				MTP_inputNotifyUsers());
+		}
+		return;
+	}
 	if (peer->notify().settingsUnknown()) {
 		const auto channel = peer->asChannel();
 		peer->session().api().requestNotifySettings(
@@ -241,7 +252,9 @@ void NotifySettings::update(
 			updateException(history->peer);
 		}
 		updateLocal(thread);
-		thread->session().api().updateNotifySettingsDelayed(thread);
+		if (!thread->peer()->isSecretChat()) {
+			thread->session().api().updateNotifySettingsDelayed(thread);
+		}
 	}
 }
 
@@ -252,7 +265,9 @@ void NotifySettings::resetToDefault(not_null<Thread*> thread) {
 			updateException(history->peer);
 		}
 		updateLocal(thread);
-		thread->session().api().updateNotifySettingsDelayed(thread);
+		if (!thread->peer()->isSecretChat()) {
+			thread->session().api().updateNotifySettingsDelayed(thread);
+		}
 		Core::App().notifications().checkDelayed();
 	}
 }
@@ -270,7 +285,9 @@ void NotifySettings::update(
 			storiesMuted)) {
 		updateException(peer);
 		updateLocal(peer);
-		peer->session().api().updateNotifySettingsDelayed(peer);
+		if (!peer->isSecretChat()) {
+			peer->session().api().updateNotifySettingsDelayed(peer);
+		}
 	}
 }
 
@@ -279,7 +296,9 @@ void NotifySettings::resetToDefault(not_null<PeerData*> peer) {
 	if (peer->notify().resetToDefault()) {
 		updateException(peer);
 		updateLocal(peer);
-		peer->session().api().updateNotifySettingsDelayed(peer);
+		if (!peer->isSecretChat()) {
+			peer->session().api().updateNotifySettingsDelayed(peer);
+		}
 		Core::App().notifications().checkDelayed();
 	}
 }

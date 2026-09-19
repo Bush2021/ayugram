@@ -73,6 +73,7 @@ private:
 
 	int _searchInHistoryRequest = 0; // Not real mtpRequestId.
 	mtpRequestId _requestId = 0;
+	bool _secretSearchDone = false;
 
 	rpl::event_stream<FoundMessages> _messagesFounds;
 

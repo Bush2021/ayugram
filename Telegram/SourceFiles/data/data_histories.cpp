@@ -38,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/data/messages_storage.h"
+#include "ayu/secret/secret_chats.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -183,6 +184,10 @@ void Histories::clearAll() {
 
 void Histories::readInbox(not_null<History*> history) {
 	DEBUG_LOG(("Reading: readInbox called."));
+	if (history->peer->isSecretChat()) { // AyuGram: ayu/secret chats.
+		readInboxTill(history, history->maxMsgId());
+		return;
+	}
 	if (history->lastServerMessageKnown()) {
 		const auto last = history->lastServerMessage();
 		DEBUG_LOG(("Reading: last known, reading till %1."
@@ -259,6 +264,14 @@ void Histories::readInboxTill(
 		MsgId tillId,
 		bool force) {
 	Expects(IsServerMsgId(tillId) || (!tillId && !force));
+
+	if (history->peer->isSecretChat()) { // AyuGram: ayu/secret.
+		session().ayuSecret().readInbox(
+			history->peer->asSecretChat(),
+			tillId,
+			false);
+		return;
+	}
 
 	DEBUG_LOG(("Reading: readInboxTill %1, force %2."
 		).arg(tillId.bare
@@ -389,6 +402,9 @@ void Histories::requestDialogEntry(not_null<Data::Folder*> folder) {
 void Histories::requestDialogEntry(
 		not_null<History*> history,
 		Fn<void()> callback) {
+	if (history->peer->isSecretChat()) { // AyuGram: ayu/secret chats.
+		return;
+	}
 	if (const auto channel = history->peer->asChannel()) {
 		if (channel->isCommunity()) {
 			return;
@@ -555,7 +571,9 @@ void Histories::changeSublistUnreadMark(
 
 void Histories::requestFakeChatListMessage(
 		not_null<History*> history) {
-	if (_fakeChatListRequests.contains(history)) {
+	if (history->peer->isSecretChat()) { // AyuGram: ayu/secret chats.
+		return;
+	} else if (_fakeChatListRequests.contains(history)) {
 		return;
 	}
 
@@ -588,6 +606,9 @@ void Histories::requestFakeChatListMessage(
 
 void Histories::requestGroupAround(not_null<HistoryItem*> item) {
 	const auto history = item->history();
+	if (history->peer->isSecretChat()) { // AyuGram: ayu/secret chats.
+		return;
+	}
 	const auto id = item->id;
 	const auto key = GroupRequestKey{ history, item->topicRootId() };
 	const auto i = _chatListGroupRequests.find(key);
@@ -813,6 +834,14 @@ void Histories::deleteMessages(
 		not_null<History*> history,
 		const QVector<MTPint> &ids,
 		bool revoke) {
+	if (const auto secret = history->peer->asSecretChat()) {
+		session().ayuSecret().deleteMessages(
+			secret,
+			ids | ranges::views::transform([](const MTPint &id) {
+				return MsgId(id.v);
+			}) | ranges::to_vector);
+		return;
+	}
 	sendRequest(history, RequestType::Delete, [=](Fn<void()> finish) {
 		const auto done = [=](const MTPmessages_AffectedMessages &result) {
 			session().api().applyAffectedMessages(history->peer, result);
@@ -839,6 +868,14 @@ void Histories::deleteAllMessages(
 		MsgId deleteTillId,
 		bool justClear,
 		bool revoke) {
+	if (const auto secret = history->peer->asSecretChat()) {
+		if (justClear) {
+			session().ayuSecret().clearHistory(secret);
+		} else {
+			session().ayuSecret().deleteChat(secret, revoke);
+		}
+		return;
+	}
 	sendRequest(history, RequestType::Delete, [=](Fn<void()> finish) {
 		const auto peer = history->peer;
 		const auto chat = peer->asChat();
@@ -1059,6 +1096,7 @@ int Histories::sendRequest(
 		RequestType type,
 		Fn<mtpRequestId(Fn<void()> finish)> generator) {
 	Expects(type != RequestType::None);
+	Expects(!history->peer->isSecretChat()); // AyuGram: ayu/secret chats.
 
 	auto &state = _states[history];
 	const auto id = ++_requestAutoincrement;
@@ -1143,6 +1181,9 @@ int Histories::sendPreparedMessage(
 		Fn<PreparedMessage(not_null<History*>, FullReplyTo)> message,
 		Fn<void(const MTPUpdates&, const MTP::Response&)> done,
 		Fn<void(const MTP::Error&, const MTP::Response&)> fail) {
+	if (history->peer->isSecretChat()) {
+		return 0;
+	}
 	markReadAfterAction(history);
 	if (isCreatingTopic(history, replyTo.topicRootId)) {
 		const auto id = ++_requestAutoincrement;

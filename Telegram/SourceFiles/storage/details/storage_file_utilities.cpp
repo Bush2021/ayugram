@@ -26,6 +26,14 @@ constexpr auto TdfMagicLen = int(sizeof(TdfMagic));
 
 constexpr auto kStrongIterationsCount = 100'000;
 
+void ClearBytes(QByteArray &value) {
+	if (!value.isEmpty()) {
+		base::RandomFill(value.data(), value.size());
+		value.clear();
+		value.squeeze();
+	}
+}
+
 struct WriteEntry {
 	QString basePath;
 	QString base;
@@ -349,6 +357,7 @@ FileReadDescriptor::~FileReadDescriptor() {
 		}
 		buffer.setBuffer(nullptr);
 	}
+	ClearBytes(data);
 }
 
 EncryptedDescriptor::EncryptedDescriptor() {
@@ -369,6 +378,7 @@ EncryptedDescriptor::EncryptedDescriptor(uint32 size) {
 
 EncryptedDescriptor::~EncryptedDescriptor() {
 	finish();
+	ClearBytes(data);
 }
 
 void EncryptedDescriptor::finish() {

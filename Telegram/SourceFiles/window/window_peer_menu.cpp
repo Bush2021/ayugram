@@ -144,6 +144,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_ayu_icons.h"
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/secret/ui/secret_chat_menu.h"
 
 
 namespace Window {
@@ -438,7 +439,9 @@ void TogglePinnedThread(
 		not_null<Window::SessionController*> controller,
 		not_null<Dialogs::Entry*> entry,
 		Fn<void()> onToggled) {
-	if (!entry->folderKnown()) {
+	const auto history = entry->asHistory();
+	if ((history && history->peer->isSecretChat())
+		|| !entry->folderKnown()) {
 		return;
 	}
 	const auto owner = &entry->owner();
@@ -448,7 +451,7 @@ void TogglePinnedThread(
 	}
 
 	owner->setChatPinned(entry, FilterId(), isPinned);
-	if (const auto history = entry->asHistory()) {
+	if (history) {
 		const auto flags = isPinned
 			? MTPmessages_ToggleDialogPin::Flag::f_pinned
 			: MTPmessages_ToggleDialogPin::Flag(0);
@@ -681,6 +684,7 @@ void Filler::addToggleFolder() {
 	const auto history = _request.key.history();
 	if (_topic
 		|| !history
+		|| history->peer->isSecretChat()
 		|| !history->owner().chatsFilters().has()
 		|| !history->inChatList()) {
 		return;
@@ -1934,6 +1938,7 @@ void Filler::fillHistoryActions() {
 	addInfo();
 	AyuUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);
 	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
+	AyuSecret::AddSecretChatActions(_peer, _controller, _addAction);
 	addViewAsTopics();
 	addManageChat();
 	addStoryArchive();
@@ -1972,6 +1977,7 @@ void Filler::fillProfileActions() {
 	addToggleTopicClosed();
 	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
 	AyuUi::AddShadowBanAction(_peer, _addAction);
+	AyuSecret::AddSecretChatActions(_peer, _controller, _addAction);
 	addViewDiscussion();
 	addDirectMessages();
 	addExportChat();
@@ -2403,6 +2409,9 @@ void PeerMenuShareContactBox(
 				ChooseRecipientArgs{
 					.session = &navigation->session(),
 					.callback = std::move(callback),
+					.filter = [](not_null<Data::Thread*> thread) {
+						return !thread->peer()->isSecretChat();
+					},
 					.moneyRestrictionError = WriteMoneyRestrictionError,
 				}),
 			[](not_null<PeerListBox*> box) {
@@ -2967,7 +2976,9 @@ object_ptr<Ui::BoxContent> PrepareChooseRecipientBox(
 		? [=](not_null<Data::Thread*> thread) -> bool {
 			using namespace InlineBots;
 			const auto peer = thread->peer();
-			if (const auto user = peer->asUser()) {
+			if (peer->isSecretChat()) {
+				return false;
+			} else if (const auto user = peer->asUser()) {
 				if (user->isBot()) {
 					return (typesRestriction & PeerType::Bot);
 				} else {
@@ -3249,6 +3260,9 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 			.session = session,
 			.callback = [=](Chosen thread) {
 				_singleChosen.fire_copy(thread);
+			},
+			.filter = [](Chosen thread) {
+				return !thread->peer()->isSecretChat();
 			},
 			.moneyRestrictionError = WriteMoneyRestrictionError,
 		})
@@ -4599,6 +4613,11 @@ void TogglePinnedThread(
 		not_null<Dialogs::Entry*> entry,
 		FilterId filterId,
 		Fn<void()> onToggled) {
+	if (const auto history = entry->asHistory()) {
+		if (history->peer->isSecretChat()) {
+			return;
+		}
+	}
 	if (!filterId) {
 		return TogglePinnedThread(controller, entry, onToggled);
 	}
@@ -4637,7 +4656,9 @@ bool IsArchived(not_null<History*> history) {
 }
 
 bool CanArchive(History *history, PeerData *peer) {
-	if (history && history->useTopPromotion()) {
+	if (peer && peer->isSecretChat()) {
+		return false;
+	} else if (history && history->useTopPromotion()) {
 		return false;
 	} else if (const auto channel = peer ? peer->asChannel() : nullptr
 		; channel && channel->isCommunity()) {

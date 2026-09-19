@@ -68,6 +68,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/secret/secret_chats.h"
 #include "api/api_blocked_peers.h"
 
 
@@ -154,6 +155,7 @@ Session::Session(
 , _storage(std::make_unique<Storage::Facade>())
 , _data(std::make_unique<Data::Session>(this))
 , _user(_data->processUser(user))
+, _ayuSecret(std::make_unique<AyuSecret::Chats>(this)) // AyuGram: ayu/secret.
 , _emojiStickersPack(std::make_unique<Stickers::EmojiPack>(this))
 , _diceStickersPacks(std::make_unique<Stickers::DicePacks>(this))
 , _giftBoxStickersPacks(std::make_unique<Stickers::GiftBoxPack>(this))

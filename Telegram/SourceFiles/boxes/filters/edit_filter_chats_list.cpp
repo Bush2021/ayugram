@@ -481,10 +481,17 @@ void EditFilterChatsListController::prepareViewHook() {
 		delegate()->peerListSetAboveWidget(prepareTypesList());
 	}
 
-	const auto count = int(_peers.size());
+	auto peers = std::vector<not_null<History*>>();
+	peers.reserve(_peers.size());
+	for (const auto &history : _peers) {
+		if (!history->peer->isSecretChat()) {
+			peers.push_back(history);
+		}
+	}
+	const auto count = int(peers.size());
 	const auto rows = std::make_unique<std::optional<ExceptionRow>[]>(count);
 	auto i = 0;
-	for (const auto &history : _peers) {
+	for (const auto &history : peers) {
 		rows[i++].emplace(history, delegate());
 	}
 	auto pointers = std::vector<ExceptionRow*>();
@@ -560,6 +567,9 @@ object_ptr<Ui::RpWidget> EditFilterChatsListController::prepareTypesList() {
 
 auto EditFilterChatsListController::createRow(not_null<History*> history)
 -> std::unique_ptr<Row> {
+	if (history->peer->isSecretChat()) {
+		return nullptr;
+	}
 	const auto business = (_options & (Flag::NewChats | Flag::ExistingChats))
 		|| (!_options && !_chatlist);
 	if (business && (history->peer->isSelf() || !history->peer->isUser())) {

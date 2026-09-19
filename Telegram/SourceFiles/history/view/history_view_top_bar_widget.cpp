@@ -74,6 +74,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_status.h"
 #include "boxes/peers/edit_participants_box.h"
 #include "data/data_chat_filters.h"
 #include "history/admin_log/history_admin_log_section.h"
@@ -706,6 +708,12 @@ void TopBarWidget::paintTopBar(Painter &p) {
 			const auto skip = _titleBadge.drawVerified(p, position, st::dialogsVerifiedColors);
 			nameleft += skip + st::dialogsChatTypeSkip;
 			namewidth -= skip + st::dialogsChatTypeSkip;
+		}
+		if (namePeer->isSecretChat()) { // AyuGram: ayu/secret.
+			const auto &icon = st::ayuSecretChatIcon.icon;
+			icon.paint(p, nameleft, nametop, width());
+			nameleft += icon.width() + st::dialogsChatTypeSkip;
+			namewidth -= icon.width() + st::dialogsChatTypeSkip;
 		}
 		const auto badgeWidth = _titleBadge.drawGetWidth(p, {
 			.peer = namePeer,
@@ -1987,7 +1995,9 @@ void TopBarWidget::setupDragOnBackButton() {
 
 bool TopBarWidget::trackOnlineOf(not_null<PeerData*> user) const {
 	const auto peer = _activeChat.key.peer();
-	if (!peer || _activeChat.key.topic() || !user->isUser()) {
+	if (peer && peer->isSecretChat()) { // AyuGram: ayu/secret.
+		return (peer == user);
+	} else if (!peer || _activeChat.key.topic() || !user->isUser()) {
 		return false;
 	} else if (peer->isUser()) {
 		return (peer == user);
@@ -2020,6 +2030,10 @@ void TopBarWidget::updateOnlineDisplay() {
 			text = Data::OnlineText(user, now);
 			titlePeerTextOnline = Data::OnlineTextActive(user, now);
 		}
+	} else if (const auto secret = peer->asSecretChat()) { // AyuGram: ayu/secret.
+		const auto status = AyuSecret::StatusText(secret, now);
+		text = status.text;
+		titlePeerTextOnline = status.active;
 	} else if (const auto chat = peer->asChat()) {
 		if (!chat->amIn()) {
 			text = tr::lng_chat_status_unaccessible(tr::now);
@@ -2120,6 +2134,8 @@ void TopBarWidget::updateOnlineDisplayTimer() {
 	};
 	if (const auto user = peer->asUser()) {
 		handleUser(user);
+	} else if (const auto secretUser = peer->secretChatUser()) {
+		handleUser(secretUser);
 	} else if (const auto chat = peer->asChat()) {
 		for (const auto &user : chat->participants) {
 			handleUser(user);

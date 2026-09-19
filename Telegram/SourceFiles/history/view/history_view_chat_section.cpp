@@ -3283,6 +3283,8 @@ SendMenu::Details ChatWidget::sendMenuDetails() const {
 		.isEphemeralBotReply(replyTo().messageId);
 	const auto type = ephemeralReply
 		? Type::Disabled
+		: _peer->isSecretChat()
+		? Type::SilentOnly
 		: (mode() != Mode::History)
 		? ((_topic && !_peer->starsPerMessageChecked())
 			? Type::Scheduled

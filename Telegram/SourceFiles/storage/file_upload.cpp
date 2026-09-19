@@ -140,7 +140,8 @@ Uploader::Entry::Entry(
 	if (file->type == SendMediaType::File
 		|| file->type == SendMediaType::ThemeFile
 		|| file->type == SendMediaType::Audio
-		|| file->type == SendMediaType::Round) {
+		|| file->type == SendMediaType::Round
+		|| file->type == SendMediaType::SecretFile) {
 		setDocSize(file->filesize);
 	}
 }
@@ -634,6 +635,8 @@ void Uploader::notifyFailed(const Entry &entry) {
 		_secondaryFileFailed.fire_copy(entry.itemId);
 	} else if (type == SendMediaType::Secure) {
 		_secureFailed.fire_copy(entry.itemId);
+	} else if (type == SendMediaType::SecretFile) {
+		_secretFailed.fire_copy(entry.itemId);
 	} else {
 		Unexpected("Type in Uploader::failed.");
 	}
@@ -656,7 +659,8 @@ QByteArray Uploader::readDocPart(not_null<Entry*> entry) {
 		if ((entry->file->type == SendMediaType::File
 			|| entry->file->type == SendMediaType::ThemeFile
 			|| entry->file->type == SendMediaType::Audio
-			|| entry->file->type == SendMediaType::Round)
+			|| entry->file->type == SendMediaType::Round
+			|| entry->file->type == SendMediaType::SecretFile)
 			&& entry->docSize <= kUseBigFilesFrom) {
 			entry->md5Hash.feed(result.data(), result.size());
 		}
@@ -1058,6 +1062,12 @@ void Uploader::partLoaded(const MTPBool &result, mtpRequestId requestId) {
 			.offset = entry.sentSize,
 			.size = entry.file->partssize,
 		});
+	} else if (entry.file->type == SendMediaType::SecretFile) {
+		_secretProgress.fire_copy({
+			.fullId = itemId,
+			.offset = entry.docSentSize,
+			.size = entry.file->filesize,
+		});
 	}
 	if (request.nonPremiumDelayed) {
 		_nonPremiumDelays.fire_copy(itemId);
@@ -1213,6 +1223,25 @@ void Uploader::finishFront() {
 			entry.itemId,
 			entry.file->id,
 			int(entry.parts->size()),
+		});
+	} else if (entry.file->type == SendMediaType::SecretFile) {
+		QByteArray docMd5(32, Qt::Uninitialized);
+		hashMd5Hex(entry.md5Hash.result(), docMd5.data());
+		_secretReady.fire({
+			.id = entry.file->id,
+			.fullId = entry.itemId,
+			.info = {
+				.file = ((entry.docSize > kUseBigFilesFrom)
+					? MTP_inputFileBig(
+						MTP_long(entry.file->id),
+						MTP_int(entry.docPartsCount),
+						MTP_string())
+					: MTP_inputFile(
+						MTP_long(entry.file->id),
+						MTP_int(entry.docPartsCount),
+						MTP_string(),
+						MTP_bytes(docMd5))),
+			},
 		});
 	}
 }

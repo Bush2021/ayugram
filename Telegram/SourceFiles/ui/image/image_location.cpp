@@ -222,7 +222,7 @@ MTPInputFileLocation StorageFileLocation::tl(UserId self) const {
 			MTP_bytes(_fileReference));
 
 	case Type::Encrypted:
-		return MTP_inputSecureFileLocation(
+		return MTP_inputEncryptedFileLocation(
 			MTP_long(_id),
 			MTP_long(_accessHash));
 

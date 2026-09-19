@@ -97,6 +97,7 @@ bool operator>=(PeerIdZero, ChatIdType<Shift>) = delete;
 using UserId = ChatIdType<0>;
 using ChatId = ChatIdType<1>;
 using ChannelId = ChatIdType<2>;
+using SecretChatId = ChatIdType<3>; // AyuGram: ayu/secret chats.
 using FakeChatId = ChatIdType<0x7F>;
 
 struct PeerIdHelper {
@@ -223,6 +224,47 @@ bool operator>=(PeerIdZero, PeerId) = delete;
 
 [[nodiscard]] inline constexpr ChannelId peerToChannel(PeerId id) noexcept {
 	return id.to<ChannelId>();
+}
+
+// AyuGram: ayu/secret chats. The server chat id is a signed int32, so the
+// sign lives in bit 47 of the bare id and the magnitude keeps the low 32
+// bits. Bit 47 is the top bit of PeerId::kChatTypeMask, so it never reaches
+// the peer kind byte.
+inline constexpr auto kSecretChatIdNegativeFlag = BareId(1) << 47;
+
+[[nodiscard]] inline constexpr bool peerIsSecretChat(PeerId id) noexcept {
+	return id.is<SecretChatId>();
+}
+
+[[nodiscard]] inline constexpr PeerId peerFromSecretChat(
+		SecretChatId secretChatId) noexcept {
+	return secretChatId;
+}
+
+[[nodiscard]] inline constexpr SecretChatId peerToSecretChat(
+		PeerId id) noexcept {
+	return id.to<SecretChatId>();
+}
+
+[[nodiscard]] inline constexpr SecretChatId SecretChatIdFromServer(
+		int32 id) noexcept {
+	return (id < 0)
+		? SecretChatId(BareId(uint32(0) - uint32(id))
+			| kSecretChatIdNegativeFlag)
+		: SecretChatId(BareId(uint32(id)));
+}
+
+[[nodiscard]] inline constexpr SecretChatId SecretChatIdFromServer(
+		MTPint id) noexcept {
+	return SecretChatIdFromServer(id.v);
+}
+
+[[nodiscard]] inline constexpr int32 SecretChatIdToServer(
+		SecretChatId id) noexcept {
+	const auto magnitude = uint32(id.bare & ~kSecretChatIdNegativeFlag);
+	return ((id.bare & kSecretChatIdNegativeFlag) != 0)
+		? int32(uint32(0) - magnitude)
+		: int32(magnitude);
 }
 
 [[nodiscard]] inline MTPlong peerToBareMTPInt(PeerId id) {

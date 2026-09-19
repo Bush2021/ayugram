@@ -5224,6 +5224,7 @@ bool ComposeControls::canShowRichEditor() const {
 		|| isShortcutComposeEligible()
 		|| isWelcomeComposeEligible();
 	return _history
+		&& !_history->peer->isSecretChat()
 		&& _regularWindow
 		&& _sendActionFactory
 		&& _wrap->isVisible()

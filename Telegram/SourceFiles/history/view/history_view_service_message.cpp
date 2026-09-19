@@ -34,7 +34,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/secret/data_secret_chat.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "data/data_user.h"
 #include "styles/style_ayu_styles.h"
 
 
@@ -1010,6 +1012,22 @@ EmptyPainter::EmptyPainter(not_null<History*> history)
 , _text(st::msgMinWidth) {
 	if (NeedAboutGroup(_history)) {
 		fillAboutGroup();
+	} else if (const auto secret = _history->peer->asSecretChat()) {
+		const auto user = secret->user();
+		const auto name = user ? user->shortName() : QString();
+		SetText(_header, secret->creator()
+			? tr::ayu_SecretChatIntroOut(tr::now, lt_user, name)
+			: tr::ayu_SecretChatIntroIn(tr::now, lt_user, name));
+		SetText(_text, tr::ayu_SecretChatIntroTitle(tr::now));
+		for (const auto &text : {
+			tr::ayu_SecretChatIntro1(tr::now),
+			tr::ayu_SecretChatIntro2(tr::now),
+			tr::ayu_SecretChatIntro3(tr::now),
+			tr::ayu_SecretChatIntro4(tr::now),
+		}) {
+			_phrases.emplace_back(st::msgMinWidth);
+			SetText(_phrases.back(), text);
+		}
 	} else if (_history->peer->isUser()
 		&& AyuSettings::getInstance().disableGreetingSticker()) {
 		SetText(_header, tr::lng_chat_intro_default_title(tr::now));

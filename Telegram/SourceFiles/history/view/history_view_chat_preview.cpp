@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_chat_preview.h"
 
 #include "apiwrap.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_status.h"
 #include "base/unixtime.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
@@ -238,6 +240,12 @@ struct StatusFields {
 				.text = Data::OnlineText(user, now),
 				.active = Data::OnlineTextActive(user, now),
 			};
+		} else if (const auto secret = peer->asSecretChat()) {
+			// AyuGram: ayu/secret.
+			const auto status = AyuSecret::StatusText(
+				secret,
+				base::unixtime::now());
+			return { .text = status.text, .active = status.active };
 		} else if (const auto chat = peer->asChat()) {
 			return wrap(!chat->amIn()
 				? tr::lng_chat_status_unaccessible(tr::now)

@@ -68,6 +68,9 @@ namespace Media::Stories {
 	};
 	const auto state = std::make_shared<State>();
 	auto filterCallback = [=](not_null<Data::Thread*> thread) {
+		if (thread->peer()->isSecretChat()) {
+			return shareJustLink;
+		}
 		if (const auto user = thread->peer()->asUser()) {
 			if (user->canSendIgnoreMoneyRestrictions()) {
 				return true;
@@ -93,6 +96,12 @@ namespace Media::Stories {
 			Data::ForwardOptions forwardOptions) {
 		if (state->requests) {
 			return; // Share clicked already.
+		}
+		if (!shareJustLink
+			&& ranges::any_of(result, [](not_null<Data::Thread*> thread) {
+				return thread->peer()->isSecretChat();
+			})) {
+			return;
 		}
 		const auto story = resolve();
 		if (!story) {
@@ -278,6 +287,9 @@ object_ptr<Ui::BoxContent> PrepareShareAtTimeBox(
 	const auto requiredRight = item->requiredSendRight();
 	const auto requiresInline = item->requiresSendInlineRight();
 	auto filterCallback = [=](not_null<Data::Thread*> thread) {
+		if (thread->peer()->isSecretChat()) {
+			return false;
+		}
 		if (const auto user = thread->peer()->asUser()) {
 			if (user->canSendIgnoreMoneyRestrictions()) {
 				return true;

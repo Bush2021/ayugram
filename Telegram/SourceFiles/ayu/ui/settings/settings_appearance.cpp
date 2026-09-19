@@ -312,6 +312,13 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.icon = { &st::menuIconChannel },
 	});
 	ayu.addSettingToggle({
+		.id = u"ayu/showNewSecretChatInDrawer"_q,
+		.title = tr::ayu_NewSecretChat(),
+		.getter = &AyuSettings::showNewSecretChatInDrawer,
+		.setter = &AyuSettings::setShowNewSecretChatInDrawer,
+		.icon = { &st::menuIconLock },
+	});
+	ayu.addSettingToggle({
 		.id = u"ayu/showContactsInDrawer"_q,
 		.title = tr::lng_menu_contacts(),
 		.getter = &AyuSettings::showContactsInDrawer,

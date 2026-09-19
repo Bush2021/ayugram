@@ -351,6 +351,8 @@ rpl::producer<QString> Widget::title() {
 			: tr::lng_info_channel_title();
 	} else if (peer->isChat()) {
 		return tr::lng_info_group_title();
+	} else if (peer->isSecretChat()) { // AyuGram: ayu/secret.
+		return tr::lng_info_user_title();
 	}
 	Unexpected("Bad peer type in Info::TitleValue()");
 }

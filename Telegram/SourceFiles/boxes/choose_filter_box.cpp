@@ -161,6 +161,9 @@ void ChangeFilterById(
 		not_null<History*> history,
 		bool add) {
 	Expects(filterId != 0);
+	if (add && history->peer->isSecretChat()) {
+		return;
+	}
 
 	const auto list = history->owner().chatsFilters().list();
 	const auto i = ranges::find(list, filterId, &Data::ChatFilter::id);
@@ -216,7 +219,7 @@ bool ChooseFilterValidator::communityAddBlocked() const {
 }
 
 bool ChooseFilterValidator::canAdd() const {
-	if (communityAddBlocked()) {
+	if (_history->peer->isSecretChat() || communityAddBlocked()) {
 		return false;
 	}
 	for (const auto &filter : _history->owner().chatsFilters().list()) {
@@ -230,7 +233,7 @@ bool ChooseFilterValidator::canAdd() const {
 bool ChooseFilterValidator::canAdd(FilterId filterId) const {
 	Expects(filterId != 0);
 
-	if (communityAddBlocked()) {
+	if (_history->peer->isSecretChat() || communityAddBlocked()) {
 		return false;
 	}
 	const auto list = _history->owner().chatsFilters().list();

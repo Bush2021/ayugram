@@ -42,6 +42,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_animation.h"
 #include "boxes/abstract_box.h" // Ui::hideLayer().
 
+#include "ayu/secret/secret_media.h"
+
 #include <QtCore/QBuffer>
 #include <QtCore/QMimeType>
 #include <QtCore/QMimeDatabase>
@@ -1011,7 +1013,7 @@ PhotoData *DocumentData::goodThumbnailPhoto() const {
 }
 
 Storage::Cache::Key DocumentData::bigFileBaseCacheKey() const {
-	return hasRemoteLocation()
+	return (hasRemoteLocation() && !isSecretFile())
 		? StorageFileLocation(
 			_dc,
 			session().userId(),
@@ -1309,11 +1311,15 @@ void DocumentData::save(
 				StorageFileLocation(
 					_dc,
 					session().userId(),
-					MTP_inputDocumentFileLocation(
-						MTP_long(id),
-						MTP_long(_access),
-						MTP_bytes(_fileReference),
-						MTP_string())),
+					(isSecretFile()
+						? MTP_inputEncryptedFileLocation(
+							MTP_long(id),
+							MTP_long(_access))
+						: MTP_inputDocumentFileLocation(
+							MTP_long(id),
+							MTP_long(_access),
+							MTP_bytes(_fileReference),
+							MTP_string()))),
 				origin,
 				locationType(),
 				toFile,
@@ -1670,7 +1676,11 @@ bool DocumentData::useStreamingLoader() const {
 }
 
 bool DocumentData::canBeStreamed() const {
-	return hasRemoteLocation() && supportsStreaming();
+	return hasRemoteLocation() && supportsStreaming() && !isSecretFile();
+}
+
+bool DocumentData::isSecretFile() const {
+	return AyuSecret::IsSecretFile(&session(), id);
 }
 
 void DocumentData::setInappPlaybackFailed() {
@@ -1686,7 +1696,7 @@ int DocumentData::videoPreloadPrefix() const {
 }
 
 StorageFileLocation DocumentData::videoPreloadLocation() const {
-	return hasRemoteLocation()
+	return (hasRemoteLocation() && !isSecretFile())
 		? StorageFileLocation(
 			_dc,
 			session().userId(),
@@ -1716,7 +1726,7 @@ auto DocumentData::createStreamingLoader(
 			return result;
 		}
 	}
-	return hasRemoteLocation()
+	return (hasRemoteLocation() && !isSecretFile())
 		? std::make_unique<Media::Streaming::LoaderMtproto>(
 			&session().downloader(),
 			StorageFileLocation(

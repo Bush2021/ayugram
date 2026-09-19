@@ -157,9 +157,24 @@ struct RestrictionsSetOptions {
 		ChatRestriction::SendOther,
 	};
 }
+// AyuGram: what ayu/secret chats can carry while their state is Ready.
+[[nodiscard]] inline constexpr auto SecretChatSendRestrictionsList() {
+	return std::array{
+		ChatRestriction::SendOther,
+		ChatRestriction::SendStickers,
+		ChatRestriction::SendGifs,
+		ChatRestriction::SendPhotos,
+		ChatRestriction::SendVideos,
+		ChatRestriction::SendFiles,
+		ChatRestriction::SendMusic,
+		ChatRestriction::SendVoiceMessages,
+		ChatRestriction::SendVideoMessages,
+	};
+}
 [[nodiscard]] ChatRestrictions AllSendRestrictions();
 [[nodiscard]] ChatRestrictions FilesSendRestrictions();
 [[nodiscard]] ChatRestrictions TabbedPanelSendRestrictions();
+[[nodiscard]] ChatRestrictions SecretChatSendRestrictions(); // AyuGram.
 
 [[nodiscard]] bool CanSendAnyOf(
 	not_null<const Thread*> thread,

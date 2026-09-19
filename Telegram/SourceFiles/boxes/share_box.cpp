@@ -531,6 +531,9 @@ void ShareBox::keyPressEvent(QKeyEvent *e) {
 
 SendMenu::Details ShareBox::sendMenuDetails() const {
 	const auto selected = _inner->selected();
+	const auto hasSecret = ranges::any_of(
+		selected | ranges::views::transform(&Data::Thread::peer),
+		[](not_null<PeerData*> peer) { return peer->isSecretChat(); });
 	const auto hasPaid = [&] {
 		for (const auto &thread : selected) {
 			if (thread->peer()->starsPerMessageChecked()) {
@@ -539,7 +542,7 @@ SendMenu::Details ShareBox::sendMenuDetails() const {
 		}
 		return false;
 	}();
-	const auto type = hasPaid
+	const auto type = (hasPaid || hasSecret)
 		? SendMenu::Type::SilentOnly
 		: ranges::all_of(
 			selected | ranges::views::transform(&Data::Thread::peer),
@@ -1820,6 +1823,11 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 		if (existingIds.empty() || result.empty()) {
 			return;
 		}
+		if (ranges::any_of(result, [](not_null<Data::Thread*> thread) {
+			return thread->peer()->isSecretChat();
+		})) {
+			return;
+		}
 		if (HistoryView::Controls::HasRichPage(items)) {
 			forwardOptions = HistoryView::Controls::NormalizeForwardOptions(
 				&history->session(),
@@ -2167,6 +2175,9 @@ void FastShareMessage(
 	const auto requiredRight = item->requiredSendRight();
 	const auto requiresInline = item->requiresSendInlineRight();
 	auto filterCallback = [=](not_null<Data::Thread*> thread) {
+		if (thread->peer()->isSecretChat()) {
+			return false;
+		}
 		if (const auto user = thread->peer()->asUser()) {
 			if (user->canSendIgnoreMoneyRestrictions()) {
 				return true;

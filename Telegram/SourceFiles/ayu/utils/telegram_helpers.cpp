@@ -15,6 +15,7 @@
 #include "ayu/data/entities.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/secret/secret_chats.h"
 #include "core/core_settings.h"
 #include "core/application.h"
 #include "base/unixtime.h"
@@ -209,6 +210,9 @@ void dispatchToMainThread(const std::function<void()> &callback, int delay) {
 }
 
 ID getDialogIdFromPeer(not_null<PeerData*> peer) {
+	if (peer->isSecretChat()) {
+		return ID(peer->id.value);
+	}
 	ID peerId = peer->id.value & PeerId::kChatTypeMask;
 	if (peer->isChannel() || peer->isChat()) {
 		peerId = -peerId;
@@ -399,6 +403,10 @@ void MarkAsReadThread(not_null<Data::Thread*> thread) {
 void readHistory(not_null<HistoryItem*> message) {
 	const auto history = message->history();
 	const auto tillId = message->id;
+	if (const auto secret = history->peer->asSecretChat()) {
+		history->session().ayuSecret().readInbox(secret, tillId, true);
+		return;
+	}
 
 	history->session().data().histories()
 		.sendRequest(history,
@@ -701,7 +709,8 @@ int getScheduleTime(int64 sumSize) {
 bool isMessageSavable(const not_null<HistoryItem*> item) {
 	const auto &settings = AyuSettings::getInstance();
 
-	if (!settings.saveDeletedMessages()) {
+	if (!settings.saveDeletedMessages()
+		|| item->history()->peer->isSecretChat()) {
 		return false;
 	}
 

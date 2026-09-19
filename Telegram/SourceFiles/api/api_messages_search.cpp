@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_messages_search.h"
 
 #include "apiwrap.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_chats.h"
 #include "data/data_channel.h"
 #include "data/data_histories.h"
 #include "data/data_message_reaction_id.h"
@@ -89,6 +91,7 @@ MessagesSearch::~MessagesSearch() {
 void MessagesSearch::searchMessages(Request request) {
 	_request = std::move(request);
 	_offsetId = {};
+	_secretSearchDone = false;
 	searchRequest();
 }
 
@@ -101,6 +104,19 @@ void MessagesSearch::searchMore() {
 
 void MessagesSearch::searchRequest() {
 	const auto nextToken = RequestToToken(_request);
+	if (const auto secret = _history->peer->asSecretChat()) {
+		// AyuGram: ayu/secret chats have no cloud history to search.
+		if (!_secretSearchDone) {
+			_secretSearchDone = true;
+			auto found = _history->session().ayuSecret().search(
+				secret,
+				_request.query);
+			_offsetId = found.empty() ? MsgId() : found.back().msg;
+			const auto total = int(found.size());
+			_messagesFounds.fire({ total, std::move(found), nextToken });
+		}
+		return;
+	}
 	if (!_offsetId) {
 		const auto it = _cacheOfStartByToken.find(nextToken);
 		if (it != end(_cacheOfStartByToken)) {

@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_ttl_validator.h"
 
 #include "apiwrap.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/ui/secret_ttl_box.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_peer.h"
@@ -37,7 +39,9 @@ void ShowAutoDeleteToast(
 		return;
 	}
 
-	const auto duration = (period == 5)
+	const auto duration = peer->isSecretChat()
+		? AyuSecret::FormatTtl(period)
+		: (period == 5)
 		? u"5 seconds"_q
 		: Ui::FormatTTL(period);
 	const auto text = peer->isBroadcast()
@@ -122,7 +126,8 @@ bool TTLValidator::can() const {
 			&& _peer->asChat()->amIn())
 		|| (_peer->isChannel()
 			&& _peer->asChannel()->canEditInformation()
-			&& _peer->asChannel()->amIn());
+			&& _peer->asChannel()->amIn())
+		|| (_peer->isSecretChat() && _peer->asSecretChat()->isReady());
 }
 
 void TTLValidator::showToast() const {
@@ -135,6 +140,10 @@ const style::icon *TTLValidator::icon() const {
 
 void TTLValidator::showBox() const {
 	if (Main::MakeSessionShow(_show, &_peer->session())->showFrozenError()) {
+		return;
+	} else if (const auto secret = _peer->asSecretChat()) {
+		// AyuGram: ayu/secret.
+		_show->showBox(Box(AyuSecret::SecretTtlBox, not_null(secret)));
 		return;
 	}
 	_show->showBox(Box(TTLBox, createArgs()));

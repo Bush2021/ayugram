@@ -558,6 +558,9 @@ void History::setForwardDraft(
 		MsgId topicRootId,
 		PeerId monoforumPeerId,
 		Data::ForwardDraft &&draft) {
+	if (peer->isSecretChat()) {
+		draft.ids.clear();
+	}
 	auto changed = false;
 	const auto key = Data::DraftKey::Local(topicRootId, monoforumPeerId);
 	if (draft.ids.empty()) {
@@ -3412,6 +3415,8 @@ bool History::trackUnreadMessages() const {
 bool History::shouldBeInChatList() const {
 	if (peer->migrateTo() || !folderKnown()) {
 		return false;
+	} else if (peer->isSecretChat()) { // AyuGram: ayu/secret chats.
+		return true;
 	} else if (const auto community = peer->asChannel()
 		; community && community->isCommunity()) {
 		return !(community->flags() & ChannelDataFlag::Forbidden)

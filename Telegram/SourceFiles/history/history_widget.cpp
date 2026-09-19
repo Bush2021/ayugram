@@ -4978,6 +4978,8 @@ void HistoryWidget::checkActivation() {
 void HistoryWidget::firstLoadMessages() {
 	if (!_history || _firstLoadRequest) {
 		return;
+	} else if (_history->peer->isSecretChat()) { // AyuGram: ayu/secret.
+		return;
 	}
 
 	auto from = _history;
@@ -5048,6 +5050,8 @@ void HistoryWidget::firstLoadMessages() {
 
 void HistoryWidget::loadMessages() {
 	if (!_history || _preloadRequest) {
+		return;
+	} else if (_history->peer->isSecretChat()) { // AyuGram: ayu/secret.
 		return;
 	}
 
@@ -5141,6 +5145,8 @@ bool HistoryWidget::historyLoadedAtBottom() const {
 void HistoryWidget::loadMessagesDown() {
 	if (!_history || _preloadDownRequest) {
 		return;
+	} else if (_history->peer->isSecretChat()) { // AyuGram: ayu/secret.
+		return;
 	}
 
 	if (_history->isEmpty() && _migrated && _migrated->isEmpty()) {
@@ -5208,6 +5214,8 @@ void HistoryWidget::delayedShowAt(
 		MsgId showAtMsgId,
 		const Window::SectionShow &params) {
 	if (!_history) {
+		return;
+	} else if (_history->peer->isSecretChat()) { // AyuGram: ayu/secret.
 		return;
 	}
 	_delayedShowAtMsgParams = params;
@@ -6078,6 +6086,8 @@ SendMenu::Details HistoryWidget::sendMenuDetails() const {
 		.isEphemeralBotReply(replyTo().messageId);
 	const auto type = (!_peer || ephemeralReply)
 		? SendMenu::Type::Disabled
+		: _peer->isSecretChat()
+		? SendMenu::Type::SilentOnly
 		: _peer->starsPerMessageChecked()
 		? SendMenu::Type::SilentOnly
 		: _peer->isSelf()
@@ -7463,6 +7473,7 @@ void HistoryWidget::updateAiButtonVisibility() {
 
 bool HistoryWidget::canShowRichEditor() const {
 	return _history
+		&& !_history->peer->isSecretChat()
 		&& _send->isVisible()
 		&& _field->isVisible()
 		&& !_voiceRecordBar->isActive()
