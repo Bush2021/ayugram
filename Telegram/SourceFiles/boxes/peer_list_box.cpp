@@ -47,6 +47,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "styles/style_ayu_icons.h"
 #include "ayu/ui/ayu_userpic.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_status.h"
 
 
 [[nodiscard]] PeerListRowId UniqueRowIdFromString(const QString &d) {
@@ -728,7 +730,18 @@ void PeerListRow::refreshStatus() {
 	}
 	_statusType = StatusType::LastSeen;
 	_statusValidTill = 0;
-	if (auto user = peer()->asUser()) {
+	if (const auto secret = peer()->asSecretChat()) { // AyuGram: ayu/secret.
+		const auto time = base::unixtime::now();
+		const auto status = AyuSecret::StatusText(secret, time);
+		setStatusText(status.text);
+		if (status.active) {
+			_statusType = StatusType::Online;
+		}
+		if (const auto user = secret->user()) {
+			_statusValidTill = crl::now()
+				+ Data::OnlineChangeTimeout(user, time);
+		}
+	} else if (auto user = peer()->asUser()) {
 		if (!_savedMessagesStatus.isEmpty()) {
 			setStatusText(_savedMessagesStatus);
 		} else {
@@ -977,6 +990,13 @@ int PeerListRow::paintNameIconGetLeadingWidth(
 		|| _isRepliesMessagesChat
 		|| _isVerifyCodesChat) {
 		return 0;
+	}
+	if (peer()->isSecretChat()) { // AyuGram: ayu/secret.
+		const auto &icon = selected
+			? st::ayuSecretChatIcon.over
+			: st::ayuSecretChatIcon.icon;
+		icon.paint(p, nameLeft, nameTop, outerWidth);
+		return icon.width() + st::dialogsChatTypeSkip;
 	}
 	const auto info = peer()->botVerifyDetails();
 	if (!info) {
@@ -2192,7 +2212,12 @@ void PeerListContent::paintRowContent(
 		width(),
 		selected);
 	auto nameCheckedRatio = row->disabled() ? 0. : row->checkedRatio();
-	p.setPen(anim::pen(st.nameFg, st.nameFgChecked, nameCheckedRatio));
+	p.setPen(anim::pen(
+		(peer && peer->isSecretChat())
+			? st::historyPeer2NameFg
+			: st.nameFg,
+		st.nameFgChecked,
+		nameCheckedRatio));
 	name.drawLeftElided(p, namex + leading, namey, namew, width());
 
 	p.setFont(st::contactsStatusFont);

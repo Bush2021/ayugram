@@ -19,6 +19,7 @@ class PeerData;
 class UserData;
 class ChatData;
 class ChannelData;
+class SecretChatData; // AyuGram: ayu/secret chats.
 
 enum class ChatRestriction;
 
@@ -270,6 +271,10 @@ public:
 	[[nodiscard]] bool isChannel() const {
 		return peerIsChannel(id);
 	}
+	// AyuGram: ayu/secret chats.
+	[[nodiscard]] bool isSecretChat() const {
+		return peerIsSecretChat(id);
+	}
 	[[nodiscard]] bool isBot() const;
 	[[nodiscard]] bool isSelf() const;
 	[[nodiscard]] bool isVerified() const;
@@ -358,6 +363,10 @@ public:
 	[[nodiscard]] const ChannelData *asChannelOrMigrated() const;
 	[[nodiscard]] ChannelData *asMonoforum();
 	[[nodiscard]] const ChannelData *asMonoforum() const;
+	// AyuGram: ayu/secret chats.
+	[[nodiscard]] SecretChatData *asSecretChat();
+	[[nodiscard]] const SecretChatData *asSecretChat() const;
+	[[nodiscard]] UserData *secretChatUser() const;
 
 	[[nodiscard]] ChatData *migrateFrom() const;
 	[[nodiscard]] ChannelData *migrateTo() const;

@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ui/image/image.h"
 #include "main/main_session.h"
+#include "ayu/secret/secret_media.h"
 
 #include <QtCore/QBuffer>
 
@@ -36,16 +37,21 @@ ImageWithLocation FromPhotoSize(
 		return ImageWithLocation();
 	}
 	return size.match([&](const MTPDphotoSize &data) {
+		const auto secret = AyuSecret::IsSecretFile(session, photo.vid().v);
 		return ImageWithLocation{
 			.location = ImageLocation(
 				DownloadLocation{ StorageFileLocation(
 					photo.vdc_id().v,
 					session->userId(),
-					MTP_inputPhotoFileLocation(
-						photo.vid(),
-						photo.vaccess_hash(),
-						photo.vfile_reference(),
-						data.vtype())) },
+					(secret
+						? MTP_inputEncryptedFileLocation(
+							photo.vid(),
+							photo.vaccess_hash())
+						: MTP_inputPhotoFileLocation(
+							photo.vid(),
+							photo.vaccess_hash(),
+							photo.vfile_reference(),
+							data.vtype()))) },
 				data.vw().v,
 				data.vh().v),
 			.bytesCount = data.vsize().v

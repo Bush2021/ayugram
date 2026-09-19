@@ -304,6 +304,7 @@ public:
 	[[nodiscard]] uint8 cacheTag() const;
 
 	[[nodiscard]] bool canBeStreamed() const;
+	[[nodiscard]] bool isSecretFile() const;
 	[[nodiscard]] auto createStreamingLoader(
 		Data::FileOrigin origin,
 		bool forceRemoteLoader) const

@@ -39,6 +39,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_chats.h"
+#include "ayu/secret/secret_media.h"
 
 
 namespace Api {
@@ -72,7 +75,26 @@ void InnerFillMessagePostFlags(
 	}
 }
 
+// AyuGram: ayu/secret chats take only what the end-to-end scheme carries.
+bool SendToSecretChat(
+		const SendAction &action,
+		std::optional<SecretTLDecryptedMessageMedia> media) {
+	const auto secret = action.history->peer->asSecretChat();
+	if (!secret || !media) {
+		return false;
+	}
+	secret->session().api().sendAction(action);
+	return secret->session().ayuSecret().sendMedia(
+		secret,
+		std::move(*media),
+		action.replyTo.messageId,
+		action.options.silent);
+}
+
 void SendSimpleMedia(SendAction action, MTPInputMedia inputMedia) {
+	if (action.history->peer->isSecretChat()) {
+		return;
+	}
 	const auto history = action.history;
 	const auto peer = history->peer;
 	const auto session = &history->session();
@@ -703,12 +725,49 @@ void SendMusicSelectionBatch(
 	performRequest(performRequest, false);
 }
 
+void SendMusicSelectionToSecretChat(
+		MessageToSend &&message,
+		std::vector<MusicSelectionItem> items) {
+	auto &action = message.action;
+	const auto session = &action.history->session();
+	action.clearDraft = false;
+	session->api().sendAction(action);
+
+	auto &secret = session->ayuSecret();
+	const auto count = int(items.size());
+	for (auto from = 0; from < count; from += Ui::MaxAlbumItems()) {
+		const auto till = std::min(from + Ui::MaxAlbumItems(), count);
+		auto batch = std::vector<AyuSecret::DocumentCopy>();
+		batch.reserve(till - from);
+		for (auto i = from; i != till; ++i) {
+			batch.push_back({ items[i].document, items[i].origin });
+		}
+		secret.sendDocumentCopies(
+			action,
+			std::move(batch),
+			(till == count) ? message.textWithTags : TextWithTags());
+	}
+}
+
 } // namespace
 
 void SendExistingDocument(
 		MessageToSend &&message,
 		not_null<DocumentData*> document,
 		std::optional<MsgId> localMessageId) {
+	if (message.action.history->peer->isSecretChat()) {
+		if (!document->sticker()) {
+			document->session().ayuSecret().sendDocumentCopies(
+				message.action,
+				{ { document, document->stickerOrGifOrigin() } });
+			return;
+		}
+		const auto media = AyuSecret::StickerMedia(document);
+		if (SendToSecretChat(message.action, media)) {
+			document->owner().stickers().incrementSticker(document);
+		}
+		return;
+	}
 	if (!document->sticker()
 		&& !document->isVideoMessage()
 		&& !document->isVoiceMessage()) {
@@ -755,6 +814,9 @@ void SendMusicSelection(
 		MessageToSend &&message,
 		std::vector<MusicSelectionItem> items) {
 	if (items.empty()) {
+		return;
+	} else if (message.action.history->peer->isSecretChat()) {
+		SendMusicSelectionToSecretChat(std::move(message), std::move(items));
 		return;
 	}
 
@@ -818,6 +880,9 @@ void SendExistingPhoto(
 		MessageToSend &&message,
 		not_null<PhotoData*> photo,
 		std::optional<MsgId> localMessageId) {
+	if (message.action.history->peer->isSecretChat()) {
+		return;
+	}
 	const auto clearReplyTo = prependPseudoReply(message);
 	if (clearReplyTo) {
 		message.action.replyTo.messageId = FullMsgId(
@@ -841,6 +906,9 @@ void SendExistingPhoto(
 }
 
 bool SendDice(MessageToSend &message) {
+	if (message.action.history->peer->isSecretChat()) {
+		return false;
+	}
 	const auto full = QStringView(message.textWithTags.text).trimmed();
 	auto length = 0;
 	if (!Ui::Emoji::Find(full.data(), full.data() + full.size(), &length)
@@ -989,6 +1057,12 @@ bool SendDice(MessageToSend &message) {
 }
 
 void SendLocation(SendAction action, float64 lat, float64 lon) {
+	if (action.history->peer->isSecretChat()) {
+		SendToSecretChat(action, secret_decryptedMessageMediaGeoPoint(
+			secret_double(lat),
+			secret_double(lon)));
+		return;
+	}
 	SendSimpleMedia(
 		action,
 		MTP_inputMediaGeoPoint(
@@ -1000,6 +1074,16 @@ void SendLocation(SendAction action, float64 lat, float64 lon) {
 }
 
 void SendVenue(SendAction action, Data::InputVenue venue) {
+	if (action.history->peer->isSecretChat()) {
+		SendToSecretChat(action, secret_decryptedMessageMediaVenue(
+			secret_double(venue.lat),
+			secret_double(venue.lon),
+			secret_string(venue.title),
+			secret_string(venue.address),
+			secret_string(venue.provider),
+			secret_string(venue.id)));
+		return;
+	}
 	SendSimpleMedia(
 		action,
 		MTP_inputMediaVenue(
@@ -1360,6 +1444,14 @@ void AddConfirmedLocalPlaceholder(const ConfirmedLocalFile &local) {
 void SendConfirmedFile(
 		not_null<Main::Session*> session,
 		const std::shared_ptr<FilePrepareResult> &file) {
+	if (session->data().peer(file->to.peer)->isSecretChat()) {
+		if (!file->to.replaceMediaOf) {
+			const auto local = PrepareConfirmedLocalFile(session, file, 0);
+			AddConfirmedLocalPlaceholder(local);
+			session->ayuSecret().sendPrepared(file, local.newId);
+		}
+		return;
+	}
 	const auto welcomeTemplate = file->to.options.welcomeTemplate;
 	if (welcomeTemplate && file->to.replaceMediaOf) {
 		return;

@@ -597,6 +597,9 @@ void MainWidget::floatPlayerDoubleClickEvent(
 bool MainWidget::setForwardDraft(
 		not_null<Data::Thread*> thread,
 		Data::ForwardDraft &&draft) {
+	if (thread->peer()->isSecretChat()) {
+		return false;
+	}
 	const auto history = thread->owningHistory();
 	const auto items = session().data().idsToItems(draft.ids);
 	const auto topicRootId = thread->topicRootId();

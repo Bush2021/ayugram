@@ -86,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/message_shot/message_shot.h"
+#include "ayu/secret/ui/secret_ttl_box.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ui/emoji_config.h"
 
@@ -3196,7 +3197,7 @@ void HistoryItem::setRealId(MsgId newId) {
 }
 
 bool HistoryItem::canPin() const {
-	if (_deleted) {
+	if (_deleted || _history->peer->isSecretChat()) {
 		return false;
 	}
 
@@ -3261,7 +3262,7 @@ bool HistoryItem::allowsEditMedia() const {
 }
 
 bool HistoryItem::canBeEdited() const {
-	if (_deleted) {
+	if (_deleted || _history->peer->isSecretChat()) {
 		return false;
 	}
 
@@ -6573,7 +6574,9 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 	auto prepareSetMessagesTTL = [this](const MTPDmessageActionSetMessagesTTL &action) {
 		auto result = PreparedServiceText();
 		const auto period = action.vperiod().v;
-		const auto duration = (period == 5)
+		const auto duration = _history->peer->isSecretChat()
+			? AyuSecret::FormatTtl(period)
+			: (period == 5)
 			? u"5 seconds"_q
 			: Ui::FormatTTL(period);
 		if (const auto from = action.vauto_setting_from(); from && period) {

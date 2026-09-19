@@ -396,6 +396,7 @@ public:
 	[[nodiscard]] bool showBotsInDrawer() const { return _showBotsInDrawer.current(); }
 	[[nodiscard]] bool showNewGroupInDrawer() const { return _showNewGroupInDrawer.current(); }
 	[[nodiscard]] bool showNewChannelInDrawer() const { return _showNewChannelInDrawer.current(); }
+	[[nodiscard]] bool showNewSecretChatInDrawer() const { return _showNewSecretChatInDrawer.current(); }
 	[[nodiscard]] bool showContactsInDrawer() const { return _showContactsInDrawer.current(); }
 	[[nodiscard]] bool showCallsInDrawer() const { return _showCallsInDrawer.current(); }
 	[[nodiscard]] bool showSavedMessagesInDrawer() const { return _showSavedMessagesInDrawer.current(); }
@@ -484,6 +485,7 @@ public:
 	void setShowBotsInDrawer(bool val);
 	void setShowNewGroupInDrawer(bool val);
 	void setShowNewChannelInDrawer(bool val);
+	void setShowNewSecretChatInDrawer(bool val);
 	void setShowContactsInDrawer(bool val);
 	void setShowCallsInDrawer(bool val);
 	void setShowSavedMessagesInDrawer(bool val);
@@ -754,6 +756,7 @@ private:
 	rpl::variable<bool> _showBotsInDrawer = true;
 	rpl::variable<bool> _showNewGroupInDrawer = true;
 	rpl::variable<bool> _showNewChannelInDrawer = true;
+	rpl::variable<bool> _showNewSecretChatInDrawer = true;
 	rpl::variable<bool> _showContactsInDrawer = true;
 	rpl::variable<bool> _showCallsInDrawer = true;
 	rpl::variable<bool> _showSavedMessagesInDrawer = true;

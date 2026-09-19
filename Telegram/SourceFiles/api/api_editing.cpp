@@ -306,6 +306,9 @@ mtpRequestId EditMessage(
 		DoneCallback &&done,
 		FailCallback &&fail,
 		std::optional<MTPInputMedia> inputMedia = std::nullopt) {
+	if (item->history()->peer->isSecretChat()) {
+		return 0;
+	}
 	if (item->computeSuggestionActions()
 		== SuggestionActions::AcceptAndDecline) {
 		return SuggestMessageOrMedia(

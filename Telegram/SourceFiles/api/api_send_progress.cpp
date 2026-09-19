@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/secret/secret_chats.h"
 
 
 namespace Api {
@@ -122,6 +123,9 @@ void SendProgressManager::send(const Key &key, int progress) {
 	if (!ghost.sendUploadProgress())
 	{
 		DEBUG_LOG(("[AyuGram] Don't send upload progress"));
+		return;
+	} else if (const auto secret = key.history->peer->asSecretChat()) {
+		_session->ayuSecret().sendTyping(secret); // AyuGram: ayu/secret.
 		return;
 	}
 

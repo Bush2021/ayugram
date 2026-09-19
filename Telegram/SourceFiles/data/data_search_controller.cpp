@@ -531,6 +531,8 @@ void SearchController::requestMore(
 		Data *listData) {
 	if (listData->requests.contains(key)) {
 		return;
+	} else if (listData->peer->isSecretChat()) { // AyuGram: ayu/secret.
+		return;
 	}
 	auto prepared = PrepareSearchRequest(
 		listData->peer,

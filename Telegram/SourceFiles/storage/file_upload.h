@@ -82,6 +82,9 @@ public:
 	[[nodiscard]] rpl::producer<UploadSecureDone> secureReady() const {
 		return _secureReady.events();
 	}
+	[[nodiscard]] rpl::producer<UploadedMedia> secretReady() const {
+		return _secretReady.events();
+	}
 	[[nodiscard]] rpl::producer<FullMsgId> photoProgress() const {
 		return _photoProgress.events();
 	}
@@ -91,6 +94,10 @@ public:
 	[[nodiscard]] auto secureProgress() const
 	-> rpl::producer<UploadSecureProgress> {
 		return _secureProgress.events();
+	}
+	[[nodiscard]] auto secretProgress() const
+	-> rpl::producer<UploadSecureProgress> {
+		return _secretProgress.events();
 	}
 	[[nodiscard]] auto secondaryFileProgress() const
 	-> rpl::producer<UploadFileProgress> {
@@ -107,6 +114,9 @@ public:
 	}
 	[[nodiscard]] rpl::producer<FullMsgId> secureFailed() const {
 		return _secureFailed.events();
+	}
+	[[nodiscard]] rpl::producer<FullMsgId> secretFailed() const {
+		return _secretFailed.events();
 	}
 
 	[[nodiscard]] rpl::producer<FullMsgId> nonPremiumDelays() const {
@@ -211,14 +221,17 @@ private:
 	rpl::event_stream<UploadedMedia> _documentReady;
 	rpl::event_stream<UploadedMedia> _secondaryFileReady;
 	rpl::event_stream<UploadSecureDone> _secureReady;
+	rpl::event_stream<UploadedMedia> _secretReady;
 	rpl::event_stream<FullMsgId> _photoProgress;
 	rpl::event_stream<FullMsgId> _documentProgress;
 	rpl::event_stream<UploadFileProgress> _secondaryFileProgress;
 	rpl::event_stream<UploadSecureProgress> _secureProgress;
+	rpl::event_stream<UploadSecureProgress> _secretProgress;
 	rpl::event_stream<FullMsgId> _photoFailed;
 	rpl::event_stream<FullMsgId> _documentFailed;
 	rpl::event_stream<FullMsgId> _secondaryFileFailed;
 	rpl::event_stream<FullMsgId> _secureFailed;
+	rpl::event_stream<FullMsgId> _secretFailed;
 	rpl::event_stream<FullMsgId> _nonPremiumDelays;
 
 	rpl::lifetime _lifetime;

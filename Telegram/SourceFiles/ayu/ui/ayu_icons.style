@@ -73,6 +73,11 @@ dialogsExteraSupporterIcon: ThreeStateIcon {
 	over: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgOver }};
 	active: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgActive }};
 }
+ayuSecretChatIcon: ThreeStateIcon {
+	icon: icon {{ "dialogs/mini_tag_lock", historyPeer2NameFg, point(0px, 1px) }};
+	over: icon {{ "dialogs/mini_tag_lock", historyPeer2NameFg, point(0px, 1px) }};
+	active: icon {{ "dialogs/mini_tag_lock", dialogsChatIconFgActive, point(0px, 1px) }};
+}
 
 ayuHistoryFileInPlugin: icon {{ "ayu/history_file_plugin", historyFileInIconFg }};
 ayuHistoryFileInPluginSelected: icon {{ "ayu/history_file_plugin", historyFileInIconFgSelected }};

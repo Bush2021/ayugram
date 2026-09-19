@@ -29,6 +29,15 @@ stickerRoundingSize: 5px;
 
 messageShotPadding: 4px;
 
+ayuSecretKeyPatternSize: 240px;
+ayuSecretKeySkip: 12px;
+ayuInfoIconLock: icon {{ "menu/lock", infoIconFg, point(4px, 4px) }};
+ayuInfoIconTimer: icon {{ "menu/auto_delete", infoIconFg, point(4px, 4px) }};
+ayuSecretKeyHexLabel: FlatLabel(defaultFlatLabel) {
+	align: align(top);
+	textFg: windowSubTextFg;
+}
+
 topBarAdmins: IconButton {
 	width: 40px;
 	height: topBarHeight;

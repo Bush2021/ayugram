@@ -164,15 +164,12 @@ void EditExceptions(
 		box->addButton(tr::lng_settings_save(), crl::guard(context, [=] {
 			const auto peers = box->collectSelectedRows();
 			const auto rules = data->current();
-			auto &&histories = ranges::views::all(
-				peers
-			) | ranges::views::transform([=](not_null<PeerData*> peer) {
-				return window->session().data().history(peer);
-			});
-			auto changed = base::flat_set<not_null<History*>>{
-				histories.begin(),
-				histories.end()
-			};
+			auto changed = base::flat_set<not_null<History*>>();
+			for (const auto &peer : peers) {
+				if (!peer->isSecretChat()) {
+					changed.emplace(window->session().data().history(peer));
+				}
+			}
 			auto removeFrom = include ? rules.never() : rules.always();
 			for (const auto &history : changed) {
 				removeFrom.remove(history);

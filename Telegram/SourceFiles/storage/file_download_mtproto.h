@@ -65,6 +65,7 @@ private:
 	bool readyToRequest() const override;
 	int64 takeNextRequestOffset() override;
 	bool feedPart(int64 offset, const QByteArray &bytes) override;
+	bool decryptSecretFile();
 	void cancelOnFail() override;
 	bool setWebFileSizeHook(int64 size) override;
 

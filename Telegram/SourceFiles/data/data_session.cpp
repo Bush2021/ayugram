@@ -97,6 +97,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/secret/data_secret_chat.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -603,6 +604,8 @@ not_null<PeerData*> Session::peer(PeerId id) {
 			return std::make_unique<ChatData>(this, id);
 		} else if (peerIsChannel(id)) {
 			return std::make_unique<ChannelData>(this, id);
+		} else if (peerIsSecretChat(id)) { // AyuGram: ayu/secret chats.
+			return std::make_unique<SecretChatData>(this, id);
 		}
 		Unexpected("Peer id type.");
 	}();
@@ -2136,7 +2139,7 @@ HistoryItem *Session::changeMessageId(PeerId peerId, MsgId wasId, MsgId nowId) {
 	list->erase(i);
 	const auto &[j, ok] = list->emplace(nowId, item);
 
-	if (!peerIsChannel(peerId)) {
+	if (!peerIsChannel(peerId) && !peerIsSecretChat(peerId)) {
 		if (IsServerMsgId(wasId)) {
 			const auto k = _nonChannelMessages.find(wasId);
 			Assert(k != end(_nonChannelMessages));
@@ -3206,7 +3209,9 @@ void Session::registerMessage(not_null<HistoryItem*> item) {
 	}
 	list->emplace(itemId, item);
 
-	if (!peerIsChannel(peerId) && IsServerMsgId(itemId)) {
+	if (!peerIsChannel(peerId)
+		&& !peerIsSecretChat(peerId)
+		&& IsServerMsgId(itemId)) {
 		_nonChannelMessages.emplace(itemId, item);
 	}
 }
@@ -3496,7 +3501,9 @@ void Session::unregisterMessage(not_null<HistoryItem*> item) {
 	}
 	messagesListForInsert(peerId)->erase(itemId);
 
-	if (!peerIsChannel(peerId) && IsServerMsgId(itemId)) {
+	if (!peerIsChannel(peerId)
+		&& !peerIsSecretChat(peerId)
+		&& IsServerMsgId(itemId)) {
 		_nonChannelMessages.erase(itemId);
 	}
 }

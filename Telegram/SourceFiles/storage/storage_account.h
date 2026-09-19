@@ -100,6 +100,12 @@ public:
 	[[nodiscard]] bool hasDraftCursors(PeerId peerId);
 	[[nodiscard]] bool hasDraft(PeerId peerId);
 
+	// AyuGram: ayu/secret chats.
+	void writeSecretChats(const QByteArray &serialized);
+	[[nodiscard]] std::optional<QByteArray> readSecretChats();
+	void writeSecretHistory(PeerId peerId, const QByteArray &serialized);
+	[[nodiscard]] std::optional<QByteArray> readSecretHistory(PeerId peerId);
+
 	void writeFileLocation(
 		MediaKey location,
 		const Core::FileLocation &local);
@@ -326,6 +332,10 @@ private:
 		base::flat_map<Data::DraftKey, MessageDraftSource>> _draftSources;
 	base::flat_map<PeerId, FileKey> _botStoragesMap;
 	base::flat_map<PeerId, bool> _botStoragesNotReadMap;
+
+	// AyuGram: ayu/secret chats.
+	FileKey _secretChatsKey = 0;
+	base::flat_map<PeerId, FileKey> _secretHistoriesMap;
 
 	QMultiMap<MediaKey, Core::FileLocation> _fileLocations;
 	QMap<QString, QPair<MediaKey, Core::FileLocation>> _fileLocationPairs;

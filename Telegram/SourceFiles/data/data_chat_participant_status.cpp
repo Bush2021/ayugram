@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/secret/data_secret_chat.h"
 
 
 namespace {
@@ -223,6 +224,18 @@ ChatRestrictions TabbedPanelSendRestrictions() {
 	return result;
 }
 
+// AyuGram: ayu/secret chats.
+ChatRestrictions SecretChatSendRestrictions() {
+	constexpr auto result = [] {
+		auto result = ChatRestrictions();
+		for (const auto right : SecretChatSendRestrictionsList()) {
+			result |= right;
+		}
+		return result;
+	}();
+	return result;
+}
+
 // Duplicated in CanSendAnyOfValue().
 bool CanSendAnyOf(
 		not_null<const Thread*> thread,
@@ -296,6 +309,10 @@ bool CanSendAnyOf(
 			|| (!channel->isBroadcast()
 				&& (channel->hasAdminRights()
 					|| (rights & ~restricted)));
+	} else if (const auto secret = peer->asSecretChat()) {
+		// AyuGram: ayu/secret chats carry text and media only while Ready.
+		return secret->isReady()
+			&& ((rights & SecretChatSendRestrictions()) != 0);
 	}
 	Unexpected("Peer type in CanSendAnyOf.");
 }

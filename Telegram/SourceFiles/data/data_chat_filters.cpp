@@ -234,13 +234,17 @@ MTPDialogFilter ChatFilter::tl(FilterId replaceId) const {
 	auto pinned = QVector<MTPInputPeer>();
 	pinned.reserve(_pinned.size());
 	for (const auto &history : _pinned) {
-		pinned.push_back(history->peer->input());
+		if (!history->peer->isSecretChat()) {
+			pinned.push_back(history->peer->input());
+		}
 		always.remove(history);
 	}
 	auto include = QVector<MTPInputPeer>();
 	include.reserve(always.size());
 	for (const auto &history : always) {
-		include.push_back(history->peer->input());
+		if (!history->peer->isSecretChat()) {
+			include.push_back(history->peer->input());
+		}
 	}
 	auto title = MTP_textWithEntities(
 		MTP_string(_title.text),
@@ -279,7 +283,9 @@ MTPDialogFilter ChatFilter::tl(FilterId replaceId) const {
 	auto never = QVector<MTPInputPeer>();
 	never.reserve(_never.size());
 	for (const auto &history : _never) {
-		never.push_back(history->peer->input());
+		if (!history->peer->isSecretChat()) {
+			never.push_back(history->peer->input());
+		}
 	}
 	return MTP_dialogFilter(
 		MTP_flags(flags),
@@ -345,6 +351,17 @@ bool ChatFilter::contains(
 		bool ignoreFakeUnread) const {
 	const auto flag = [&] {
 		const auto peer = history->peer;
+		// AyuGram: ayu/secret chats filter as their participant user.
+		if (peer->isSecretChat()) {
+			const auto user = peer->secretChatUser();
+			return !user
+				? Flag::NonContacts
+				: user->isBot()
+				? Flag::Bots
+				: user->isContact()
+				? Flag::Contacts
+				: Flag::NonContacts;
+		}
 		if (const auto user = peer->asUser()) {
 			return user->isBot()
 				? Flag::Bots
@@ -363,7 +380,16 @@ bool ChatFilter::contains(
 			Unexpected("Peer type in ChatFilter::contains.");
 		}
 	}();
-	if (_never.contains(history)) {
+	// AyuGram: ayu/secret chats follow their user's exceptions too.
+	const auto secretUser = history->peer->secretChatUser();
+	const auto userHistory = secretUser
+		? history->owner().historyLoaded(secretUser)
+		: nullptr;
+	const auto listed = [&](const base::flat_set<not_null<History*>> &set) {
+		return set.contains(history)
+			|| (userHistory && set.contains(userHistory));
+	};
+	if (listed(_never)) {
 		return false;
 	}
 	const auto channel = history->peer->asChannel();
@@ -388,7 +414,7 @@ bool ChatFilter::contains(
 				|| (!ignoreFakeUnread && history->fakeUnreadWhileOpened()))
 			&& (!(_flags & Flag::NoArchived)
 				|| (history->folderKnown() && !history->folder())))
-		|| _always.contains(history);
+		|| listed(_always);
 }
 
 ChatFilters::ChatFilters(not_null<Session*> owner)

@@ -1382,6 +1382,9 @@ void ShowReplyToChatBox(
 			.callback = [=](Chosen thread) {
 				_singleChosen.fire_copy(thread);
 			},
+			.filter = [](Chosen thread) {
+				return !thread->peer()->isSecretChat();
+			},
 			.moneyRestrictionError = WriteMoneyRestrictionError,
 		}) {
 			_authorRow = AuthorRowSelector(

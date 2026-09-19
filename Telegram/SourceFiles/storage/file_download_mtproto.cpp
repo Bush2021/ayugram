@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtp_instance.h"
 #include "mtproto/mtproto_config.h"
 #include "mtproto/mtproto_auth_key.h"
+#include "ayu/secret/secret_media.h"
 
 mtpFileLoader::mtpFileLoader(
 	not_null<Main::Session*> session,
@@ -39,6 +40,11 @@ mtpFileLoader::mtpFileLoader(
 	autoLoading,
 	cacheTag)
 , DownloadMtprotoTask(&session->downloader(), location, origin) {
+	// WHY: a secret chat file is AES-IGE encrypted as one stream, so it can
+	// only be decrypted whole, which needs every part in memory at the end.
+	if (location.type() == StorageFileLocation::Type::Encrypted) {
+		_toCache = LoadToCacheAsWell;
+	}
 }
 
 mtpFileLoader::mtpFileLoader(
@@ -154,12 +160,30 @@ bool mtpFileLoader::feedPart(int64 offset, const QByteArray &bytes) {
 		&& (_lastComplete || (_fullSize && _nextRequestOffset >= _loadSize));
 	if (finished) {
 		removeFromQueue();
-		if (!finalizeResult()) {
+		if (!decryptSecretFile() || !finalizeResult()) {
 			return false;
 		}
 	} else {
 		notifyAboutProgress();
 	}
+	return true;
+}
+
+bool mtpFileLoader::decryptSecretFile() {
+	const auto storage = std::get_if<StorageFileLocation>(&location().data);
+	if (!storage || storage->type() != StorageFileLocation::Type::Encrypted) {
+		return true;
+	}
+	auto decrypted = AyuSecret::DecryptSecretFile(
+		_session,
+		storage->objectId(),
+		_data);
+	if (!decrypted) {
+		cancel(FailureReason::OtherFailure);
+		return false;
+	}
+	_data = std::move(*decrypted);
+	_fullSize = _loadSize = _data.size();
 	return true;
 }
 

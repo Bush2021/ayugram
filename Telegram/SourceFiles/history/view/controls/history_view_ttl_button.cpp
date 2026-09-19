@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/controls/history_view_ttl_button.h"
 
+#include "ayu/secret/ui/secret_ttl_box.h"
 #include "data/data_changes.h"
 #include "data/data_peer.h"
 #include "main/main_session.h"
@@ -37,7 +38,10 @@ TTLButton::TTLButton(
 		peer,
 		Data::PeerUpdate::Flag::MessagesTTL
 	) | rpl::on_next([=] {
-		_button.setText(Ui::FormatTTLTiny(peer->messagesTTL()));
+		const auto ttl = peer->messagesTTL();
+		_button.setText(peer->isSecretChat() // AyuGram: ayu/secret.
+			? AyuSecret::FormatTtlTiny(ttl)
+			: Ui::FormatTTLTiny(ttl));
 	}, _button.lifetime());
 }
 

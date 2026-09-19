@@ -110,6 +110,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_chats.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/platform/base_platform_haptic.h"
 
@@ -3259,7 +3261,31 @@ bool Widget::search(bool inCache, SearchRequestDelay delay) {
 		process->full = false;
 		_migratedProcess.full = false;
 		cancelSearchRequest();
-		if (inPeer) {
+		if (const auto secret = inPeer ? inPeer->asSecretChat() : nullptr) {
+			// AyuGram: ayu/secret chats search their local history.
+			process->full = true;
+			crl::on_main(this, [=, query = _searchQuery] {
+				if (_searchQuery != query || searchInPeer() != secret) {
+					return;
+				}
+				auto items = std::vector<not_null<HistoryItem*>>();
+				for (const auto &id : session().ayuSecret().search(
+						secret,
+						query)) {
+					if (const auto item = session().data().message(id)) {
+						items.push_back(item);
+					}
+				}
+				const auto count = int(items.size());
+				_inner->searchReceived(
+					std::move(items),
+					nullptr,
+					{ .start = true, .peer = true },
+					count);
+				listScrollUpdated();
+				update();
+			});
+		} else if (inPeer) {
 			const auto topic = searchInTopic();
 			auto &histories = session().data().histories();
 			const auto type = Data::Histories::RequestType::History;
