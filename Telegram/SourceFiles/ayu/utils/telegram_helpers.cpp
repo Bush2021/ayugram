@@ -15,6 +15,7 @@
 #include "ayu/data/entities.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/secret/secret_chats.h"
 #include "core/core_settings.h"
 #include "core/application.h"
 #include "base/unixtime.h"
@@ -399,6 +400,10 @@ void MarkAsReadThread(not_null<Data::Thread*> thread) {
 void readHistory(not_null<HistoryItem*> message) {
 	const auto history = message->history();
 	const auto tillId = message->id;
+	if (const auto secret = history->peer->asSecretChat()) {
+		history->session().ayuSecret().readInbox(secret, tillId, true);
+		return;
+	}
 
 	history->session().data().histories()
 		.sendRequest(history,

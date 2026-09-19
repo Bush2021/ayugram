@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_shared_media.h"
 
 // AyuGram includes
+#include "ayu/secret/data_secret_chat.h"
 #include "ayu/ui/ayu_userpic.h"
 
 
@@ -663,7 +664,9 @@ void PeerData::setHasSensitiveContent(bool has) {
 
 // This is duplicated in CanPinMessagesValue().
 bool PeerData::canPinMessages() const {
-	if (const auto user = asUser()) {
+	if (isSecretChat()) { // AyuGram: ayu/secret chats have no pinning.
+		return false;
+	} else if (const auto user = asUser()) {
 		return !user->amRestricted(ChatRestriction::PinMessages);
 	} else if (const auto chat = asChat()) {
 		return chat->amIn()
@@ -678,7 +681,9 @@ bool PeerData::canPinMessages() const {
 }
 
 bool PeerData::canCreatePolls(bool forbidInForums) const {
-	if (const auto user = asUser()) {
+	if (isSecretChat()) { // AyuGram: ayu/secret chats have no polls.
+		return false;
+	} else if (const auto user = asUser()) {
 		return user->isSelf()
 			|| (user->isBot()
 				&& !user->isSupport()
@@ -756,7 +761,9 @@ bool PeerData::canTransferGifts() const {
 }
 
 bool PeerData::canEditMessagesIndefinitely() const {
-	if (const auto user = asUser()) {
+	if (isSecretChat()) { // AyuGram: ayu/secret chats have no editing.
+		return false;
+	} else if (const auto user = asUser()) {
 		return user->isSelf();
 	} else if (isChat()) {
 		return false;
@@ -1231,6 +1238,22 @@ ChannelData *PeerData::asMonoforum() {
 const ChannelData *PeerData::asMonoforum() const {
 	const auto channel = asMegagroup();
 	return (channel && channel->isMonoforum()) ? channel : nullptr;
+}
+
+// AyuGram: ayu/secret chats.
+SecretChatData *PeerData::asSecretChat() {
+	return isSecretChat() ? static_cast<SecretChatData*>(this) : nullptr;
+}
+
+const SecretChatData *PeerData::asSecretChat() const {
+	return isSecretChat()
+		? static_cast<const SecretChatData*>(this)
+		: nullptr;
+}
+
+UserData *PeerData::secretChatUser() const {
+	const auto secret = asSecretChat();
+	return secret ? secret->user() : nullptr;
 }
 
 ChatData *PeerData::migrateFrom() const {
@@ -1868,7 +1891,9 @@ int PeerData::slowmodeSecondsLeft() const {
 }
 
 bool PeerData::canManageGroupCall() const {
-	if (const auto user = asUser()) {
+	if (isSecretChat()) { // AyuGram: ayu/secret chats have no calls.
+		return false;
+	} else if (const auto user = asUser()) {
 		return user->isSelf();
 	} else if (const auto chat = asChat()) {
 		return chat->amCreator()

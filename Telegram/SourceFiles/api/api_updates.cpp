@@ -76,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
+#include "ayu/secret/secret_chats.h"
 
 
 namespace Api {
@@ -504,9 +505,12 @@ void Updates::differenceDone(const MTPupdates_Difference &result) {
 	case mtpc_updates_differenceSlice: {
 		const auto &d = result.c_updates_differenceSlice();
 		feedDifference(d.vusers(), d.vchats(), d.vnew_messages(), d.vother_updates());
+		// AyuGram: ayu/secret chats.
+		session().ayuSecret().applyDifference(d.vnew_encrypted_messages());
 
 		const auto &s = d.vintermediate_state().c_updates_state();
 		setState(s.vpts().v, s.vdate().v, s.vqts().v, s.vseq().v);
+		session().ayuSecret().applyQts(s.vqts().v); // AyuGram: ayu/secret.
 
 		_ptsWaiter.setRequesting(false);
 
@@ -518,8 +522,13 @@ void Updates::differenceDone(const MTPupdates_Difference &result) {
 	case mtpc_updates_difference: {
 		const auto &d = result.c_updates_difference();
 		feedDifference(d.vusers(), d.vchats(), d.vnew_messages(), d.vother_updates());
+		// AyuGram: ayu/secret chats.
+		session().ayuSecret().applyDifference(d.vnew_encrypted_messages());
 
 		stateDone(d.vstate());
+		// AyuGram: ayu/secret chats.
+		session().ayuSecret().applyQts(
+			d.vstate().c_updates_state().vqts().v);
 	} break;
 	case mtpc_updates_differenceTooLong: {
 		LOG(("API Error: updates.differenceTooLong is not supported by Telegram Desktop!"));
@@ -2187,15 +2196,21 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 	} break;
 
 	case mtpc_updateNewEncryptedMessage: {
+		const auto &d = update.c_updateNewEncryptedMessage();
+		session().ayuSecret().apply(update); // AyuGram: ayu/secret chats.
+		setState(0, 0, d.vqts().v, 0);
 	} break;
 
 	case mtpc_updateEncryptedChatTyping: {
+		session().ayuSecret().apply(update); // AyuGram: ayu/secret chats.
 	} break;
 
 	case mtpc_updateEncryption: {
+		session().ayuSecret().apply(update); // AyuGram: ayu/secret chats.
 	} break;
 
 	case mtpc_updateEncryptedMessagesRead: {
+		session().ayuSecret().apply(update); // AyuGram: ayu/secret chats.
 	} break;
 
 	case mtpc_updatePhoneCall:

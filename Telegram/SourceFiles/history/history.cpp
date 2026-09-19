@@ -3412,6 +3412,8 @@ bool History::trackUnreadMessages() const {
 bool History::shouldBeInChatList() const {
 	if (peer->migrateTo() || !folderKnown()) {
 		return false;
+	} else if (peer->isSecretChat()) { // AyuGram: ayu/secret chats.
+		return true;
 	} else if (const auto community = peer->asChannel()
 		; community && community->isCommunity()) {
 		return !(community->flags() & ChannelDataFlag::Forbidden)

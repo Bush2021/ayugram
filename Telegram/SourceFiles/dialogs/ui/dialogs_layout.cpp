@@ -973,6 +973,8 @@ void PaintRow(
 		}
 		p.setPen(context.active
 			? st::dialogsNameFgActive
+			: from->isSecretChat() // AyuGram: ayu/secret.
+			? st::historyPeer2NameFg
 			: context.selected
 			? st::dialogsNameFgOver
 			: st::dialogsNameFg);
@@ -1112,7 +1114,12 @@ const style::icon *ChatTypeIcon(not_null<PeerData*> peer) {
 const style::icon *ChatTypeIcon(
 		not_null<PeerData*> peer,
 		const PaintContext &context) {
-	if (const auto user = peer->asUser()) {
+	if (peer->isSecretChat()) { // AyuGram: ayu/secret.
+		return &ThreeStateIcon(
+			st::ayuSecretChatIcon,
+			context.active,
+			context.selected);
+	} else if (const auto user = peer->asUser()) {
 		if (ShowUserBotIcon(user)) {
 			return &ThreeStateIcon(
 				st::dialogsBotIcon,

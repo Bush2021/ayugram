@@ -111,6 +111,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/secret_chats.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/forward/ayu_forward.h"
 
@@ -138,6 +140,9 @@ using UpdatedFileReferences = Data::UpdatedFileReferences;
 		not_null<Main::Session*> session,
 		not_null<Data::Thread*> thread) {
 	const auto history = thread->owningHistory();
+	if (history->peer->isSecretChat()) { // AyuGram: ayu/secret, local only.
+		return true;
+	}
 	const auto topicRootId = thread->topicRootId();
 	const auto monoforumPeerId = thread->monoforumPeerId();
 	const auto cloudDraft = history->cloudDraft(topicRootId, monoforumPeerId);
@@ -1222,7 +1227,9 @@ void ApiWrap::requestWallPaper(
 }
 
 void ApiWrap::requestFullPeer(not_null<PeerData*> peer) {
-	if (_fullPeerRequests.contains(peer)) {
+	if (peer->isSecretChat()) { // AyuGram: ayu/secret chats have no full.
+		return;
+	} else if (_fullPeerRequests.contains(peer)) {
 		return;
 	} else if (!peer->isUser() && !peer->barSettings().has_value()) {
 		requestPeerSettings(peer);
@@ -2256,7 +2263,7 @@ void ApiWrap::deleteHistory(
 		int retries) {
 	auto deleteTillId = MsgId(0);
 	const auto history = _session->data().history(peer);
-	if (justClear) {
+	if (justClear && !peer->isSecretChat()) { // AyuGram: ayu/secret.
 		// In case of clear history we need to know the last server message.
 		while (history->lastMessageKnown()) {
 			const auto last = history->lastMessage();
@@ -2903,6 +2910,19 @@ void ApiWrap::refreshFileReference(
 				}
 			}
 			const auto media = item->media();
+			if (item->history()->peer->isSecretChat()) {
+				// AyuGram: ayu/secret stickers refresh through their set.
+				const auto document = media ? media->document() : nullptr;
+				const auto sticker = document ? document->sticker() : nullptr;
+				if (sticker && sticker->set) {
+					request(MTPmessages_GetStickerSet(
+						Data::InputStickerSet(sticker->set),
+						MTP_int(0))); // hash
+				} else {
+					fail();
+				}
+				return;
+			}
 			const auto mediaStory = media ? media->storyId() : FullStoryId();
 			const auto storyId = mediaStory
 				? mediaStory
@@ -3649,6 +3669,8 @@ void ApiWrap::requestHistory(
 	};
 	if (_historyRequests.contains(key)) {
 		return;
+	} else if (peer->isSecretChat()) { // AyuGram: ayu/secret, all local.
+		return;
 	}
 
 	const auto prepared = Api::PrepareHistoryRequest(peer, messageId, slice);
@@ -3702,6 +3724,27 @@ void ApiWrap::requestSharedMedia(
 		slice,
 	};
 	if (_sharedMediaRequests.contains(key)) {
+		return;
+	} else if (peer->isSecretChat()) {
+		// WHY: secret chats have no cloud history to search, and
+		// Histories::sendRequest asserts on them. The whole history is
+		// local, so the answer is one full slice of the stored messages.
+		crl::on_main(_session, [=] {
+			auto found = Api::SearchResult();
+			if (const auto secret = peer->asSecretChat()) {
+				found.messageIds = _session->ayuSecret().sharedMedia(
+					secret,
+					type);
+			}
+			found.noSkipRange = MsgRange{ 0, ServerMaxMsgId };
+			found.fullCount = int(found.messageIds.size());
+			sharedMediaDone(
+				peer,
+				topicRootId,
+				monoforumPeerId,
+				type,
+				std::move(found));
+		});
 		return;
 	}
 
@@ -3865,6 +3908,11 @@ void ApiWrap::forwardMessages(
 		SendAction action,
 		FnMut<void()> &&successCallback) {
 	Expects(!draft.items.empty());
+
+	// AyuGram: ayu/secret chats.
+	if (action.history->peer->isSecretChat()) {
+		return;
+	}
 
 	const auto fullAyuForward = AyuForward::isFullAyuForwardNeeded(draft.items.front());
 	if (fullAyuForward) {
@@ -4186,6 +4234,11 @@ void ApiWrap::sendSharedContact(
 		UserId userId,
 		const SendAction &action,
 		Fn<void(bool)> done) {
+	// AyuGram: ayu/secret chats.
+	if (action.history->peer->isSecretChat()) {
+		return;
+	}
+
 	sendAction(action);
 
 	const auto history = action.history;
@@ -4397,7 +4450,10 @@ void ApiWrap::sendFiles(
 		}));
 	}
 	if (album) {
-		_sendingAlbums.emplace(album->groupId, album);
+		// AyuGram: ayu/secret albums are grouped by the engine.
+		if (!action.history->peer->isSecretChat()) {
+			_sendingAlbums.emplace(album->groupId, album);
+		}
 		album->items.reserve(tasks.size());
 		for (const auto &task : tasks) {
 			album->items.emplace_back(task->id());
@@ -4748,6 +4804,21 @@ void ApiWrap::sendRichMessage(
 void ApiWrap::sendMessage(
 		MessageToSend &&message,
 		std::optional<MsgId> localMessageId) {
+	// AyuGram: ayu/secret chats.
+	if (const auto secret = message.action.history->peer->asSecretChat()) {
+		sendAction(message.action);
+		_session->ayuSecret().sendText(
+			secret,
+			TextWithEntities{
+				message.textWithTags.text,
+				TextUtilities::ConvertTextTagsToEntities(
+					message.textWithTags.tags),
+			},
+			message.action.replyTo.messageId,
+			message.action.options.silent);
+		return;
+	}
+
 	applyGhostScheduling(_session, message.action.options);
 	const auto clearReplyTo = prependPseudoReply(message);
 
@@ -5080,6 +5151,11 @@ void ApiWrap::sendBotStart(
 		const QString &startTokenForChat) {
 	Expects(bot->isBot());
 
+	// AyuGram: ayu/secret chats.
+	if (chat && chat->isSecretChat()) {
+		return;
+	}
+
 	if (chat && chat->isChannel() && !chat->isMegagroup()) {
 		ShowAddParticipantsError(show, "USER_BOT", chat, bot);
 		return;
@@ -5127,6 +5203,11 @@ void ApiWrap::sendInlineResult(
 		SendAction action,
 		std::optional<MsgId> localMessageId,
 		Fn<void(bool)> done) {
+	// AyuGram: ayu/secret chats.
+	if (action.history->peer->isSecretChat()) {
+		return;
+	}
+
 	StripEphemeralReply(_session, action.replyTo);
 	sendAction(action);
 

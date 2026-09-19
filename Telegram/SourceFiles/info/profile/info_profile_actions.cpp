@@ -118,6 +118,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 
 // AyuGram includes
+#include "ayu/secret/data_secret_chat.h"
+#include "ayu/secret/ui/secret_key_box.h"
+#include "ayu/secret/ui/secret_ttl_box.h"
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_ayu_styles.h"
@@ -1301,6 +1304,7 @@ private:
 	void addJoinChannelAction(not_null<ChannelData*> channel);
 	void fillUserActions(not_null<UserData*> user);
 	void fillChannelActions(not_null<ChannelData*> channel);
+	void fillSecretActions(not_null<SecretChatData*> secret);
 
 	not_null<Controller*> _controller;
 	not_null<Ui::RpWidget*> _parent;
@@ -3356,6 +3360,39 @@ void ActionsFiller::fillChannelActions(
 	}
 }
 
+void ActionsFiller::fillSecretActions(not_null<SecretChatData*> secret) {
+	const auto show = _controller->uiShow();
+	auto ready = secret->stateValue(
+	) | rpl::map([](SecretChatData::State state) {
+		return (state == SecretChatData::State::Ready);
+	}) | rpl::start_spawning(_wrap->lifetime());
+	AddActionButton(
+		_wrap,
+		tr::ayu_SecretChatKey(),
+		rpl::duplicate(ready),
+		[=] { show->showBox(Box(AyuSecret::SecretKeyBox, secret)); },
+		&st::ayuInfoIconLock);
+	const auto timer = AddActionButton(
+		_wrap,
+		tr::lng_manage_messages_ttl_title(),
+		rpl::duplicate(ready),
+		[=] { show->showBox(Box(AyuSecret::SecretTtlBox, secret)); },
+		&st::ayuInfoIconTimer);
+	::Settings::CreateRightLabel(
+		timer->entity(),
+		secret->session().changes().peerFlagsValue(
+			secret,
+			Data::PeerUpdate::Flag::MessagesTTL
+		) | rpl::map([=] {
+			const auto ttl = secret->messagesTTL();
+			return ttl
+				? AyuSecret::FormatTtl(ttl)
+				: tr::lng_settings_ttl_after_off(tr::now);
+		}),
+		st::infoSharedMediaButton,
+		tr::lng_manage_messages_ttl_title());
+}
+
 object_ptr<Ui::RpWidget> ActionsFiller::fill() {
 	auto wrapResult = [=](auto &&callback) {
 		_wrap = object_ptr<Ui::VerticalLayout>(_parent);
@@ -3372,6 +3409,11 @@ object_ptr<Ui::RpWidget> ActionsFiller::fill() {
 		}
 		return wrapResult([=] {
 			fillChannelActions(channel);
+		});
+	} else if (const auto secret = _peer->asSecretChat()) {
+		// AyuGram: ayu/secret.
+		return wrapResult([=] {
+			fillSecretActions(secret);
 		});
 	}
 	return { nullptr };

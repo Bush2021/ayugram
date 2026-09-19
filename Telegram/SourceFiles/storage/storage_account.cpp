@@ -104,6 +104,10 @@ enum { // Local Storage Keys
 	lskMediaLastPlaybackPositions = 0x1c, // no data
 	lskBotStorages = 0x1d, // data: PeerId botId
 	lskPrefs = 0x1e, // no data
+
+	// AyuGram: ayu/secret chats.
+	lskSecretChats = 0x1f, // no data
+	lskSecretHistories = 0x20, // data: PeerId peer
 };
 
 auto EmptyMessageDraftSources()
@@ -271,6 +275,8 @@ base::flat_set<QString> Account::collectGoodNames() const {
 		_roundPlaceholderKey,
 		_inlineBotsDownloadsKey,
 		_mediaLastPlaybackPositionsKey,
+
+		_secretChatsKey, // AyuGram: ayu/secret chats.
 	};
 	auto result = base::flat_set<QString>{
 		"map0",
@@ -296,6 +302,10 @@ base::flat_set<QString> Account::collectGoodNames() const {
 		push(value);
 	}
 	for (const auto &[key, value] : _botStoragesMap) {
+		push(value);
+	}
+	// AyuGram: ayu/secret chats.
+	for (const auto &[key, value] : _secretHistoriesMap) {
 		push(value);
 	}
 	for (const auto &value : keys) {
@@ -366,6 +376,11 @@ Account::ReadMapResult Account::readMapWith(
 	quint64 inlineBotsDownloadsKey = 0;
 	quint64 mediaLastPlaybackPositionsKey = 0;
 	QByteArray webviewStorageTokenBots, webviewStorageTokenOther;
+
+	// AyuGram: ayu/secret chats.
+	quint64 secretChatsKey = 0;
+	base::flat_map<PeerId, FileKey> secretHistoriesMap;
+
 	while (!map.stream.atEnd()) {
 		quint32 keyType;
 		map.stream >> keyType;
@@ -412,6 +427,23 @@ Account::ReadMapResult Account::readMapWith(
 		case lskPrefs: {
 			map.stream >> prefsKey;
 		} break;
+
+		// AyuGram: ayu/secret chats.
+		case lskSecretChats: {
+			map.stream >> secretChatsKey;
+		} break;
+		case lskSecretHistories: {
+			quint32 count = 0;
+			map.stream >> count;
+			for (quint32 i = 0; i < count; ++i) {
+				FileKey key;
+				quint64 peerIdSerialized;
+				map.stream >> key >> peerIdSerialized;
+				const auto peerId = DeserializePeerId(peerIdSerialized);
+				secretHistoriesMap.emplace(peerId, key);
+			}
+		} break;
+
 		case lskLocations: {
 			map.stream >> locationsKey;
 		} break;
@@ -545,6 +577,11 @@ Account::ReadMapResult Account::readMapWith(
 	_roundPlaceholderKey = roundPlaceholderKey;
 	_inlineBotsDownloadsKey = inlineBotsDownloadsKey;
 	_mediaLastPlaybackPositionsKey = mediaLastPlaybackPositionsKey;
+
+	// AyuGram: ayu/secret chats.
+	_secretChatsKey = secretChatsKey;
+	_secretHistoriesMap = secretHistoriesMap;
+
 	_oldMapVersion = mapData.version;
 	_webviewStorageIdBots.token = webviewStorageTokenBots;
 	_webviewStorageIdOther.token = webviewStorageTokenOther;
@@ -668,6 +705,10 @@ void Account::writeMap() {
 	if (_mediaLastPlaybackPositionsKey) mapSize += sizeof(quint32) + sizeof(quint64);
 	if (!_botStoragesMap.empty()) mapSize += sizeof(quint32) * 2 + _botStoragesMap.size() * sizeof(quint64) * 2;
 
+	// AyuGram: ayu/secret chats.
+	if (_secretChatsKey) mapSize += sizeof(quint32) + sizeof(quint64);
+	if (!_secretHistoriesMap.empty()) mapSize += sizeof(quint32) * 2 + _secretHistoriesMap.size() * sizeof(quint64) * 2;
+
 	EncryptedDescriptor mapData(mapSize);
 	if (!self.isEmpty()) {
 		mapData.stream << quint32(lskSelfSerialized) << self;
@@ -758,6 +799,18 @@ void Account::writeMap() {
 			mapData.stream << quint64(value) << SerializePeerId(key);
 		}
 	}
+
+	// AyuGram: ayu/secret chats.
+	if (_secretChatsKey) {
+		mapData.stream << quint32(lskSecretChats) << quint64(_secretChatsKey);
+	}
+	if (!_secretHistoriesMap.empty()) {
+		mapData.stream << quint32(lskSecretHistories) << quint32(_secretHistoriesMap.size());
+		for (const auto &[key, value] : _secretHistoriesMap) {
+			mapData.stream << quint64(value) << SerializePeerId(key);
+		}
+	}
+
 	map.writeEncrypted(mapData, _localKey);
 
 	_mapChanged = false;
@@ -792,6 +845,11 @@ void Account::reset() {
 	_roundPlaceholderKey = 0;
 	_inlineBotsDownloadsKey = 0;
 	_mediaLastPlaybackPositionsKey = 0;
+
+	// AyuGram: ayu/secret chats.
+	_secretChatsKey = 0;
+	_secretHistoriesMap.clear();
+
 	_oldMapVersion = 0;
 	_fileLocations.clear();
 	_fileLocationPairs.clear();
@@ -1752,6 +1810,102 @@ bool Account::hasDraftCursors(PeerId peer) {
 
 bool Account::hasDraft(PeerId peer) {
 	return _draftsMap.contains(peer);
+}
+
+// AyuGram: ayu/secret chats.
+void Account::writeSecretChats(const QByteArray &serialized) {
+	if (serialized.isEmpty()) {
+		if (_secretChatsKey) {
+			ClearKey(_secretChatsKey, _basePath);
+			_secretChatsKey = 0;
+			writeMapDelayed();
+		}
+		return;
+	}
+	if (!_secretChatsKey) {
+		_secretChatsKey = GenerateKey(_basePath);
+		writeMapQueued();
+	}
+
+	const auto size = quint32(Serialize::bytearraySize(serialized));
+	EncryptedDescriptor data(size);
+	data.stream << serialized;
+
+	FileWriteDescriptor file(_secretChatsKey, _basePath);
+	file.writeEncrypted(data, _localKey);
+}
+
+QByteArray Account::readSecretChats() {
+	if (!_secretChatsKey) {
+		return QByteArray();
+	}
+
+	FileReadDescriptor chats;
+	if (!ReadEncryptedFile(chats, _secretChatsKey, _basePath, _localKey)) {
+		ClearKey(_secretChatsKey, _basePath);
+		_secretChatsKey = 0;
+		writeMapDelayed();
+		return QByteArray();
+	}
+
+	auto result = QByteArray();
+	chats.stream >> result;
+	return CheckStreamStatus(chats.stream) ? result : QByteArray();
+}
+
+void Account::writeSecretHistory(PeerId peerId, const QByteArray &serialized) {
+	if (serialized.isEmpty()) {
+		const auto i = _secretHistoriesMap.find(peerId);
+		if (i != _secretHistoriesMap.cend()) {
+			ClearKey(i->second, _basePath);
+			_secretHistoriesMap.erase(i);
+			writeMapDelayed();
+		}
+		return;
+	}
+
+	auto i = _secretHistoriesMap.find(peerId);
+	if (i == _secretHistoriesMap.cend()) {
+		i = _secretHistoriesMap.emplace(peerId, GenerateKey(_basePath)).first;
+		writeMapQueued();
+	}
+
+	const auto size = quint32(sizeof(quint64)
+		+ Serialize::bytearraySize(serialized));
+	EncryptedDescriptor data(size);
+	data.stream << SerializePeerId(peerId) << serialized;
+
+	FileWriteDescriptor file(i->second, _basePath);
+	file.writeEncrypted(data, _localKey);
+}
+
+QByteArray Account::readSecretHistory(PeerId peerId) {
+	const auto i = _secretHistoriesMap.find(peerId);
+	if (i == _secretHistoriesMap.cend()) {
+		return QByteArray();
+	}
+
+	const auto clear = [&] {
+		ClearKey(i->second, _basePath);
+		_secretHistoriesMap.erase(i);
+		writeMapDelayed();
+	};
+
+	FileReadDescriptor history;
+	if (!ReadEncryptedFile(history, i->second, _basePath, _localKey)) {
+		clear();
+		return QByteArray();
+	}
+
+	auto peerIdSerialized = quint64();
+	auto result = QByteArray();
+	history.stream >> peerIdSerialized >> result;
+	if (!CheckStreamStatus(history.stream)
+		|| DeserializePeerId(peerIdSerialized) != peerId) {
+		clear();
+		return QByteArray();
+	}
+	return result;
 }
 
 void Account::writeFileLocation(MediaKey location, const Core::FileLocation &local) {

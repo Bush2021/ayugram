@@ -83,6 +83,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/secret/ui/secret_chat_menu.h"
 #include "boxes/abstract_box.h"
 #include "styles/style_ayu_icons.h"
 #include "lang_auto.h"
@@ -744,6 +745,14 @@ void MainMenu::setupMenu() {
 			if (which == Qt::LeftButton) {
 				controller->showNewChannel();
 			}
+		});
+
+		if (settings.showNewSecretChatInDrawer())
+		addAction(
+			tr::ayu_NewSecretChat(),
+			{ &st::menuIconLock }
+		)->setClickedCallback([=] {
+			AyuSecret::ShowNewSecretChatBox(controller);
 		});
 
 		if (settings.showContactsInDrawer())

@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/secret/data_secret_chat.h"
 
 
 namespace Data {
@@ -317,6 +318,13 @@ inline auto DefaultRestrictionValue(
 						|| (!(flags & Flag::Broadcast)
 							&& (rights & ~restricted)));
 			});
+	} else if (const auto secret = peer->asSecretChat()) {
+		// AyuGram: ayu/secret chats carry text and media only while Ready.
+		return secret->stateValue(
+		) | rpl::map([=](SecretChatData::State state) {
+			return (state == SecretChatData::State::Ready)
+				&& ((rights & SecretChatSendRestrictions()) != 0);
+		});
 	}
 	Unexpected("Peer type in Data::CanSendAnyOfValue.");
 }
@@ -324,7 +332,9 @@ inline auto DefaultRestrictionValue(
 // This is duplicated in PeerData::canPinMessages().
 rpl::producer<bool> CanPinMessagesValue(not_null<PeerData*> peer) {
 	using namespace rpl::mappers;
-	if (const auto user = peer->asUser()) {
+	if (peer->isSecretChat()) { // AyuGram: ayu/secret chats have no pinning.
+		return rpl::single(false);
+	} else if (const auto user = peer->asUser()) {
 		return PeerFlagsValue(
 			user,
 			UserDataFlag::CanPinMessages

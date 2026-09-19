@@ -45,6 +45,9 @@ include(cmake/td_webauthn.cmake)
 include(cmake/telegram_apple_swift_runtime.cmake)
 include(cmake/generate_appstream_changelog.cmake)
 
+# AyuGram secret chats
+include(${src_loc}/ayu/secret/secret_scheme.cmake)
+
 if (DESKTOP_APP_TEST_APPS)
     include(cmake/tests.cmake)
 endif()
@@ -105,6 +108,7 @@ PRIVATE
 
     # AyuGram filters
     ayugram::lib_icu
+    ayugram::td_ayu_secret_scheme
 )
 
 set(ayugram_files
@@ -243,6 +247,33 @@ set(ayugram_files
         ayu/data/entities.h
         ayu/data/ayu_database.cpp
         ayu/data/ayu_database.h
+        ayu/secret/scheme/secret_tl_core.h
+        ayu/secret/secret_crypto.cpp
+        ayu/secret/secret_crypto.h
+        ayu/secret/data_secret_chat.cpp
+        ayu/secret/data_secret_chat.h
+        ayu/secret/secret_chat_state.cpp
+        ayu/secret/secret_chat_state.h
+        ayu/secret/secret_chats.cpp
+        ayu/secret/secret_chats.h
+        ayu/secret/secret_dh.cpp
+        ayu/secret/secret_dh.h
+        ayu/secret/secret_inbound.cpp
+        ayu/secret/secret_inbound.h
+        ayu/secret/secret_media.cpp
+        ayu/secret/secret_media.h
+        ayu/secret/secret_messages.cpp
+        ayu/secret/secret_messages.h
+        ayu/secret/secret_outbound.cpp
+        ayu/secret/secret_outbound.h
+        ayu/secret/secret_status.cpp
+        ayu/secret/secret_status.h
+        ayu/secret/ui/secret_chat_menu.cpp
+        ayu/secret/ui/secret_chat_menu.h
+        ayu/secret/ui/secret_key_box.cpp
+        ayu/secret/ui/secret_key_box.h
+        ayu/secret/ui/secret_ttl_box.cpp
+        ayu/secret/ui/secret_ttl_box.h
 
         info/profile/info_profile_music_button.cpp
         info/profile/info_profile_music_button.h

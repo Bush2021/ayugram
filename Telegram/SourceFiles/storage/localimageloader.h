@@ -51,6 +51,8 @@ enum class SendMediaType {
 
 	// Uploaded just to get an InputFile, without a document or a message.
 	SecondaryFile,
+
+	SecretFile, // AyuGram: ayu/secret, already encrypted bytes.
 };
 
 using TaskId = void*; // no interface, just id

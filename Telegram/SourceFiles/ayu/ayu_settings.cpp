@@ -1054,6 +1054,12 @@ void AyuSettings::setShowNewChannelInDrawer(bool val) {
 	save();
 }
 
+void AyuSettings::setShowNewSecretChatInDrawer(bool val) {
+	if (_showNewSecretChatInDrawer.current() == val) return;
+	_showNewSecretChatInDrawer = val;
+	save();
+}
+
 void AyuSettings::setShowContactsInDrawer(bool val) {
 	if (_showContactsInDrawer.current() == val) return;
 	_showContactsInDrawer = val;
@@ -1324,6 +1330,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showBotsInDrawer", s._showBotsInDrawer.current()},
 		{"showNewGroupInDrawer", s._showNewGroupInDrawer.current()},
 		{"showNewChannelInDrawer", s._showNewChannelInDrawer.current()},
+		{"showNewSecretChatInDrawer", s._showNewSecretChatInDrawer.current()},
 		{"showContactsInDrawer", s._showContactsInDrawer.current()},
 		{"showCallsInDrawer", s._showCallsInDrawer.current()},
 		{"showSavedMessagesInDrawer", s._showSavedMessagesInDrawer.current()},
@@ -1435,6 +1442,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showBotsInDrawer = j.value("showBotsInDrawer", defaults._showBotsInDrawer.current());
 	s._showNewGroupInDrawer = j.value("showNewGroupInDrawer", defaults._showNewGroupInDrawer.current());
 	s._showNewChannelInDrawer = j.value("showNewChannelInDrawer", defaults._showNewChannelInDrawer.current());
+	s._showNewSecretChatInDrawer = j.value("showNewSecretChatInDrawer", defaults._showNewSecretChatInDrawer.current());
 	s._showContactsInDrawer = j.value("showContactsInDrawer", defaults._showContactsInDrawer.current());
 	s._showCallsInDrawer = j.value("showCallsInDrawer", defaults._showCallsInDrawer.current());
 	s._showSavedMessagesInDrawer = j.value("showSavedMessagesInDrawer", defaults._showSavedMessagesInDrawer.current());

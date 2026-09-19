@@ -97,6 +97,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/secret/data_secret_chat.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -603,6 +604,8 @@ not_null<PeerData*> Session::peer(PeerId id) {
 			return std::make_unique<ChatData>(this, id);
 		} else if (peerIsChannel(id)) {
 			return std::make_unique<ChannelData>(this, id);
+		} else if (peerIsSecretChat(id)) { // AyuGram: ayu/secret chats.
+			return std::make_unique<SecretChatData>(this, id);
 		}
 		Unexpected("Peer id type.");
 	}();

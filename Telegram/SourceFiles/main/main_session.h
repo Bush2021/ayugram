@@ -84,6 +84,10 @@ namespace Ui {
 struct ColorIndicesCompressed;
 } // namespace Ui
 
+namespace AyuSecret { // AyuGram: ayu/secret chats.
+class Chats;
+} // namespace AyuSecret
+
 namespace Main {
 
 class Account;
@@ -213,6 +217,10 @@ public:
 	[[nodiscard]] Data::Session &data() const {
 		return *_data;
 	}
+	// AyuGram: ayu/secret chats.
+	[[nodiscard]] AyuSecret::Chats &ayuSecret() const {
+		return *_ayuSecret;
+	}
 	[[nodiscard]] SessionSettings &settings() const {
 		return *_settings;
 	}
@@ -320,6 +328,9 @@ private:
 	// _data depends on _downloader / _uploader.
 	const std::unique_ptr<Data::Session> _data;
 	const not_null<UserData*> _user;
+
+	// AyuGram: ayu/secret chats, destroyed before _data.
+	const std::unique_ptr<AyuSecret::Chats> _ayuSecret;
 
 	// _emojiStickersPack depends on _data.
 	const std::unique_ptr<Stickers::EmojiPack> _emojiStickersPack;

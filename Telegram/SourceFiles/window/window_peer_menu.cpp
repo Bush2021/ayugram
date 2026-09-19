@@ -144,6 +144,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_ayu_icons.h"
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/secret/ui/secret_chat_menu.h"
 
 
 namespace Window {
@@ -1934,6 +1935,7 @@ void Filler::fillHistoryActions() {
 	addInfo();
 	AyuUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);
 	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
+	AyuSecret::AddSecretChatActions(_peer, _controller, _addAction);
 	addViewAsTopics();
 	addManageChat();
 	addStoryArchive();
@@ -1972,6 +1974,7 @@ void Filler::fillProfileActions() {
 	addToggleTopicClosed();
 	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
 	AyuUi::AddShadowBanAction(_peer, _addAction);
+	AyuSecret::AddSecretChatActions(_peer, _controller, _addAction);
 	addViewDiscussion();
 	addDirectMessages();
 	addExportChat();

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 
 #include "apiwrap.h"
+#include "ayu/secret/data_secret_chat.h"
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -91,6 +92,8 @@ void DeleteMessagesBox::prepare() {
 	auto deleteStyle = &st::defaultBoxButton;
 	auto canDelete = true;
 	if (const auto peer = _wipeHistoryPeer) {
+		// AyuGram: ayu/secret.
+		const auto privateLike = peer->isUser() || peer->isSecretChat();
 		if (!_wipeHistoryFirstToDelete.isNull()) {
 			details = (_wipeHistoryFirstToDelete
 				== _wipeHistoryLastToDelete)
@@ -121,7 +124,7 @@ void DeleteMessagesBox::prepare() {
 					peer->name())
 				: peer->isSelf()
 				? tr::lng_sure_delete_saved_messages(tr::now)
-				: peer->isUser()
+				: privateLike
 				? tr::lng_sure_delete_history(
 					tr::now,
 					lt_contact,
@@ -135,7 +138,7 @@ void DeleteMessagesBox::prepare() {
 		} else {
 			details.text = peer->isSelf()
 				? tr::lng_sure_delete_saved_messages(tr::now)
-				: peer->isUser()
+				: privateLike
 				? tr::lng_sure_delete_history(
 					tr::now,
 					lt_contact,
@@ -149,7 +152,7 @@ void DeleteMessagesBox::prepare() {
 				? tr::lng_sure_leave_group(tr::now)
 				: tr::lng_sure_leave_channel(tr::now);
 			details = tr::rich(details.text);
-			if (!peer->isUser()) {
+			if (!privateLike) {
 				*deleteText = tr::lng_box_leave();
 			}
 			deleteStyle = &st::attentionBoxButton;
@@ -162,7 +165,7 @@ void DeleteMessagesBox::prepare() {
 				false,
 				st::defaultBoxCheckbox);
 			appendDetails(std::move(revoke->description));
-			if (!peer->isUser() && !_wipeHistoryJustClear) {
+			if (!privateLike && !_wipeHistoryJustClear) {
 				_revoke->checkedValue(
 				) | rpl::on_next([=](bool revokeForAll) {
 					*deleteText = revokeForAll
@@ -176,6 +179,12 @@ void DeleteMessagesBox::prepare() {
 			appendDetails({
 				tr::lng_delete_clear_for_me(tr::now)
 			});
+		} else if (_wipeHistoryJustClear && peer->isSecretChat()) {
+			appendDetails(tr::ayu_SecretChatClearHint(
+				tr::now,
+				lt_user,
+				tr::bold(peer->name()),
+				tr::marked));
 		}
 	} else {
 		details.text = hasSavedMusicMessages()
@@ -216,6 +225,10 @@ void DeleteMessagesBox::prepare() {
 					setDimensions(st::boxWidth, _fullHeight + h);
 				}, lifetime());
 				appendDetails(std::move(revoke->description));
+			} else if (peer->isSecretChat()) {
+				appendDetails({
+					tr::lng_delete_for_everyone_hint(tr::now, lt_count, count)
+				});
 			} else if (peer->isChannel()) {
 				if (peer->isMegagroup()) {
 					appendDetails({
@@ -345,7 +358,18 @@ PeerData *DeleteMessagesBox::checkFromSinglePeer() const {
 auto DeleteMessagesBox::revokeText(not_null<PeerData*> peer) const
 -> std::optional<RevokeConfig> {
 	auto result = RevokeConfig();
-	if (peer == _wipeHistoryPeer) {
+	if (const auto secret = peer->asSecretChat()) {
+		const auto user = secret->user();
+		if (peer != _wipeHistoryPeer || _wipeHistoryJustClear || !user) {
+			return std::nullopt; // AyuGram: ayu/secret deletes reach both.
+		}
+		result.checkbox = tr::lng_delete_for_other_check(
+			tr::now,
+			lt_user,
+			{ user->firstName },
+			tr::rich);
+		return result;
+	} else if (peer == _wipeHistoryPeer) {
 		if (!peer->canRevokeFullHistory()) {
 			return std::nullopt;
 		} else if (const auto user = peer->asUser()) {
