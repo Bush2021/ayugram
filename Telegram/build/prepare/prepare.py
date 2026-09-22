@@ -926,7 +926,7 @@ mac:
 """)
 
 stage('libde265', """
-    git clone -b v1.1.1 https://github.com/strukturag/libde265.git
+    git clone -b v1.1.3 https://github.com/strukturag/libde265.git
     cd libde265
 win:
     cmake . ^
@@ -997,7 +997,7 @@ mac:
 """)
 
 stage('libheif', """
-    git clone -b v1.23.1 https://github.com/strukturag/libheif.git
+    git clone -b v1.23.4 https://github.com/strukturag/libheif.git
     cd libheif
 win:
     %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed.exe -i 's/LIBHEIF_EXPORTS/LIBDE265_STATIC_BUILD/g' libheif/CMakeLists.txt
