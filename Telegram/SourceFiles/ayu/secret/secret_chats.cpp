@@ -45,6 +45,8 @@
 #include "ui/toast/toast.h"
 #include "styles/style_boxes.h"
 
+#include <QtCore/QMimeDatabase>
+
 #include <algorithm>
 #include <limits>
 
@@ -186,6 +188,17 @@ void ClearKeyMaterial(ChatState &state) {
 	for (auto &service : state.services) {
 		ClearBytes(service.serialized);
 	}
+}
+
+[[nodiscard]] QString DocumentCopyName(not_null<DocumentData*> document) {
+	if (auto name = document->filename(); !name.isEmpty()) {
+		return name;
+	} else if (!document->isSong()) {
+		return u"animation.mp4"_q;
+	}
+	const auto suffix = QMimeDatabase().mimeTypeForName(
+		document->mimeString()).preferredSuffix();
+	return suffix.isEmpty() ? u"audio"_q : (u"audio."_q + suffix);
 }
 
 } // namespace
@@ -411,66 +424,112 @@ bool Chats::sendMedia(
 	return true;
 }
 
-void Chats::sendDocumentCopy(
+void Chats::sendDocumentCopies(
 		const Api::SendAction &action,
-		not_null<DocumentData*> document) {
-	if (const auto path = document->filepath(true); !path.isEmpty()) {
-		sendFileCopy(action, path);
+		std::vector<DocumentCopy> documents,
+		TextWithTags caption) {
+	if (documents.empty()) {
 		return;
 	}
-	auto &actions = _documentCopies[document];
-	actions.push_back(action);
-	if (actions.size() == 1) {
-		const auto folder = _session->local().tempDirectory();
+	auto pending = PendingDocumentCopies{
+		.action = action,
+		.caption = std::move(caption),
+	};
+	pending.documents.reserve(documents.size());
+	for (const auto &[document, origin] : documents) {
+		pending.documents.push_back(document);
+		if (!document->filepath(true).isEmpty()) {
+			continue;
+		}
+		const auto folder = _session->local().tempDirectory()
+			+ QString::number(document->id)
+			+ '/';
 		QDir().mkpath(folder);
-		const auto name = document->filename();
 		document->save(
-			document->stickerOrGifOrigin(),
-			folder
-				+ QString::number(document->id)
-				+ '_'
-				+ (name.isEmpty() ? u"animation.mp4"_q : name));
+			origin ? origin : document->stickerOrGifOrigin(),
+			folder + DocumentCopyName(document));
 	}
+	_documentCopies.push_back(std::move(pending));
 	checkDocumentCopies();
 }
 
 void Chats::checkDocumentCopies() {
-	auto finished = std::vector<not_null<DocumentData*>>();
-	for (const auto &[document, actions] : _documentCopies) {
-		if (!document->loading()) {
-			finished.push_back(document);
+	auto waiting = base::flat_set<not_null<History*>>();
+	auto finished = std::vector<PendingDocumentCopies>();
+	for (auto i = begin(_documentCopies); i != end(_documentCopies);) {
+		const auto history = i->action.history;
+		const auto loading = ranges::any_of(
+			i->documents,
+			[](not_null<DocumentData*> document) {
+				return document->loading();
+			});
+		if (loading || waiting.contains(history)) {
+			waiting.emplace(history);
+			++i;
+		} else {
+			finished.push_back(std::move(*i));
+			i = _documentCopies.erase(i);
 		}
 	}
-	for (const auto document : finished) {
-		const auto actions = _documentCopies.take(document);
-		const auto path = document->filepath(true);
-		if (path.isEmpty()) {
-			if (!document->cancelled()) {
-				Ui::Toast::Show(tr::ayu_SecretChatFileFailed(tr::now));
-			}
-			continue;
-		}
-		for (const auto &action : *actions) {
-			sendFileCopy(action, path);
-		}
+	for (auto &copies : finished) {
+		sendFileCopies(
+			copies.action,
+			copies.documents,
+			std::move(copies.caption));
 	}
 }
 
-void Chats::sendFileCopy(
+void Chats::sendFileCopies(
 		const Api::SendAction &action,
-		const QString &path) {
-	auto list = Storage::PrepareMediaList(
-		QStringList(path),
-		st::sendMediaPreviewSize,
-		_session->premium());
-	if (list.error != Ui::PreparedList::Error::None) {
+		const std::vector<not_null<DocumentData*>> &documents,
+		TextWithTags caption) {
+	auto list = Ui::PreparedList();
+	auto failed = false;
+	for (const auto document : documents) {
+		const auto path = document->filepath(true);
+		if (path.isEmpty()) {
+			failed = failed || !document->cancelled();
+			continue;
+		}
+		auto prepared = Storage::PrepareMediaList(
+			QStringList(path),
+			st::sendMediaPreviewSize,
+			_session->premium());
+		if (prepared.error != Ui::PreparedList::Error::None
+			|| prepared.files.empty()) {
+			failed = true;
+			continue;
+		}
+		auto &file = prepared.files.front();
+		const auto song = document->song();
+		const auto information = song && file.information
+			? std::get_if<Ui::PreparedFileInformation::Song>(
+				&file.information->media)
+			: nullptr;
+		if (information) {
+			if (!song->title.isEmpty()) {
+				information->title = song->title;
+			}
+			if (!song->performer.isEmpty()) {
+				information->performer = song->performer;
+			}
+		}
+		list.files.push_back(std::move(file));
+	}
+	if (failed) {
 		Ui::Toast::Show(tr::ayu_SecretChatFileFailed(tr::now));
+	}
+	if (list.files.empty()) {
 		return;
 	}
+	list.files.back().caption = std::move(caption);
+	const auto album = (list.files.size() > 1)
+		? std::make_shared<SendingAlbum>()
+		: nullptr;
 	_session->api().sendFiles(
 		std::move(list),
 		SendMediaType::Photo,
-		nullptr,
+		album,
 		action);
 }
 

@@ -11,6 +11,7 @@
 #include "ayu/secret/secret_dh.h"
 #include "ayu/secret/secret_media.h"
 #include "base/timer.h"
+#include "data/data_file_origin.h"
 #include "data/data_types.h"
 #include "mtproto/sender.h"
 
@@ -33,6 +34,11 @@ namespace AyuSecret {
 
 struct IncomingLayer;
 struct QueuedMessage;
+
+struct DocumentCopy {
+	not_null<DocumentData*> document;
+	Data::FileOrigin origin;
+};
 
 class Chats final {
 public:
@@ -68,9 +74,10 @@ public:
 		const std::shared_ptr<FilePrepareResult> &file,
 		FullMsgId placeholder);
 	void cancelPlaceholder(FullMsgId placeholder);
-	void sendDocumentCopy(
+	void sendDocumentCopies(
 		const Api::SendAction &action,
-		not_null<DocumentData*> document);
+		std::vector<DocumentCopy> documents,
+		TextWithTags caption = TextWithTags());
 	void readInbox(
 		not_null<SecretChatData*> peer,
 		MsgId tillId,
@@ -135,6 +142,12 @@ private:
 		bool silent = false;
 	};
 
+	struct PendingDocumentCopies {
+		Api::SendAction action;
+		std::vector<not_null<DocumentData*>> documents;
+		TextWithTags caption;
+	};
+
 	[[nodiscard]] Chat *lookup(SecretChatId id) const;
 	[[nodiscard]] not_null<Chat*> emplace(ChatState &&state);
 	[[nodiscard]] not_null<Chat*> applyFields(
@@ -183,7 +196,10 @@ private:
 	void adoptPlaceholderMedia(FullMsgId id, const HistoryRecord &record);
 	void removePlaceholder(FullMsgId id);
 	void checkDocumentCopies();
-	void sendFileCopy(const Api::SendAction &action, const QString &path);
+	void sendFileCopies(
+		const Api::SendAction &action,
+		const std::vector<not_null<DocumentData*>> &documents,
+		TextWithTags caption);
 	void clearQueue(not_null<Chat*> chat);
 	void registerFile(const HistoryRecord &record);
 	void unregisterFile(const HistoryRecord &record);
@@ -284,9 +300,7 @@ private:
 	base::flat_map<SecretChatId, bytes::vector> _pendingKeys;
 	base::flat_map<uint64, MediaFile> _files;
 	base::flat_map<FullMsgId, Upload> _uploads;
-	base::flat_map<
-		not_null<DocumentData*>,
-		std::vector<Api::SendAction>> _documentCopies;
+	std::vector<PendingDocumentCopies> _documentCopies;
 	rpl::event_stream<not_null<SecretChatData*>> _chatAdded;
 
 	base::Timer _saveTimer;

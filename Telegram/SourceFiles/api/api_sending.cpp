@@ -725,6 +725,30 @@ void SendMusicSelectionBatch(
 	performRequest(performRequest, false);
 }
 
+void SendMusicSelectionToSecretChat(
+		MessageToSend &&message,
+		std::vector<MusicSelectionItem> items) {
+	auto &action = message.action;
+	const auto session = &action.history->session();
+	action.clearDraft = false;
+	session->api().sendAction(action);
+
+	auto &secret = session->ayuSecret();
+	const auto count = int(items.size());
+	for (auto from = 0; from < count; from += Ui::MaxAlbumItems()) {
+		const auto till = std::min(from + Ui::MaxAlbumItems(), count);
+		auto batch = std::vector<AyuSecret::DocumentCopy>();
+		batch.reserve(till - from);
+		for (auto i = from; i != till; ++i) {
+			batch.push_back({ items[i].document, items[i].origin });
+		}
+		secret.sendDocumentCopies(
+			action,
+			std::move(batch),
+			(till == count) ? message.textWithTags : TextWithTags());
+	}
+}
+
 } // namespace
 
 void SendExistingDocument(
@@ -733,9 +757,9 @@ void SendExistingDocument(
 		std::optional<MsgId> localMessageId) {
 	if (message.action.history->peer->isSecretChat()) {
 		if (!document->sticker()) {
-			document->session().ayuSecret().sendDocumentCopy(
+			document->session().ayuSecret().sendDocumentCopies(
 				message.action,
-				document);
+				{ { document, document->stickerOrGifOrigin() } });
 			return;
 		}
 		const auto media = AyuSecret::StickerMedia(document);
@@ -789,7 +813,10 @@ void SendExistingDocument(
 void SendMusicSelection(
 		MessageToSend &&message,
 		std::vector<MusicSelectionItem> items) {
-	if (items.empty() || message.action.history->peer->isSecretChat()) {
+	if (items.empty()) {
+		return;
+	} else if (message.action.history->peer->isSecretChat()) {
+		SendMusicSelectionToSecretChat(std::move(message), std::move(items));
 		return;
 	}
 
