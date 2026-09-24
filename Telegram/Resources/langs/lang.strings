@@ -9225,6 +9225,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_NewSecretChat" = "New Secret Chat";
 "ayu_SecretChatKey" = "Encryption Key";
 "ayu_SecretChatClearHint" = "This will also clear the history for {user}.";
+"ayu_SecretChatDeleteConfirm" = "Delete the secret chat with {user} and all messages for both of you?\n\nThis action cannot be undone.";
 "ayu_SecretChatReportSure" = "Are you sure you want to report spam from {user}?";
 "ayu_SecretChatIntroOut" = "You have invited {user} to join a secret chat.";
 "ayu_SecretChatIntroIn" = "{user} invited you to join a secret chat.";

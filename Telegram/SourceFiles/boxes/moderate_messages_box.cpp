@@ -1575,6 +1575,8 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 
 	const auto userpicPeer = peer->userpicPaintingPeer();
 	const auto maybeUser = peer->asUser();
+	const auto isSecretChat = peer->isSecretChat();
+	const auto privateLike = maybeUser || isSecretChat;
 	const auto isBot = maybeUser && maybeUser->isBot();
 
 	Ui::AddSkip(container);
@@ -1595,7 +1597,7 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 			container,
 			peer->isSelf()
 				? tr::lng_saved_messages(tr::bold)
-				: maybeUser
+				: privateLike
 				? tr::lng_profile_delete_conversation(tr::bold)
 				: rpl::single(
 					tr::bold(userpicPeer->name())
@@ -1610,6 +1612,10 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 			container,
 			peer->isSelf()
 				? tr::lng_sure_delete_saved_messages()
+				: isSecretChat
+				? tr::ayu_SecretChatDeleteConfirm(
+					lt_user,
+					rpl::single(peer->name()))
 				: maybeUser
 				? tr::lng_sure_delete_history(
 					lt_contact,
@@ -1620,7 +1626,7 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 			st::boxLabel));
 
 	const auto maybeCheckbox = [&]() -> Ui::Checkbox* {
-		if (!peer->canRevokeFullHistory()) {
+		if (isSecretChat || !peer->canRevokeFullHistory()) {
 			return nullptr;
 		}
 		Ui::AddSkip(container);
@@ -1691,7 +1697,7 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 
 	Ui::AddSkip(container);
 
-	auto buttonText = maybeUser
+	auto buttonText = privateLike
 		? tr::lng_box_delete()
 		: !maybeCheckbox
 		? tr::lng_box_leave()
@@ -1701,7 +1707,8 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 
 	const auto close = crl::guard(box, [=] { box->closeBox(); });
 	box->addButton(std::move(buttonText), [=] {
-		const auto revoke = maybeCheckbox && maybeCheckbox->checked();
+		const auto revoke = isSecretChat
+			|| (maybeCheckbox && maybeCheckbox->checked());
 		const auto stopBot = maybeBotCheckbox && maybeBotCheckbox->checked();
 		const auto removeFromChats = maybeChatsFiltersCheckbox
 			&& maybeChatsFiltersCheckbox->checked();
