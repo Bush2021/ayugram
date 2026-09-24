@@ -62,6 +62,7 @@ void SetupButtonContextMenu(
 		state->menu->setDestroyedCallback([=] {
 			if (!state->closing) {
 				button->setForceRippled(false);
+				button->setSynteticOver(false);
 				SendSynteticMouseEvent(
 					button,
 					QEvent::MouseMove,

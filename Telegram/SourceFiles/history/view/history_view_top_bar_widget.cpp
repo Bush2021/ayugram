@@ -420,6 +420,7 @@ bool TopBarWidget::createMenu(
 void TopBarWidget::unrippleMenuButton() {
 	if (const auto button = _menuButton.get()) {
 		button->setForceRippled(false);
+		button->setSynteticOver(false);
 		Ui::SendSynteticMouseEvent(button, QEvent::MouseMove, Qt::NoButton);
 	}
 }
