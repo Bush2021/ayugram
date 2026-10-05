@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync AyuGram"
+  short_description: "Curate dev onto the latest AyuGram upstream"
+  default_prompt: "Use $sync-ayu to reconstruct dev on ayu/dev while preserving durable fork intent."
