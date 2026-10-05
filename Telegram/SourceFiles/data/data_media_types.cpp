@@ -1013,7 +1013,7 @@ crl::time MediaPhoto::ttlSeconds() const {
 }
 
 bool MediaPhoto::allowsForward() const {
-	return !ttlSeconds();
+	return true;
 }
 
 bool MediaPhoto::updateInlineResultMedia(const MTPMessageMedia &media) {
