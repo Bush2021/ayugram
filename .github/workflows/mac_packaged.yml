@@ -21,6 +21,9 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ""
       CMAKE_PREFIX_PATH: "/opt/homebrew/opt/ffmpeg@6:/opt/homebrew/opt/openal-soft"
       TDE2E: "51743dfd01dff6179e2d8f7095729caa4e2222e9"
+      TLOTTIE: "31f1b542f88e7b4be9a01e749920d857535fc715"
+      PATCHES: "4ca9e1e9d86cc87b78c2480f41ba61871c76f2fa"
+      RUST_TOOLCHAIN: "1.96.1"
       UPLOAD_ARTIFACT: "true"
       ONLY_CACHE: "false"
       MANUAL_CACHING: "1"
@@ -120,6 +123,42 @@ jobs:
           cmake -Bbuild . -DCMAKE_INSTALL_PREFIX=$LibrariesPath/local/tde2e -DTD_E2E_ONLY=ON
           cmake --build build
           cmake --install build
+
+      - name: TLottie cache.
+        id: cache-tlottie
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tlottie
+          key: ${{ runner.OS }}-tlottie-${{ env.TLOTTIE }}-${{ env.PATCHES }}-${{ env.RUST_TOOLCHAIN }}-${{ env.CACHE_KEY }}
+
+      - name: TLottie.
+        if: steps.cache-tlottie.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+
+          rustup toolchain install $RUST_TOOLCHAIN --profile minimal
+          export PATH="$(dirname "$(rustup which --toolchain $RUST_TOOLCHAIN cargo)"):$PATH"
+
+          git init patches
+          git -C patches remote add origin $GIT/desktop-app/patches.git
+          git -C patches fetch --depth=1 origin $PATCHES
+          git -C patches reset --hard FETCH_HEAD
+
+          git init tlottie
+          cd tlottie
+          git remote add origin $GIT/dkaraush/tlottie.git
+          git fetch --depth=1 origin $TLOTTIE
+          git reset --hard FETCH_HEAD
+          git apply ../patches/tlottie.patch
+
+          cargo rustc --lib --release --locked \
+          --features c-api --crate-type staticlib \
+          --target aarch64-apple-darwin \
+          -- --print native-static-libs
+
+          mkdir -p $LibrariesPath/local/tlottie/lib $LibrariesPath/local/tlottie/include/tlottie
+          cp target/aarch64-apple-darwin/release/libtlottie.a $LibrariesPath/local/tlottie/lib/
+          cp include/tlottie.h $LibrariesPath/local/tlottie/include/tlottie/
 
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
