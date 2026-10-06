@@ -689,6 +689,7 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 	{
 		const auto membersLinkCallback = _statusLabel->membersLinkCallback();
 		const auto hiddenLinkCallback = _statusLabel->hiddenLinkCallback();
+		const auto onlineCount = _statusLabel->onlineCount();
 		{
 			_statusLabel = nullptr;
 			delete _status.release();
@@ -734,6 +735,7 @@ void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
 			// setColorized) overwrite _status only when there is no custom
 			// status.
 			_statusLabel->setColorized(!shouldOverrideStatus);
+			_statusLabel->setOnlineCount(onlineCount);
 		}
 	}
 
@@ -1509,7 +1511,7 @@ void TopBar::setupUserpicButton(
 						&controller->window(),
 						editorData(type),
 						choosePhotoCallback(type),
-						qvariant_cast<QImage>(data->imageData()));
+						QGuiApplication::clipboard()->image());
 				});
 				menu->addAction(
 					std::move(text)(tr::now),
@@ -3245,9 +3247,6 @@ void TopBar::fillTopBarMenu(
 }
 
 void TopBar::updateVideoUserpic() {
-	if (width() <= 0) {
-		return;
-	}
 	const auto id = _peer->userpicPhotoId();
 	if (!id) {
 		_videoUserpicPlayer = nullptr;

@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_user.h"
 #include "data/data_forum_topic.h"
+#include "data/data_saved_sublist.h"
 #include "mainwidget.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_numbers_animation.h"
@@ -156,7 +157,11 @@ WrapWidget::WrapWidget(
 		});
 	}, lifetime());
 	restoreHistoryStack(memento->takeStack());
+	subscribeToThreadDestroyed();
+}
 
+void WrapWidget::subscribeToThreadDestroyed() {
+	_threadDestroyedLifetime.destroy();
 	if (const auto topic = _controller->topic()) {
 		topic->destroyed(
 		) | rpl::on_next([=] {
@@ -170,7 +175,23 @@ WrapWidget::WrapWidget(
 			} else {
 				_removeRequests.fire({});
 			}
-		}, lifetime());
+		}, _threadDestroyedLifetime);
+	} else if (const auto sublist = _controller->sublist()) {
+		sublist->destroyed(
+		) | rpl::on_next([=] {
+			auto keep = base::take(_threadDestroyedLifetime);
+			auto removeRequests = base::take(_removeRequests);
+			const auto parent = _controller->parentController();
+			parent->hideSpecialLayer();
+			parent->showBackFromStack(
+				Window::SectionShow(
+					anim::type::instant,
+					anim::activation::background));
+			parent->clearSectionStack(Window::SectionShow(
+				Window::SectionShow::Way::ClearStack,
+				anim::type::instant));
+			removeRequests.fire({});
+		}, _threadDestroyedLifetime);
 	}
 }
 
@@ -589,12 +610,8 @@ void WrapWidget::addTopBarMenuButton() {
 	Expects(_topBar != nullptr);
 	Expects(_content != nullptr);
 
-	{
-		const auto guard = gsl::finally([&] { _topBarMenu = nullptr; });
-		showTopBarMenu(true);
-		if (!_topBarMenu) {
-			return;
-		}
+	if (!topBarMenuHasActions()) {
+		return;
 	}
 
 	_topBarMenuToggle.reset(_topBar->addButton(
@@ -605,7 +622,7 @@ void WrapWidget::addTopBarMenuButton() {
 				: st::infoTopBarMenu))));
 	_topBarMenuToggle->setAccessibleName(tr::lng_sr_profile_menu(tr::now));
 	_topBarMenuToggle->addClickHandler([this] {
-		showTopBarMenu(false);
+		showTopBarMenu();
 	});
 
 	Shortcuts::Requests(
@@ -616,7 +633,7 @@ void WrapWidget::addTopBarMenuButton() {
 
 		request->check(Command::ShowChatMenu, 1) && request->handle([=] {
 			Window::ActivateWindow(_controller->parentController());
-			showTopBarMenu(false);
+			showTopBarMenu();
 			return true;
 		});
 	}, _topBarMenuToggle->lifetime());
@@ -659,7 +676,15 @@ void WrapWidget::addProfileCallsButton() {
 	}
 }
 
-void WrapWidget::showTopBarMenu(bool check) {
+bool WrapWidget::topBarMenuHasActions() const {
+	const auto menu = base::make_unique_q<Ui::PopupMenu>(
+		QWidget::window(),
+		st::popupMenuExpandedSeparator);
+	_content->fillTopBarMenu(Ui::Menu::CreateAddActionCallback(menu));
+	return !menu->empty();
+}
+
+void WrapWidget::showTopBarMenu() {
 	if (_topBarMenu) {
 		_topBarMenu->hideMenu(true);
 		return;
@@ -678,8 +703,6 @@ void WrapWidget::showTopBarMenu(bool check) {
 	_content->fillTopBarMenu(Ui::Menu::CreateAddActionCallback(_topBarMenu));
 	if (_topBarMenu->empty()) {
 		_topBarMenu = nullptr;
-		return;
-	} else if (check) {
 		return;
 	}
 	_topBarMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
@@ -922,7 +945,7 @@ void WrapWidget::showFinishedHook() {
 		}();
 		if (!highlightId.isEmpty()
 			&& controller->takeHighlightControlId(highlightId)) {
-			showTopBarMenu(false);
+			showTopBarMenu();
 			if (_topBarMenu) {
 				const auto menu = _topBarMenu->menu();
 				for (const auto &action : menu->actions()) {
@@ -1022,6 +1045,8 @@ bool WrapWidget::returnToFirstStackFrame(
 	const auto first = _historyStack.front().section.get();
 	if (first->peer() == memento->peer()
 		&& first->savedMessages() == memento->savedMessages()
+		&& first->topic() == memento->topic()
+		&& first->sublist() == memento->sublist()
 		&& first->section().type() == memento->section().type()
 		&& first->section().type() == Section::Type::Profile) {
 		_historyStack.resize(1);
@@ -1097,6 +1122,7 @@ void WrapWidget::showNewContent(
 			showNewContent(memento);
 		}
 	}
+	subscribeToThreadDestroyed();
 
 	if (animationParams) {
 		if (Ui::InFocusChain(this)) {
