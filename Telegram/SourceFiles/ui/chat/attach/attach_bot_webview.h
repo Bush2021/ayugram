@@ -207,7 +207,6 @@ private:
 		std::optional<QColor> bottom;
 	};
 	struct ExternalShellAnchor {
-		std::optional<QRect> anchorGeometry;
 		std::optional<QSize> outerSize;
 		Platform::ForeignParent transientParent;
 	};
@@ -239,8 +238,8 @@ private:
 	void requestExternalShellButtonEmoji(const QString &name);
 	void applyExternalShellFullscreen(bool fullscreen);
 	void sendExternalShellChrome();
-	void setExternalShellBlocked(bool blocked);
-	void closeExternalShellLayer();
+	void setWebviewBlocked(bool blocked);
+	void closeExternalShellPopup();
 	[[nodiscard]] ExternalShellAnchor externalShellAnchor() const;
 	void showPopup(
 		Webview::PopupArgs &&args,
@@ -325,7 +324,7 @@ private:
 	const not_null<Delegate*> _delegate;
 	QString _externalUrl;
 	QString _externalTitle;
-	int _externalBlockCount = 0;
+	int _webviewBlockCount = 0;
 	bool _closeNeedConfirmation = false;
 	bool _hasSettingsButton = false;
 	bool _externalTitleBadgeVisible = false;
@@ -345,6 +344,7 @@ private:
 	std::unique_ptr<SeparatePanel> _widget;
 	std::unique_ptr<WebviewWithLifetime> _webview;
 	std::unique_ptr<StandaloneLayerStack> _externalLayer;
+	Fn<void()> _closeExternalShellPopup;
 	std::unique_ptr<RpWidget> _externalWebviewParent;
 	std::unique_ptr<RpWidget> _webviewBottom;
 	QPointer<FlatLabel> _webviewBottomLabel;
