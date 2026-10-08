@@ -35,6 +35,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
 #include "history/view/history_view_draw_to_reply.h"
+#include "history/view/controls/history_view_compose_stash.h"
+#include "history/view/controls/history_view_compose_stash_hint.h"
 #include "history/view/controls/history_view_rich_draft_preview.h"
 #include "ui/emoji_config.h"
 #include "ui/chat/attach/attach_prepare.h"
@@ -78,6 +80,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/sponsored_messages.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
+#include "data/data_compose_stash.h"
 #include "data/data_drafts.h"
 #include "data/data_session.h"
 #include "data/data_todo_list.h"
@@ -523,6 +526,16 @@ HistoryWidget::HistoryWidget(
 	) | rpl::filter(rpl::mappers::_1) | rpl::on_next([=] {
 		fieldFocused();
 	}, _field->lifetime());
+	if (session().settings().shouldShowStashHint()) {
+		using StashHintManager = HistoryView::Controls::StashHintManager;
+		_stashHintManager = std::make_unique<StashHintManager>(
+			HistoryView::Controls::StashHintDescriptor{
+				.session = &session(),
+				.toastParent = [=]() -> QWidget* { return _scroll.data(); },
+				.fieldText = [=] { return _field->getTextWithTags().text; },
+				.canUse = [=] { return canUseComposeStash(); },
+			});
+	}
 	_field->changes(
 	) | rpl::on_next([=] {
 		fieldChanged();
@@ -1316,6 +1329,7 @@ HistoryWidget::HistoryWidget(
 	setupScheduledToggle();
 	setupSendAsToggle();
 	orderWidgets();
+	setupComposeStash();
 	setupShortcuts();
 
 	_attachToggle->setAccessibleName(tr::lng_attach(tr::now));
@@ -1478,6 +1492,9 @@ void HistoryWidget::initVoiceRecordBar() {
 	) | rpl::on_next([=] {
 		_cornerButtons.updateJumpDownVisibility();
 		_cornerButtons.updateUnreadThingsVisibility();
+		if (_stash) {
+			_stash->updateButton();
+		}
 	}, lifetime());
 
 	_voiceRecordBar->errors(
@@ -1533,6 +1550,9 @@ void HistoryWidget::initVoiceRecordBar() {
 		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
+		if (_stash) {
+			_stash->updateButton();
+		}
 	}, lifetime());
 
 	_voiceRecordBar->hideFast();
@@ -1606,7 +1626,8 @@ void HistoryWidget::offerRichPaste(not_null<const QMimeData*> data) {
 	const auto tail = cursor.document()->characterCount() - till;
 	crl::on_main(this, [=] {
 		const auto now = _field->getTextWithTags();
-		if (now == was) {
+		if (now == was
+			|| !_richPasteOfferThrottle.take()) {
 			return;
 		}
 		ChatHelpers::ShowRichPasteToast({
@@ -1733,6 +1754,11 @@ void HistoryWidget::sendTextAsFile(
 		}
 		sendingFilesConfirmed(std::move(bundle), options);
 	}));
+	box->setStashCallbacks(
+		crl::guard(this, [=] { return _stash->canTakeFromBox(); }),
+		crl::guard(this, [=](SendFilesStashed &&stashed) {
+			_stash->takeFromBox(std::move(stashed));
+		}));
 	box->setCancelledCallback(crl::guard(this, [=] {
 		_field->setTextWithTags(restoreText);
 		auto cursor = _field->textCursor();
@@ -2375,6 +2401,13 @@ bool HistoryWidget::suppressSendAction() const {
 }
 
 void HistoryWidget::fieldChanged() {
+	if (_stashHintManager) {
+		const auto save = bool(
+			_textUpdateEvents & TextUpdateEvent::SaveDraft);
+		const auto sendTyping = bool(
+			_textUpdateEvents & TextUpdateEvent::SendTyping);
+		_stashHintManager->trackChange(save && sendTyping);
+	}
 	const auto updateTyping = (_textUpdateEvents
 		& TextUpdateEvent::SendTyping);
 
@@ -2839,6 +2872,13 @@ void HistoryWidget::setupShortcuts() {
 				}
 				return true;
 			});
+		_stash
+			&& _stash->canExchange()
+			&& request->check(Command::StashMessage, 1)
+			&& request->handle([=] {
+				_stash->exchange();
+				return true;
+			});
 		if (showRecordButton()
 			&& _canSendMessages
 			&& _joinChannel->isHidden()
@@ -2873,6 +2913,131 @@ void HistoryWidget::setupShortcuts() {
 			});
 		}
 	}, lifetime());
+}
+
+void HistoryWidget::setupComposeStash() {
+	using namespace HistoryView::Controls;
+	_stash = std::make_unique<StashManager>(StashManagerDescriptor{
+		.session = &session(),
+		.buttons = &_cornerButtons,
+		.show = controller()->uiShow(),
+		.history = [=] { return _history; },
+		.key = [] { return Data::DraftKey::Local(MsgId(), PeerId()); },
+		.allowed = [=] { return canUseComposeStash(); },
+		.hasContent = [=] { return hasStashableContent(); },
+		.canSendTexts = [=] { return _canSendTexts; },
+		.take = [=] { return takeComposeStash(); },
+		.apply = [=](Data::ComposeStash &&stash) {
+			applyComposeStash(std::move(stash));
+		},
+		.suggest = [=] { return suggestOptions(); },
+		.clearComposer = [=] {
+			cancelReplyOrSuggest();
+			updateForwarding();
+			saveDraftWithTextNow();
+		},
+		.openFiles = [=](Ui::PreparedList &list) -> SendFilesBox* {
+			if (showSendingFilesError(list)) {
+				return nullptr;
+			}
+			return confirmSendingFiles(std::move(list), QString())
+				? _sendFilesBox.data()
+				: nullptr;
+		},
+		.filesError = [=](const Ui::PreparedList &list) {
+			return showSendingFilesError(list);
+		},
+		.menuDetails = [=] { return sendMenuDetails(); },
+		.send = [=](Api::SendOptions options) { send(options); },
+	});
+}
+
+bool HistoryWidget::canUseComposeStash() const {
+	return canWriteMessage()
+		&& !_editMsgId
+		&& !_chooseTheme
+		&& !_voiceRecordBar->isActive();
+}
+
+bool HistoryWidget::hasStashableContent() const {
+	return _history
+		&& (!_field->empty()
+			|| _replyTo
+			|| _suggestOptions
+			|| readyToForward()
+			|| shownRichMessage());
+}
+
+std::unique_ptr<Data::ComposeStash> HistoryWidget::takeComposeStash() {
+	Expects(_history != nullptr);
+
+	if (!hasStashableContent()) {
+		return nullptr;
+	}
+	auto result = std::make_unique<Data::ComposeStash>();
+	if (const auto draft = shownRichMessage() ? cloudDraft() : nullptr) {
+		result->draft = *draft;
+		result->draft.saveRequestId = 0;
+		clearRichDraft();
+	} else {
+		result->draft = Data::Draft(
+			_field,
+			_replyTo,
+			suggestOptions(),
+			_preview ? _preview->draft() : Data::WebPageDraft());
+		clearFieldText();
+		if (_preview) {
+			_preview->apply({ .removed = true });
+		}
+	}
+	cancelReplyOrSuggest();
+	result->forward = _history->forwardDraft(MsgId(), PeerId());
+	if (!result->forward.ids.empty()) {
+		_history->setForwardDraft(MsgId(), PeerId(), {});
+		updateForwarding();
+	}
+	saveDraftWithTextNow();
+	saveCloudDraft();
+	if (_stashHintManager) {
+		_stashHintManager->markUsed();
+	}
+	return result;
+}
+
+void HistoryWidget::applyComposeStash(Data::ComposeStash &&stash) {
+	Expects(_history != nullptr);
+
+	if (stash.draft.hasRichMessage()) {
+		_history->clearLocalDraft(MsgId(), PeerId());
+		const auto cloud = _history->createCloudDraft(
+			MsgId(),
+			PeerId(),
+			&stash.draft);
+		applyDraft();
+		if (cloud) {
+			session().api().saveDraftToCloud(not_null{ _history }, *cloud);
+		}
+	} else {
+		const auto reply = stash.draft.reply;
+		_history->setDraft(
+			Data::DraftKey::Local(MsgId(), PeerId()),
+			std::make_unique<Data::Draft>(std::move(stash.draft)));
+		if (!applyDraft() && reply) {
+			replyToMessage(reply);
+		}
+		saveDraftWithTextNow();
+		saveCloudDraft();
+	}
+	if (!stash.forward.ids.empty()) {
+		_history->setForwardDraft(
+			MsgId(),
+			PeerId(),
+			std::move(stash.forward));
+		updateForwarding();
+	}
+	if (_stashHintManager) {
+		_stashHintManager->markUsed();
+	}
 }
 
 void HistoryWidget::setupGiftToChannelButton() {
@@ -4209,6 +4374,9 @@ void HistoryWidget::updateControlsVisibility() {
 	}
 	_cornerButtons.updateJumpDownVisibility();
 	_cornerButtons.updateUnreadThingsVisibility();
+	if (_stash) {
+		_stash->updateButton();
+	}
 	if (!_history || _showAnimation) {
 		hideChildWidgets();
 		return;
@@ -8047,6 +8215,7 @@ bool HistoryWidget::confirmSendingFiles(
 		sendMenuDetails(),
 		[=](const TextWithTags &text) { _field->setTextWithTags(text); });
 	box->setReplyTo(replyTo());
+	_sendFilesBox = box.data();
 	_field->setTextWithTags({});
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,
@@ -8057,6 +8226,11 @@ bool HistoryWidget::confirmSendingFiles(
 		}
 		sendingFilesConfirmed(std::move(bundle), options);
 	}));
+	box->setStashCallbacks(
+		crl::guard(this, [=] { return _stash->canTakeFromBox(); }),
+		crl::guard(this, [=](SendFilesStashed &&stashed) {
+			_stash->takeFromBox(std::move(stashed));
+		}));
 	box->setCancelledCallback(crl::guard(this, [=] {
 		_field->setTextWithTags(text);
 		auto cursor = _field->textCursor();

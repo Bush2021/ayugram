@@ -292,8 +292,6 @@ public:
 
 	void itemDataChanged() override;
 
-	VerticalRepaintRange verticalRepaintRange() const override;
-
 	void applyGroupAdminChanges(
 		const base::flat_set<UserId> &changes) override;
 

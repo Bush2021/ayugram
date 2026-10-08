@@ -552,7 +552,7 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 		history()->owner().registerHeavyViewPart(_parent);
 	}
 
-	if (tagged) {
+	if (tagged && (_parent->context() != Context::MediaEditor)) {
 		tagged->drawSpoilerTag(p, fullRect, context, [&] {
 			return generateSpoilerTagBackground(fullRect);
 		});
@@ -1016,8 +1016,7 @@ bool GroupedMedia::computeNeedBubble() const {
 		return true;
 	}
 	if (const auto item = _parent->data()) {
-		if (item->repliesAreComments()
-			|| item->externalReply()
+		if (_parent->hasCommentsButton()
 			|| item->viaBot()
 			|| _parent->displayReply()
 			|| _parent->displayForwardedFrom()
