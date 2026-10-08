@@ -526,7 +526,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 51912ada9f0c3dfbded54616175ddd211dce8aaf
+    git checkout aec474953ff7ee9b6e4cd9b8658288ea86d124f3
 mac:
     sed -i '' "s/10.13/$MACOSX_DEPLOYMENT_TARGET/g" macos_meson_*.txt
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
@@ -625,8 +625,9 @@ release:
 
 stage('xz', """
 !win:
-    git clone -b v5.4.5 https://github.com/tukaani-project/xz.git
+    git clone -b v5.4 https://github.com/tukaani-project/xz.git
     cd xz
+    git checkout 05af863c3166cddeb4ab935829b14e995c8346b4
     sed -i '' '\\@check_symbol_exists(futimens "sys/types.h;sys/stat.h" HAVE_FUTIMENS)@d' CMakeLists.txt
     CFLAGS="$UNGUARDED" CPPFLAGS="$UNGUARDED" cmake -B build . \\
         -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \\
@@ -711,7 +712,7 @@ mac:
 """)
 
 stage('openssl3', """
-    git clone -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
+    git clone -b openssl-3.5.9 https://github.com/openssl/openssl openssl3
     cd openssl3
 win32:
     perl Configure no-shared no-tests debug-VC-WIN32 /FS
@@ -1592,7 +1593,7 @@ if qt < '6':
 win:
     git clone https://github.com/desktop-app/tg_angle.git
     cd tg_angle
-    git checkout 48bc60bdb1
+    git checkout f62ce7f6efe014cf1f7d95830c505fd2ac1c49e0
     cmake -B out ^
         -DTG_ANGLE_SPECIAL_TARGET=%SPECIAL_TARGET% ^
         -DTG_ANGLE_ZLIB_INCLUDE_PATH=%LIBS_DIR%/zlib
@@ -1792,7 +1793,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout e2d0e88d1bde6cc600da5dc92581dc97e4c1e685
+    git checkout d1cf250ea73de26c4c1f0a3c8173eb2648efbb04
     git submodule update --init --recursive
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg
@@ -1890,7 +1891,7 @@ release:
 """)
 
 stage('ada', """
-    git clone -b v3.2.4 https://github.com/ada-url/ada.git
+    git clone -b v3.2.9 https://github.com/ada-url/ada.git
     cd ada
 win:
     cmake -B out . ^

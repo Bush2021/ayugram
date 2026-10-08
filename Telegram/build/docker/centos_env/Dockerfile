@@ -160,7 +160,7 @@ RUN <<EOF
 git init patches
 cd patches
 git remote add origin https://github.com/desktop-app/patches.git
-git fetch --depth=1 origin ebcd707f1763651089e3e7220ddd4f97cbcf87e0
+git fetch --depth=1 origin aec474953ff7ee9b6e4cd9b8658288ea86d124f3
 git reset --hard FETCH_HEAD
 rm -rf .git
 EOF
@@ -189,7 +189,7 @@ EOF
 
 FROM builder AS xz
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v5.8.1 --depth=1 https://github.com/tukaani-project/xz.git
+git clone -b v5.8.4 --depth=1 https://github.com/tukaani-project/xz.git
 cd xz
 cmake -B build .
 cmake --build build
@@ -395,7 +395,7 @@ FROM builder AS xcb
 COPY --link --from=xcb-proto /usr/src/xcb-proto-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libxcb-1.16 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxcb.git
+git clone -b libxcb-1.16.1 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxcb.git
 cd libxcb
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -509,7 +509,7 @@ EOF
 
 FROM builder AS xtst
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXtst-1.2.4 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxtst.git
+git clone -b libXtst-1.2.5 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxtst.git
 cd libxtst
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -533,7 +533,7 @@ FROM builder AS xv
 COPY --link --from=xext /usr/src/xext-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXv-1.0.12 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxv.git
+git clone -b libXv-1.0.13 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxv.git
 cd libxv
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -544,7 +544,7 @@ EOF
 
 FROM builder AS xrandr
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXrandr-1.5.3 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrandr.git
+git clone -b libXrandr-1.5.4 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrandr.git
 cd libxrandr
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -555,7 +555,7 @@ EOF
 
 FROM builder AS xrender
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXrender-0.9.11 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrender.git
+git clone -b libXrender-0.9.12 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrender.git
 cd libxrender
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -822,7 +822,7 @@ EOF
 
 FROM builder AS openssl
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b openssl-3.2.1 --depth=1 https://github.com/openssl/openssl.git
+git clone -b openssl-3.5.9 --depth=1 https://github.com/openssl/openssl.git
 cd openssl
 sed -i 's/$cmd $cmdflags -c -o/$cmd $cmdflags -g0 -c -o/' Configurations/unix-Makefile.tmpl
 ./config --openssldir=/etc/ssl no-shared no-tests no-dso
@@ -951,7 +951,7 @@ RUN --mount=type=cache,target=/var/cache/ccache <<EOF
 git init tg_owt
 cd tg_owt
 git remote add origin https://github.com/desktop-app/tg_owt.git
-git fetch --depth=1 origin e2d0e88d1bde6cc600da5dc92581dc97e4c1e685
+git fetch --depth=1 origin d1cf250ea73de26c4c1f0a3c8173eb2648efbb04
 git reset --hard FETCH_HEAD
 git submodule update --init --recursive --depth=1
 cmake -B build . -DTG_OWT_DLOPEN_PIPEWIRE=ON
@@ -963,7 +963,7 @@ EOF
 
 FROM builder AS ada
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v3.2.4 --depth=1 https://github.com/ada-url/ada.git
+git clone -b v3.2.9 --depth=1 https://github.com/ada-url/ada.git
 cd ada
 cmake -B build . -DADA_TESTING=OFF -DADA_TOOLS=OFF -DADA_INCLUDE_URL_PATTERN=OFF
 cmake --build build
