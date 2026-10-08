@@ -1898,6 +1898,7 @@ win:
         -D ADA_TESTING=OFF ^
         -D ADA_TOOLS=OFF ^
         -D ADA_INCLUDE_URL_PATTERN=OFF ^
+        -D ADA_BUILD_SINGLE_HEADER_LIB=ON ^
         -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
     cmake --build out --config Debug
     cmake --build out --config Release
