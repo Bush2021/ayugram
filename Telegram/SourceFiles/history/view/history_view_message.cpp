@@ -6504,7 +6504,7 @@ auto Message::countRichPageBubbleEdges() const
 		|| logEntryOriginal()
 		|| (mediaDisplayed && !_invertMedia);
 	const auto bubble = drawBubble();
-	return {
+	return Iv::Markdown::MarkdownArticleBubbleEdges{
 		.top = bubble && !somethingAbove,
 		.bottom = bubble && !somethingBelow,
 		.mediaAbove = bubble && mediaDisplayed && _invertMedia,
