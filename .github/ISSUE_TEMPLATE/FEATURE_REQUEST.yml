@@ -1,29 +1,72 @@
----
-name: 💡 Feature request
-description: Suggest an idea.
+name: Feature request
+description: Implemented at the maintainer's discretion. Questions and requests for help are out of scope.
 labels: [enhancement]
 body:
-  - type: textarea
+  - type: markdown
     attributes:
-      label: Is your feature request related to a problem?
-      placeholder: A clear and concise description of what the problem is.
+      value: |
+        This is a personal fork. Whether a request gets implemented is entirely my call, and there is no timeline. A high-quality pull request is the reliable way to get a feature in.
+
+        A change to behaviour owned by Telegram Desktop or AyuGram has to be kept working through every upstream merge, so it is rarely accepted here. Suggest it upstream instead.
+
+        Requests with missing or careless answers are closed without discussion.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched [open and closed issues](https://github.com/Bush2021/ayugram/issues?q=is%3Aissue) and found no request for this feature.
+          required: true
+        - label: I checked the latest release, including AyuGram Preferences and the experimental settings, and the feature does not exist yet.
+          required: true
+        - label: This is not a question or a request for help.
+          required: true
+        - label: The feature can be implemented in the desktop client alone. It needs no change on Telegram's servers or in other apps.
+          required: true
+        - label: This issue asks for one feature and describes a concrete use case.
+          required: true
+        - label: I understand that the request may be closed without being implemented.
+          required: true
+        - label: I wrote this request in English.
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Added by this fork (Qt 6 build, OpenAI translation, privacy controls, ad modes, secret chats)
+        - AyuGram feature
+        - Telegram Desktop behaviour
+        - Builds, packaging, or releases
+        - Something new
     validations:
       required: true
   - type: textarea
+    id: use-case
     attributes:
-      label: Describe the solution you'd like
-      placeholder: A clear and concise description of what you want to happen.
+      label: Use case
+      description: What you are trying to do, and why the current behaviour is not enough.
     validations:
       required: true
   - type: textarea
+    id: proposal
     attributes:
-      label: Describe alternatives you've considered
-      placeholder: A clear and concise description of any alternative solutions or features you've considered.
+      label: Proposed behaviour
+      description: Where it appears in the interface, how it is switched on or off, and what the default is.
     validations:
       required: true
   - type: textarea
+    id: prior-art
     attributes:
-      label: Additional context
-      placeholder: Add any other context or screenshots about the feature request here.
+      label: Existing implementations
+      description: A client that already has this feature, with a link to the commit or source file if you can find it. An existing implementation is much easier to port than a new design.
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Your contribution
+      options:
+        - I will submit a pull request
+        - I can test development builds
+        - Neither
     validations:
-      required: false
+      required: true

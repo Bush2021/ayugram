@@ -49,6 +49,9 @@ Every merge must preserve these paths:
 - `Telegram/SourceFiles/**/*.style` — entries with the `ayu_` prefix (mixed into upstream style files)
 - `Telegram/CMakeLists.txt` — lines mentioning `ayu/`
 
+## Fork-owned (not merged from upstream)
+
+- `.github/ISSUE_TEMPLATE/`: this fork's own issue forms and support policy. On conflict keep ours whole. Do not fold upstream template changes in.
 ## Hands-off (owned by tg/ayu upstream)
 
 Editing these in this repo causes recurring merge conflicts. Put fork-specific rules in `FORK.md` or a skill, not these files:

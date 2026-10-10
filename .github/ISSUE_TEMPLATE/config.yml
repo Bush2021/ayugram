@@ -1,11 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Platform-wide issue
+  - name: Bug that Telegram Desktop also has.
+    url: https://github.com/telegramdesktop/tdesktop/issues
+    about: Report it there. The fix arrives here with the next merge.
+  - name: Bug that official AyuGram Desktop also has.
+    url: https://github.com/AyuGram/AyuGramDesktop/issues
+    about: Report it there. The fix arrives here with the next merge.
+  - name: Telegram-wide bug or suggestion.
     url: https://bugs.telegram.org
-    about: Any bug report or feature request affecting more than only Telegram Desktop.
-  - name: Issue of other client
-    url: https://bugs.telegram.org
-    about: Any bug report or feature request not about Telegram Desktop.
-  - name: Question
-    url: https://t.me/ayugramchat
-    about: Ask a question.
+    about: Mobile apps, server behaviour, design.
+  - name: How to use an AyuGram feature.
+    url: https://docs.ayugram.one/desktop/
+    about: Questions are not answered in this tracker.

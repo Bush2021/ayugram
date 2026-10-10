@@ -1,72 +1,139 @@
 name: Bug report
-description: Report errors or unexpected behavior.
+description: Builds from this repository only. Questions and requests for help are out of scope.
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting issues of AyuGram Desktop!
+        This is a personal fork with a single maintainer. I try to fix the bugs reported here, but a bug in code I am not familiar with may stay unfixed.
 
-        To make it easier for us to help you please enter detailed information below.
-  - type: textarea
+        A bug that also exists in Telegram Desktop or in official AyuGram Desktop is best fixed there. The fix then arrives here with the next merge. Report it upstream first and put the link in the last field.
+
+        Automatic updates are disabled and crash reports are never uploaded. Both are intentional.
+
+        Reports with missing or careless answers are closed without discussion.
+  - type: checkboxes
+    id: checklist
     attributes:
-      label: Steps to reproduce
-      placeholder: |
-        1. 
-        2. 
-        3. 
-    validations:
-      required: true
-  - type: textarea
+      label: Before you submit
+      options:
+        - label: I use a build from this repository's [Releases](https://github.com/Bush2021/ayugram/releases) or [Actions](https://github.com/Bush2021/ayugram/actions), or I built it from this repository's source. Official AyuGram builds and third-party packages are not covered here.
+          required: true
+        - label: I reproduced the bug on the latest release or on a newer Actions build.
+          required: true
+        - label: I searched [open and closed issues](https://github.com/Bush2021/ayugram/issues?q=is%3Aissue) and found no report of this bug.
+          required: true
+        - label: This is one reproducible bug. It is not a question, a request for help, or a feature request.
+          required: true
+        - label: I understand that the bug may stay unfixed, and that the issue may be closed if the bug belongs upstream or the information requested below is missing.
+          required: true
+        - label: I wrote this report in English.
+          required: true
+  - type: dropdown
+    id: build
     attributes:
-      label: Expected behaviour
-      placeholder: Tell us what should happen
-    validations:
-      required: true
-  - type: textarea
-    attributes:
-      label: Actual behaviour
-      placeholder: Tell us what happens instead
+      label: Build
+      description: The Qt 6 release package has `_Qt6_win10+` in its file name. In a running build, hover over the version text at the bottom of the main menu. The tooltip shows the Qt version.
+      options:
+        - Windows x64, Qt 6
+        - Windows x64, Qt 5
+        - macOS
+        - Built from source
     validations:
       required: true
   - type: input
+    id: version
+    attributes:
+      label: Version and commit
+      description: Open the main menu and hover over the version text at the bottom. Write the version and the `Commit` value from the tooltip. "Latest" is not a version.
+      placeholder: 7.3.0 x64, commit 65e23ba
+    validations:
+      required: true
+  - type: input
+    id: os
     attributes:
       label: Operating system
-      description: >
-        Your operating system name, version and desktop environment.
-        **Don't use kernel version (uname), it's useless.**
-    validations:
-      required: true
-  - type: input
-    attributes:
-      label: Version of AyuGram Desktop
-      description: >
-        **Don't use 'latest'**, specify actual version.
+      description: Name and exact version. For rendering or font bugs, add the display scaling and the GPU model.
+      placeholder: Windows 11 26H2, 150% scaling, NVIDIA RTX 5090
     validations:
       required: true
   - type: dropdown
+    id: upstream
     attributes:
-      label: Installation source
-      multiple: false
+      label: Upstream comparison
+      description: |
+        Repeat the same steps with the same account in the latest [Telegram Desktop](https://desktop.telegram.org) and the latest [official AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop/releases). A report marked "Not tested" has the lowest priority.
+
+        Give each client its own folder. Never open this fork's `tdata` folder with another client or with an older version.
       options:
-        - Binary from Bush GitHub Releases
-        - Arch Linux (ayugram-desktop / ayugram-desktop-git)
-        - Arch Linux (ayugram-desktop-bin)
-        - flatpak by 0FL01
-        - Other (unofficial) source
+        - Only this fork has the bug
+        - Official AyuGram Desktop has it too, Telegram Desktop does not
+        - Telegram Desktop has it too
+        - The affected feature exists only in this fork
+        - Not tested
+    validations:
+      required: true
+  - type: dropdown
+    id: qt-compare
+    attributes:
+      label: The other Windows Qt build
+      description: On Windows, repeat the steps in the other Qt build of the same version. A bug limited to one Qt build is much easier to locate.
+      options:
+        - The other Qt build has the same bug
+        - The other Qt build works correctly
+        - Not tested
+        - Not on Windows
     validations:
       required: true
   - type: input
+    id: last-good
     attributes:
-      label: Crash ID
-      description: >
-        If you're reporting a crash, please enter the crash ID from the crash reporter
-        opening on the next launch after crash.
+      label: Last working version
+      description: The newest version of this fork in which this worked. Write "never worked" or "unknown" if that is the case.
+      placeholder: 7.2.9
+    validations:
+      required: true
   - type: textarea
+    id: steps
     attributes:
-      label: Logs
-      description: >
-        You can find log.txt using the `viewlogs`
-        [cheat code](https://github.com/telegramdesktop/tdesktop/wiki/Cheat-Codes).
-      placeholder: Insert log.txt here (if necessary)
-      render: shell
+      label: Steps to reproduce
+      description: |
+        Start from a state anyone can reach. Name every relevant setting that differs from the default, including AyuGram Preferences, experimental settings, proxy, custom font, and theme.
+
+        For OpenAI translation, name the service, the model, and the endpoint type (Responses or Chat Completions). Never post the API key.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: |
+        Attach what makes the report verifiable.
+        - Anything visible needs a screenshot or a screen recording.
+        - A crash needs the text shown by **VIEW REPORT** in the window that opens on the next launch. Keep the file from **SAVE TO FILE** in case it is requested.
+        - A startup, network, or translation failure needs the relevant part of `log.txt`. Type `viewlogs` in Settings to open its folder.
+
+        Remove phone numbers, API keys, and private message text first. Never upload the `tdata` folder.
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: The link to the upstream report, what you already ruled out, and anything else that helps.
