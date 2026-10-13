@@ -5531,6 +5531,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_context_copy_selected" = "Copy Selected Text";
 "lng_context_copy_selected_items" = "Copy Selected as Text";
 "lng_context_copy_in_reply_to" = "in reply to {name}";
+"lng_context_copy_text_from_image" = "—Text from image—";
 "lng_context_forward_selected" = "Forward Selected";
 "lng_context_send_now_selected" = "Send selected now";
 "lng_context_reschedule_selected" = "Reschedule Selected";
@@ -6527,6 +6528,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_group_call_settings" = "Settings";
 "lng_group_call_video" = "Video";
 "lng_group_call_message" = "Message";
+"lng_group_call_screen" = "Screen";
 "lng_group_call_screen_share_start" = "Share Screen";
 "lng_group_call_screen_share_stop" = "Stop Sharing";
 "lng_group_call_screen_title" = "Screen {index}";
@@ -8705,6 +8707,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_sr_playback_order" = "Playback order";
 "lng_sr_player_close" = "Close media player";
 "lng_sr_group_call_menu" = "Video chat menu";
+"lng_sr_group_call_column_show" = "Show participants";
+"lng_sr_group_call_column_hide" = "Hide participants";
 "lng_sr_search_date" = "Search by date";
 "lng_sr_cancel_search" = "Cancel search";
 "lng_sr_clear_search" = "Clear search";

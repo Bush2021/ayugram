@@ -32,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_reply_button.h"
 #include "history/view/history_view_context_menu.h"
+#include "history/view/history_view_copy_selection.h"
 #include "history/view/history_view_reaction_preview.h"
 #include "history/view/history_view_quick_action.h"
 #include "history/view/history_view_add_poll_option.h"
@@ -4065,18 +4066,21 @@ bool HistoryInner::showCopyRestrictionForSelected() {
 		&& showCopyRestriction(_selectedTextItem);
 }
 
-void HistoryInner::copySelectedText() {
+void HistoryInner::copySelectedText(bool withImageText) {
 	if (showCopyRestrictionForSelected()) {
 		return;
 	}
-	const auto text = getSelectedText();
-	if (text.empty()) {
+	auto text = getSelectedTextParts();
+	if (text.empty() && (!withImageText || text.images.empty())) {
 		return;
 	}
-	Iv::SetRichBlocksClipboard(
-		text,
-		getSelectedRichBlocks(),
-		&session());
+	HistoryView::CopySelection({
+		.show = _controller->uiShow(),
+		.session = &session(),
+		.text = std::move(text),
+		.blocks = getSelectedRichBlocks(),
+		.withImageText = withImageText,
+	});
 	if (hasSelectedItems()) {
 		clearSelected();
 	}
@@ -4197,6 +4201,10 @@ void HistoryInner::resizeEvent(QResizeEvent *e) {
 }
 
 TextForMimeData HistoryInner::getSelectedText() const {
+	return getSelectedTextParts().composed();
+}
+
+HistorySelectedTextParts HistoryInner::getSelectedTextParts() const {
 	auto selected = _selected;
 
 	if (_mouseAction == MouseAction::Selecting && _dragSelFrom && _dragSelTo) {
@@ -4205,9 +4213,9 @@ TextForMimeData HistoryInner::getSelectedText() const {
 
 	if (selected.empty()) {
 		if (const auto view = viewByItem(_selectedTextItem)) {
-			return view->selectedText(_selectedTextSelection);
+			return { .texts = { view->selectedText(_selectedTextSelection) } };
 		}
-		return _selectedText;
+		return { .texts = { _selectedText } };
 	}
 
 	const auto richContext = (selected.size() > 1);
@@ -4250,19 +4258,12 @@ TextForMimeData HistoryInner::getSelectedText() const {
 			addItem(item);
 		}
 	}
-	if (!richContext && texts.size() == 1) {
-		const auto &part = texts.front().second;
-		if (part.group) {
-			return HistoryGroupText(not_null<const Data::Group*>{ part.group });
-		}
-		return HistoryItemText(part.item);
-	}
 	auto entries = std::vector<HistorySelectedTextEntry>();
 	entries.reserve(texts.size());
 	for (const auto &entry : texts) {
 		entries.push_back(entry.second);
 	}
-	return HistorySelectedItemsText(entries, richContext);
+	return HistorySelectedItemsTextParts(entries, richContext);
 }
 
 Iv::RichPageBlocksSlice HistoryInner::getSelectedRichBlocks() const {
@@ -4470,6 +4471,9 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 	} else if (e == QKeySequence::Copy
 		&& canCopySelected()) {
 		copySelectedText();
+	} else if (HistoryView::IsCopyWithImageTextShortcut(e, &session())
+		&& canCopySelected()) {
+		copySelectedText(true);
 #ifdef Q_OS_MAC
 	} else if (e->key() == Qt::Key_E
 		&& e->modifiers().testFlag(Qt::ControlModifier)
