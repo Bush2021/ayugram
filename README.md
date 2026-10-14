@@ -51,6 +51,8 @@ paths. Built-in automatic updates are disabled; download updates from this repos
 
 - Ads have three modes: Show Ads, Camouflage, and Strict Block. Camouflage requests
   ads but hides them; Strict Block skips ad requests.
+- Session details show more fields: API ID, platform, creation date, whether the
+  session accepts secret chats and calls, and the server region.
 - Compatibility fixes preserve AyuGram settings as upstream UI code changes,
   including the gift button toggle and filtering out sticker packs you have not added.
 - The build tooltip includes the source commit hash to help identify development builds.
