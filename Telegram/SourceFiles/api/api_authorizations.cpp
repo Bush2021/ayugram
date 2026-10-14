@@ -31,6 +31,9 @@ Authorizations::Entry ParseEntry(const MTPDauthorization &data) {
 	result.incomplete = data.is_password_pending();
 	result.callsDisabled = data.is_call_requests_disabled();
 	result.officialApp = data.is_official_app();
+	result.encryptedRequestsDisabled = data.is_encrypted_requests_disabled();
+	result.createdTime = data.vdate_created().v;
+	result.region = qs(data.vregion());
 
 	const auto apiId = result.apiId = data.vapi_id().v;
 	const auto isTest = (apiId == TestApiId);

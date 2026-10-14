@@ -9615,6 +9615,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **AyuGram**.";
 "ayu_MutualContactInfo" = "This contact is mutual.";
 "ayu_SessionInfoOfficialApp" = "Official app";
+"ayu_SessionInfoApiId" = "API ID";
+"ayu_SessionInfoPlatform" = "Platform";
+"ayu_SessionInfoCreated" = "Created";
+"ayu_SessionInfoSecretChats" = "Accepts secret chats";
+"ayu_SessionInfoCalls" = "Accepts calls";
+"ayu_SessionInfoRegion" = "Region";
 "ayu_SettingsWatermark" = "AyuGram is developed and maintained by Radolyn Labs.";
 "ayu_SettingsDescription" = "Telegram Desktop fork focused on customization and ToS-breaking features.";
 "ayu_ConfirmationSticker" = "Do you want to send this sticker?";

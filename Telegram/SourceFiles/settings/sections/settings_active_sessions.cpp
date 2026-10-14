@@ -460,11 +460,41 @@ void SessionInfoBox(
 		tr::lng_sessions_system(),
 		data.system,
 		st::menuIconInfo);
+	const auto yesNo = [](bool value) {
+		return value ? tr::lng_box_yes(tr::now) : tr::lng_box_no(tr::now);
+	};
 	AddSessionInfoRow(
 		container,
 		tr::ayu_SessionInfoOfficialApp(),
-		data.officialApp ? tr::lng_box_yes(tr::now) : tr::lng_box_no(tr::now),
+		yesNo(data.officialApp),
 		st::menuIconInfo);
+	AddSessionInfoRow(
+		container,
+		tr::ayu_SessionInfoApiId(),
+		QString::number(data.apiId),
+		st::menuIconBotCommands);
+	AddSessionInfoRow(
+		container,
+		tr::ayu_SessionInfoPlatform(),
+		data.platform,
+		st::menuIconDevices);
+	if (data.createdTime) {
+		AddSessionInfoRow(
+			container,
+			tr::ayu_SessionInfoCreated(),
+			langDateTimeFull(base::unixtime::parse(data.createdTime)),
+			st::menuIconSchedule);
+	}
+	AddSessionInfoRow(
+		container,
+		tr::ayu_SessionInfoSecretChats(),
+		yesNo(!data.encryptedRequestsDisabled),
+		st::menuIconLock);
+	AddSessionInfoRow(
+		container,
+		tr::ayu_SessionInfoCalls(),
+		yesNo(!data.callsDisabled),
+		st::menuIconPhone);
 	AddSessionInfoRow(
 		container,
 		tr::lng_sessions_ip(),
@@ -474,6 +504,11 @@ void SessionInfoBox(
 		container,
 		tr::lng_sessions_location(),
 		data.location,
+		st::menuIconAddress);
+	AddSessionInfoRow(
+		container,
+		tr::ayu_SessionInfoRegion(),
+		data.region,
 		st::menuIconAddress);
 
 	AddSkip(container, st::sessionValueSkip);
