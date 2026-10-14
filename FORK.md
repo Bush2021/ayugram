@@ -49,6 +49,19 @@ Every merge must preserve these paths:
 - `Telegram/SourceFiles/**/*.style` — entries with the `ayu_` prefix (mixed into upstream style files)
 - `Telegram/CMakeLists.txt` — lines mentioning `ayu/`
 
+## Fork feature rules
+
+- **Document every feature.** A change that adds or changes a user-visible feature of this fork also updates the "What this fork adds" section of `README.md` in the same change. `README-RU.md` is upstream AyuGram's text; leave it alone.
+- **Copyright.** A new source file this fork adds starts with the AyuGram header, credited to Bush2021 with the year the file was created. Keep the existing tdesktop and Radolyn headers on files that came from upstream. A file written for a PR to AyuGram (sent through the `pr` remote) uses `Copyright @Radolyn` instead, like the OpenAI translator files.
+  ```cpp
+  // This is the source code of AyuGram for Desktop.
+  //
+  // We do not and cannot prevent the use of our code,
+  // but be respectful and credit the original author.
+  //
+  // Copyright @Bush2021, 2026
+  ```
+
 ## Fork-owned (not merged from upstream)
 
 - `.github/ISSUE_TEMPLATE/`: this fork's own issue forms and support policy. On conflict keep ours whole. Do not fold upstream template changes in.
