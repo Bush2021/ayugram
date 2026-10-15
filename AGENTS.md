@@ -161,6 +161,24 @@ cmake --build "l:\Telegram\tx64\out" --config Debug --target Telegram
 
 **Never build Release** - it's extremely heavy and not needed for testing changes.
 
+**On macOS, never run an Xcode clean against `out/`** - not `--target clean`,
+not `--clean-first` with any target, not `xcodebuild ... clean` and not a
+Clean in the Xcode app. Xcode's build-products folder for `Telegram` is
+`out/Debug`, which also holds the portable account folders. When `out/Debug`
+carries the `com.apple.xcode.CreatedByBuildSystem` extended attribute,
+`--target clean` deletes `out/Debug` with every folder in it, and
+`--target Telegram --clean-first` does the same before it builds. Without the
+attribute, `--target clean` refuses to delete `out/Debug` and ends
+`** CLEAN FAILED **` (exit 65). It ends the same way when it refuses only
+another, unmarked products folder and deletes a marked `out/Debug`, so exit 65
+alone does not prove that `out/Debug` survived. To force a full recompile,
+follow the `out/build` deletion in "### Forcing a full recompile on macOS"
+under "## Troubleshooting" exactly as written there, its precondition and its
+checks before and after the rebuild included. Never mark `out/Debug` deletable
+with `xattr -w com.apple.xcode.CreatedByBuildSystem true`, as the note in
+Xcode's refusal suggests, and never move, rename or remove any `out/Debug`
+entry to make a clean succeed.
+
 ## Platform-Specific Requirements
 
 ### Windows
@@ -220,37 +238,65 @@ older `kKeysCount`. The characteristic failure is:
   `Local::readLangPack()`.
 
 If this exact startup failure repeats twice, do not change the implementation,
-test overlay, or portable account. Stop only this checkout's exact Telegram
-process. Because Xcode's `CONFIGURATION_BUILD_DIR` is `out/Debug`, make a
-safety copy of every existing portable folder outside `out/` before cleaning:
+test overlay, or portable account. Rebuild every object once by following the
+`out/build` deletion in "### Forcing a full recompile on macOS" exactly as
+written there, its precondition and checks included, never with an Xcode clean
+(see the macOS statement in "### Build Commands" under
+"## Build Configuration"). Then rerun the same test once. If the signature
+persists after that clean rebuild, continue normal crash diagnosis or report
+the blocker. Do not loop clean rebuilds.
+
+### Forcing a full recompile on macOS
+
+Start only when no build of this checkout is running and this checkout's exact
+Telegram process is stopped. Never stop any other process for this procedure.
+Outside the autonomous `continue` / `perform-task` workflow, stopping that
+process follows "### Build output locks": the user may be testing it, so ask
+the user first and never terminate it without explicit permission. Then
+rebuild every object by deleting the intermediate tree `out/build`, never with
+an Xcode clean (see the macOS statement in "### Build Commands" under
+"## Build Configuration").
+
+The generated project keeps every intermediate (object files, precompiled
+headers and Xcode's build database) under `out/build`, its `SYMROOT`, and
+only build products in `out/Debug` and the other per-target `Debug` folders.
+Deleting `out/build` therefore works the same whether or not `out/Debug`
+carries the `com.apple.xcode.CreatedByBuildSystem` attribute, and it touches
+nothing in `out/Debug`. From the repository root, record what `out/Debug`
+holds, delete the intermediates and confirm that `out/build` is gone:
 
 ```bash
-portable_backup_root="$(mktemp -d "${TMPDIR:-/tmp}/tdesktop-portable-clean.XXXXXX")"
-for portable_name in \
-  TelegramForcePortable \
-  test_TelegramForcePortable \
-  real_TelegramForcePortable; do
-  if [ -d "out/Debug/$portable_name" ]; then
-    ditto "out/Debug/$portable_name" "$portable_backup_root/$portable_name"
-  fi
-done
+test -d out/Telegram.xcodeproj &&
+  ls -A out/Debug | sort > out/language-rebuild-mark.txt &&
+  rm -rf out/build &&
+  test ! -e out/build &&
+  echo 'out/build is gone'
 ```
 
-Require every expected backup copy to exist before continuing. Then perform
-one full Xcode Debug clean and rebuild:
+It must print `out/build is gone`: no intermediate object survived. Object
+files elsewhere in `out/`, such as CMake's compiler checks or a release
+build's tree, belong to other builds; leave them alone. This step has no
+accepted failure: an error, other output or no output stops the procedure.
+Then run one full Debug rebuild, which has to compile every object again:
 
 ```bash
-cmake --build out --config Debug --target clean
 cmake --build out --config Debug --target Telegram
 ```
 
-Afterward, restore a portable folder from the backup only when its original
-path is missing; never overwrite a folder that survived the clean. Verify all
-three original folder names that existed before the clean are present, keep
-the backup until the rebuilt app completes one successful launch, and record
-its path if the run stops before verification. Then rerun the same test once.
-If the signature persists after that clean rebuild, continue normal crash
-diagnosis or report the blocker. Do not loop clean rebuilds.
+It must end `** BUILD SUCCEEDED **`. Then check that the rebuild compiled every
+object and that nothing in `out/Debug` was lost:
+
+```bash
+test -f out/language-rebuild-mark.txt &&
+  find out/build -name '*.o' ! -newer out/language-rebuild-mark.txt | wc -l &&
+  find out/build -name '*.o' | wc -l &&
+  ls -A out/Debug | sort | comm -23 out/language-rebuild-mark.txt -
+```
+
+It must print `0` (no object file is older than the mark written before
+`out/build` was deleted), then a nonzero object count, and nothing else (every
+entry `out/Debug` held before is still there). Anything else stops the
+procedure; report what it printed.
 
 ### Build output locks
 

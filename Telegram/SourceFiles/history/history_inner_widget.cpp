@@ -2442,6 +2442,9 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 			uponSelected = isPressInSelectedText(pressedView, dragState);
 		}
 	}
+	if (uponSelected && hasCopyRestrictionForSelected()) {
+		return nullptr;
+	}
 	auto urls = QList<QUrl>();
 	const auto selectedText = [&] {
 		if (uponSelected) {
@@ -2470,6 +2473,12 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 		}
 		return mimeData;
 	} else if (pressedView) {
+		const auto pressedItem = HistoryView::LookupItemByPoint(
+			pressedView,
+			_dragStartPosition);
+		if (hasCopyRestriction(pressedItem)) {
+			return nullptr;
+		}
 		auto forwardIds = MessageIdsList();
 		const auto tryForwardSelection = uponSelected
 			&& !_controller->adaptive().isOneColumn();
