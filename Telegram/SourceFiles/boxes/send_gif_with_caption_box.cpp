@@ -63,6 +63,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 
+#include "ayu/features/text_spacing/text_spacing.h"
+
 namespace Ui {
 
 void SetupCaptionFieldInBox(
@@ -659,6 +661,7 @@ void SendGifWithCaptionBox(
 		st::boxWidth);
 	Ui::AddSkip(box->verticalLayout());
 	const auto d = [=](Api::SendOptions o, TextWithTags t) {
+		t = AyuFeatures::TextSpacing::ForSending(std::move(t));
 		auto edited = Ui::PreparedList();
 		if (VideoModified(state)) {
 			edited = base::take(state->list);

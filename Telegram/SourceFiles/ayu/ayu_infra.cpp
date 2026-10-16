@@ -39,6 +39,7 @@ void initUiSettings() {
 	AyuUiSettings::setWideMultiplier(settings.wideMultiplier());
 	AyuUiSettings::setMaterialSwitches(settings.materialSwitches());
 	AyuUiSettings::setAvatarCorners(settings.avatarCorners());
+	AyuUiSettings::setCjkSpacing(settings.cjkSpacingInMessages());
 	Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
 }
 

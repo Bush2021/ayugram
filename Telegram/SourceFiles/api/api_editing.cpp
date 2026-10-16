@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/abstract_box.h" // Ui::show().
 
 // AyuGram includes
+#include "ayu/features/text_spacing/text_spacing.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -529,7 +530,7 @@ mtpRequestId EditCaption(
 		Fn<void(const QString &)> fail) {
 	return EditMessage(
 		item,
-		caption,
+		AyuFeatures::TextSpacing::ForEditing(caption),
 		Data::WebPageDraft(),
 		options,
 		done,
@@ -538,13 +539,14 @@ mtpRequestId EditCaption(
 
 mtpRequestId EditTextMessage(
 		not_null<HistoryItem*> item,
-		const TextWithEntities &caption,
+		const TextWithEntities &original,
 		Data::WebPageDraft webpage,
 		SendOptions options,
 		Fn<void(mtpRequestId requestId)> done,
 		Fn<void(const QString &error, mtpRequestId requestId)> fail,
 		bool spoilered,
 		VideoCoverEdit videoCover) {
+	const auto caption = AyuFeatures::TextSpacing::ForEditing(original);
 	if (item->isWelcomeTemplate()) {
 		const auto history = item->history();
 		auto &welcome = history->session().welcomeMessages();

@@ -429,6 +429,9 @@ public:
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
+	[[nodiscard]] bool cjkSpacingInMessages() const { return _cjkSpacingInMessages.current(); }
+	[[nodiscard]] bool cjkSpacingWhenSending() const { return _cjkSpacingWhenSending.current(); }
+	[[nodiscard]] bool cjkSpacingWhenEditing() const { return _cjkSpacingWhenEditing.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -518,6 +521,9 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setCjkSpacingInMessages(bool val);
+	void setCjkSpacingWhenSending(bool val);
+	void setCjkSpacingWhenEditing(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -790,6 +796,9 @@ private:
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
+	rpl::variable<bool> _cjkSpacingInMessages = false;
+	rpl::variable<bool> _cjkSpacingWhenSending = false;
+	rpl::variable<bool> _cjkSpacingWhenEditing = false;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

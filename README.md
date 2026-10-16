@@ -36,6 +36,14 @@ Chat Completions endpoints are supported.
 The API key is saved in the application's encrypted local settings. Selecting an
 external translation provider prompts you to confirm where message text will be sent.
 
+### CJK spacing
+
+Adds a space between Chinese or Japanese characters and Latin letters or digits, in
+the style of pangu.js. In messages, captions, link previews, chat list previews and
+notifications, the spacing only changes the display: quotes, Copy Text, and the
+message itself keep the original text. Separate options add the spaces to messages
+you send or edit. Code, links, mentions, hashtags and custom emoji stay untouched.
+
 ### Privacy and external requests
 
 This fork removes AyuGram's remote configuration service and crash report upload

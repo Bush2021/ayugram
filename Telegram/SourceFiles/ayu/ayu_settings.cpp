@@ -1267,6 +1267,25 @@ void AyuSettings::setStreamerMode(bool val) {
 	save();
 }
 
+void AyuSettings::setCjkSpacingInMessages(bool val) {
+	if (_cjkSpacingInMessages.current() == val) return;
+	_cjkSpacingInMessages = val;
+	AyuUiSettings::setCjkSpacing(val);
+	save();
+}
+
+void AyuSettings::setCjkSpacingWhenSending(bool val) {
+	if (_cjkSpacingWhenSending.current() == val) return;
+	_cjkSpacingWhenSending = val;
+	save();
+}
+
+void AyuSettings::setCjkSpacingWhenEditing(bool val) {
+	if (_cjkSpacingWhenEditing.current() == val) return;
+	_cjkSpacingWhenEditing = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1366,6 +1385,9 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
 		{"streamerMode", s._streamerMode.current()},
+		{"cjkSpacingInMessages", s._cjkSpacingInMessages.current()},
+		{"cjkSpacingWhenSending", s._cjkSpacingWhenSending.current()},
+		{"cjkSpacingWhenEditing", s._cjkSpacingWhenEditing.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1480,6 +1502,9 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
+	s._cjkSpacingInMessages = j.value("cjkSpacingInMessages", defaults._cjkSpacingInMessages.current());
+	s._cjkSpacingWhenSending = j.value("cjkSpacingWhenSending", defaults._cjkSpacingWhenSending.current());
+	s._cjkSpacingWhenEditing = j.value("cjkSpacingWhenEditing", defaults._cjkSpacingWhenEditing.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

@@ -227,6 +227,42 @@ void BuildMarks(
 	ayu.addSectionDivider();
 }
 
+void BuildCjkSpacing(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	const auto controller = builder.controller();
+	ayu.addCollapsibleToggle({
+		.id = u"ayu/cjkSpacing"_q,
+		.title = tr::ayu_CjkSpacing(),
+		.checkboxes = {
+			NestedEntry{
+				tr::ayu_CjkSpacingInMessages(tr::now),
+				[] { return AyuSettings::getInstance().cjkSpacingInMessages(); },
+				[=](bool v) {
+					auto &settings = AyuSettings::getInstance();
+					if (v != settings.cjkSpacingInMessages()) {
+						settings.setCjkSpacingInMessages(v);
+						ShowRestartPrompt(controller);
+					}
+				}
+			},
+			NestedEntry{
+				tr::ayu_CjkSpacingWhenSending(tr::now),
+				[] { return AyuSettings::getInstance().cjkSpacingWhenSending(); },
+				[](bool v) { AyuSettings::getInstance().setCjkSpacingWhenSending(v); }
+			},
+			NestedEntry{
+				tr::ayu_CjkSpacingWhenEditing(tr::now),
+				[] { return AyuSettings::getInstance().cjkSpacingWhenEditing(); },
+				[](bool v) { AyuSettings::getInstance().setCjkSpacingWhenEditing(v); }
+			},
+		},
+		.toggledWhenAll = false,
+		.keywords = { u"pangu"_q },
+	});
+	builder.addSkip();
+	builder.addDividerText(tr::ayu_CjkSpacingDescription());
+	builder.addSkip();
+}
+
 void BuildWideMessagesMultiplier(
 		SectionBuilder &builder,
 		AyuSectionBuilder &ayu,
@@ -458,6 +494,7 @@ const auto kMeta = BuildHelper({
 	BuildStickersAndEmoji(builder, ayu);
 	BuildGroupsAndChannels(builder, ayu);
 	BuildMarks(builder, ayu, previewState);
+	BuildCjkSpacing(builder, ayu);
 	BuildWideMessagesMultiplier(builder, ayu, previewState);
 	BuildContextMenuElements(builder, ayu);
 	BuildMessageFieldElements(builder, ayu);

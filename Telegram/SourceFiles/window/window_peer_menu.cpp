@@ -146,6 +146,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_ayu_icons.h"
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 #include "ayu/secret/ui/secret_chat_menu.h"
 
 
@@ -3635,7 +3636,8 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 	const auto field = comment->entity();
 	state->submit = [=](Api::SendOptions options) {
 		const auto peers = state->box->collectSelectedRows();
-		auto comment = field->getTextWithAppliedMarkdown();
+		auto comment = AyuFeatures::TextSpacing::ForSending(
+			field->getTextWithAppliedMarkdown());
 		const auto checkPaid = [=] {
 			const auto withPaymentApproved = crl::guard(weak, [=](
 					int approved) {

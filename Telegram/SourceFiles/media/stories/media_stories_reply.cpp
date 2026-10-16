@@ -59,6 +59,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_media_view.h"
 
+#include "ayu/features/text_spacing/text_spacing.h"
+
 namespace Media::Stories {
 namespace {
 
@@ -242,7 +244,8 @@ bool ReplyArea::sendReaction(const Data::ReactionId &id) {
 }
 
 void ReplyArea::send(Api::SendOptions options) {
-	auto text = _controls->getTextWithAppliedMarkdown();
+	auto text = AyuFeatures::TextSpacing::ForSending(
+		_controls->getTextWithAppliedMarkdown());
 	const auto stars = _controls->chosenStarsForMessage();
 	if (const auto stream = _videoStream.get()) {
 		if (stars > 0) {

@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/features/message_shot/message_shot.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 
 
 namespace HistoryView {
@@ -781,7 +782,8 @@ void ScheduledWidget::send(Api::SendOptions options) {
 	const auto webPageDraft = _composeControls->webPageDraft();
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
-	message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
+	message.textWithTags = AyuFeatures::TextSpacing::ForSending(
+		_composeControls->getTextWithAppliedMarkdown());
 	message.webPage = webPageDraft;
 
 	session().api().sendMessage(std::move(message));

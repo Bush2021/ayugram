@@ -87,6 +87,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "base/unixtime.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 #include "ayu/utils/telegram_helpers.h"
 #include <QApplication>
 #include <QBuffer>
@@ -2700,7 +2701,7 @@ void SendFilesBox::send(
 
 	_confirmed = true;
 	if (_confirmedCallback) {
-		auto caption = fieldText();
+		auto caption = AyuFeatures::TextSpacing::ForSending(fieldText());
 		if (!validateLength(caption.text)) {
 			return;
 		}
@@ -2724,6 +2725,9 @@ void SendFilesBox::send(
 		for (auto &file : _list.files) {
 			if (SkipCaption(file, way)) {
 				file.caption = {};
+			} else {
+				file.caption = AyuFeatures::TextSpacing::ForSending(
+					std::move(file.caption));
 			}
 		}
 		if (!way.sendImagesAsPhotos()) {

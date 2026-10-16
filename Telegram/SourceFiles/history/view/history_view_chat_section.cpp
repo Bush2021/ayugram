@@ -138,6 +138,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/message_shot/message_shot.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 #include "base/unixtime.h"
 
 
@@ -2570,6 +2571,8 @@ void ChatWidget::sendTextWithTags(
 		_cornerButtons.clearReplyReturns();
 	}
 
+	textWithTags = AyuFeatures::TextSpacing::ForSending(
+		std::move(textWithTags));
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
 	if (useCurrentWebPageDraft) {

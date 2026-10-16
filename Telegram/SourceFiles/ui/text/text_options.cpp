@@ -103,6 +103,16 @@ TextParseOptions WebpageDescriptionOptions = {
 } // namespace
 
 void InitTextOptions() {
+	for (const auto options : {
+			&HistoryTextOptions,
+			&HistoryBotOptions,
+			&HistoryTextNoMonoOptions,
+			&HistoryBotNoMonoOptions,
+			&TextDialogOptions,
+			&WebpageTitleOptions,
+			&WebpageDescriptionOptions }) {
+		options->flags |= TextParseCjkSpacing;
+	}
 	TextDialogOptions.maxw = st::columnMaximalWidthLeft * 2;
 	WebpageTitleOptions.maxh = st::webPageTitleFont->height * 2;
 	WebpageTitleOptions.maxw

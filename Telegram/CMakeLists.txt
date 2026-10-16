@@ -232,6 +232,8 @@ set(ayugram_files
         ayu/features/streamer_mode/platform/platform_streamer_mode.h
         ayu/features/streamer_mode/streamer_mode.cpp
         ayu/features/streamer_mode/streamer_mode.h
+        ayu/features/text_spacing/text_spacing.cpp
+        ayu/features/text_spacing/text_spacing.h
         ayu/features/message_shot/message_shot.cpp
         ayu/features/message_shot/message_shot.h
         ayu/features/message_shot/message_shot_theme_state.cpp

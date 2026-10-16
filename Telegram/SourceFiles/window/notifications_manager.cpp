@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 #include "ayu/utils/telegram_helpers.h"
 
 
@@ -1453,7 +1454,7 @@ void Manager::notificationReplied(
 		: id.contextId.monoforumPeerId;
 
 	auto message = Api::MessageToSend(Api::SendAction(history));
-	message.textWithTags = reply;
+	message.textWithTags = AyuFeatures::TextSpacing::ForSending(reply);
 	const auto replyToId = (id.msgId > 0 && !history->peer->isUser()
 		&& id.msgId != topicRootId)
 		? id.msgId
@@ -1621,9 +1622,10 @@ void NativeManager::doShowNotification(NotificationFields &&fields) {
 		: item->groupId()
 		? tr::lng_in_dlg_album(tr::now)
 		: TextWithForwardedChar(
-			TextWithPermanentSpoiler(item->notificationText({
-				.spoilerLoginCode = options.spoilerLoginCode,
-			})),
+			TextWithPermanentSpoiler(AyuFeatures::TextSpacing::ForDisplay(
+				item->notificationText({
+					.spoilerLoginCode = options.spoilerLoginCode,
+				}))),
 			(fields.forwardedCount == 1));
 
 	// #TODO optimize

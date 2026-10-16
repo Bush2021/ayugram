@@ -227,6 +227,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 #include "boxes/abstract_box.h"
 
 
@@ -6145,6 +6146,8 @@ void HistoryWidget::sendTextWithTags(
 		_cornerButtons.clearReplyReturns();
 	}
 
+	textWithTags = AyuFeatures::TextSpacing::ForSending(
+		std::move(textWithTags));
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
 	if (useWebPageDraft && _preview) {

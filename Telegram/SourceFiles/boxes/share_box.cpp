@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/features/text_spacing/text_spacing.h"
 
 
 class ShareBox::Inner final : public Ui::RpWidget {
@@ -696,7 +697,8 @@ void ShareBox::submit(Api::SendOptions options) {
 	auto threads = _inner->selected();
 	const auto weak = base::make_weak(this);
 	const auto field = _comment->entity();
-	auto comment = field->getTextWithAppliedMarkdown();
+	auto comment = AyuFeatures::TextSpacing::ForSending(
+		field->getTextWithAppliedMarkdown());
 	const auto checkPaid = [=] {
 		if (!_descriptor.countMessagesCallback) {
 			return true;

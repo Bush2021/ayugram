@@ -1003,6 +1003,7 @@ void Notification::updateNotifyDisplay() {
 			const auto options = TextParseOptions{
 				(TextParseColorized
 					| TextParseMarkdown
+					| TextParseCjkSpacing
 					| (_forwardedCount > 1 ? TextParseMultiline : 0)),
 				0,
 				0,

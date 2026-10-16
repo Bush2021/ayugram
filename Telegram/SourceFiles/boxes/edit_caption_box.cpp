@@ -74,6 +74,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QMimeData>
 
+#include "ayu/features/text_spacing/text_spacing.h"
+
 namespace {
 
 constexpr auto kChangesDebounceTimeout = crl::time(1000);
@@ -1337,7 +1339,8 @@ void EditCaptionBox::save() {
 		_controller->session().api().editMedia(
 			std::move(_preparedList),
 			(compressed ? SendMediaType::Photo : SendMediaType::File),
-			_field->getTextWithAppliedMarkdown(),
+			AyuFeatures::TextSpacing::ForEditing(
+				_field->getTextWithAppliedMarkdown()),
 			action);
 		closeAfterSave();
 		return;

@@ -69,6 +69,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_layers.h"
 
+#include "ayu/features/text_spacing/text_spacing.h"
+
 namespace Settings {
 namespace {
 
@@ -1214,7 +1216,8 @@ void ShortcutMessages::send(Api::SendOptions options) {
 	_cornerButtons.clearReplyReturns();
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
-	message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
+	message.textWithTags = AyuFeatures::TextSpacing::ForSending(
+		_composeControls->getTextWithAppliedMarkdown());
 	message.webPage = _composeControls->webPageDraft();
 
 	_session->api().sendMessage(std::move(message));
