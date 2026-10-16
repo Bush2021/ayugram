@@ -44,6 +44,14 @@ notifications, the spacing only changes the display: quotes, Copy Text, and the
 message itself keep the original text. Separate options add the spaces to messages
 you send or edit. Code, links, mentions, hashtags and custom emoji stay untouched.
 
+### Original date of forwarded messages
+
+Shows when a forwarded message was first sent at the end of its "Forwarded from" line,
+for example "Forwarded from Durov • Mar 12 at 14:30". The time in the corner of the
+bubble still shows when the message arrived in the chat. The original time includes
+seconds when Show Message Seconds is on. Turn it on in AyuGram's Chats settings, under
+Messages.
+
 ### Privacy and external requests
 
 This fork removes AyuGram's remote configuration service and crash report upload

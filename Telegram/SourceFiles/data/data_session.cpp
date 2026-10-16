@@ -451,6 +451,19 @@ Session::Session(not_null<Main::Session*> session)
 			requestItemViewRefresh(item);
 		}
 	}, _lifetime);
+
+	AyuSettings::getInstance().showForwardOriginalDateChanges(
+	) | rpl::on_next([=] {
+		auto resize = std::vector<not_null<const HistoryItem*>>();
+		for (const auto &[item, _] : _views) {
+			if (item->Has<HistoryMessageForwarded>()) {
+				resize.push_back(item);
+			}
+		}
+		for (const auto &item : resize) {
+			requestItemResize(item);
+		}
+	}, _lifetime);
 }
 
 void Session::subscribeForTopicRepliesLists() {

@@ -66,6 +66,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/utils/telegram_helpers.h"
 
 
 namespace {
@@ -399,7 +400,8 @@ void HistoryMessageForwarded::create(
 	}
 	text.setMarkedText(
 		st::fwdTextStyle,
-		phrase(via, std::move(userpic)),
+		phrase(via, std::move(userpic)).append(
+			forwardOriginalDateSuffix(this)),
 		kMarkupTextOptions,
 		context);
 

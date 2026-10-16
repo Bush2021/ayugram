@@ -212,6 +212,12 @@ void BuildMarks(
 		.getter = &AyuSettings::simpleQuotesAndReplies,
 		.setter = &AyuSettings::setSimpleQuotesAndReplies,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/showForwardOriginalDate"_q,
+		.title = tr::ayu_ShowForwardOriginalDate(),
+		.getter = &AyuSettings::showForwardOriginalDate,
+		.setter = &AyuSettings::setShowForwardOriginalDate,
+	});
 
 	const auto semiTransparent = ayu.addSettingToggle({
 		.id = u"ayu/semiTransparentDeletedMessages"_q,

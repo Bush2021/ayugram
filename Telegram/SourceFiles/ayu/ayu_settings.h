@@ -432,6 +432,7 @@ public:
 	[[nodiscard]] bool cjkSpacingInMessages() const { return _cjkSpacingInMessages.current(); }
 	[[nodiscard]] bool cjkSpacingWhenSending() const { return _cjkSpacingWhenSending.current(); }
 	[[nodiscard]] bool cjkSpacingWhenEditing() const { return _cjkSpacingWhenEditing.current(); }
+	[[nodiscard]] bool showForwardOriginalDate() const { return _showForwardOriginalDate.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -524,6 +525,7 @@ public:
 	void setCjkSpacingInMessages(bool val);
 	void setCjkSpacingWhenSending(bool val);
 	void setCjkSpacingWhenEditing(bool val);
+	void setShowForwardOriginalDate(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -699,6 +701,7 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
+	[[nodiscard]] rpl::producer<bool> showForwardOriginalDateChanges() const { return _showForwardOriginalDate.changes(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -799,6 +802,7 @@ private:
 	rpl::variable<bool> _cjkSpacingInMessages = false;
 	rpl::variable<bool> _cjkSpacingWhenSending = false;
 	rpl::variable<bool> _cjkSpacingWhenEditing = false;
+	rpl::variable<bool> _showForwardOriginalDate = false;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

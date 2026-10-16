@@ -9296,6 +9296,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CjkSpacingWhenSending" = "When Sending";
 "ayu_CjkSpacingWhenEditing" = "When Editing";
 "ayu_CjkSpacingDescription" = "Adds a space between Chinese or Japanese characters and Latin letters or digits, like pangu.js. In messages, only the display changes. When sending or editing, the space becomes part of the text. Code, links and mentions stay untouched.";
+"ayu_ShowForwardOriginalDate" = "Show Original Date of Forwarded Messages";
 "ayu_LinksHeader" = "Links";
 "ayu_LinksChannel" = "Channel";
 "ayu_LinksChats" = "Chats";

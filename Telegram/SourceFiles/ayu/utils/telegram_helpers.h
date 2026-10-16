@@ -21,6 +21,8 @@ namespace Window {
 class SessionController;
 }
 
+struct HistoryMessageForwarded;
+
 using UsernameResolverCallback = Fn<void(const QString &, PeerData *)>;
 
 struct CustomBadge {
@@ -86,6 +88,8 @@ void readHistory(not_null<HistoryItem*> message);
 
 QString formatDateTime(const QDateTime &date);
 QString formatMessageTime(const QTime &time);
+QString forwardOriginalDateSuffix(
+	not_null<const HistoryMessageForwarded*> forwarded);
 
 QString getDCName(int dc);
 

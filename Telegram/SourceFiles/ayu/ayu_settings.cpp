@@ -1286,6 +1286,12 @@ void AyuSettings::setCjkSpacingWhenEditing(bool val) {
 	save();
 }
 
+void AyuSettings::setShowForwardOriginalDate(bool val) {
+	if (_showForwardOriginalDate.current() == val) return;
+	_showForwardOriginalDate = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1388,6 +1394,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"cjkSpacingInMessages", s._cjkSpacingInMessages.current()},
 		{"cjkSpacingWhenSending", s._cjkSpacingWhenSending.current()},
 		{"cjkSpacingWhenEditing", s._cjkSpacingWhenEditing.current()},
+		{"showForwardOriginalDate", s._showForwardOriginalDate.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1505,6 +1512,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._cjkSpacingInMessages = j.value("cjkSpacingInMessages", defaults._cjkSpacingInMessages.current());
 	s._cjkSpacingWhenSending = j.value("cjkSpacingWhenSending", defaults._cjkSpacingWhenSending.current());
 	s._cjkSpacingWhenEditing = j.value("cjkSpacingWhenEditing", defaults._cjkSpacingWhenEditing.current());
+	s._showForwardOriginalDate = j.value("showForwardOriginalDate", defaults._showForwardOriginalDate.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

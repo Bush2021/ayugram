@@ -48,6 +48,7 @@
 #include "ui/boxes/confirm_box.h"
 #include "ui/emoji_config.h"
 #include "ui/text/format_values.h"
+#include "ui/text/text.h"
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
 #include "window/window_session_controller.h"
@@ -513,6 +514,28 @@ QString formatMessageTime(const QTime &time) {
 		time,
 		format
 	);
+}
+
+QString forwardOriginalDateSuffix(
+		not_null<const HistoryMessageForwarded*> forwarded) {
+	if (!AyuSettings::getInstance().showForwardOriginalDate()
+		|| !forwarded->originalDate
+		|| forwarded->story
+		|| !forwarded->psaType.isEmpty()) {
+		return QString();
+	}
+	const auto date = base::unixtime::parse(forwarded->originalDate);
+	auto text = tr::lng_mediaview_date_time(
+		tr::now,
+		lt_date,
+		langDayOfMonth(date.date()),
+		lt_time,
+		formatMessageTime(date.time()));
+	// Nbsp ties the bullet to the sender and keeps the date on one line.
+	return QChar(QChar::Nbsp)
+		+ Ui::kQBullet
+		+ u' '
+		+ text.replace(u' ', QChar::Nbsp);
 }
 
 int getMediaSizeBytes(not_null<HistoryItem*> message) {
