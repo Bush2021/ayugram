@@ -9583,6 +9583,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CreationDateSelfLater" = "You created your account later than **{item}**.";
 "ayu_RegistrationDateDisclosure" = "AyuGram will send {query} to {bot} to estimate this account's registration date. The bot will see your Telegram account and the target user ID.";
 "ayu_RegistrationDateDisclosureConfirm" = "Look Up Date";
+"ayu_RegistrationDateLocalEstimate" = "Estimated on this device from the user ID.";
 "ayu_JoinDateChat" = "You joined **{item1}** on **{item2}**.";
 "ayu_JumpToBeginning" = "To Beginning";
 "ayu_ExpireMediaContextMenuText" = "Burn";

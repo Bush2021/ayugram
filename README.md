@@ -57,8 +57,10 @@ Messages.
 This fork removes AyuGram's remote configuration service and crash report upload
 paths. Built-in automatic updates are disabled; download updates from this repository.
 
-- External translation, registration date lookup, GIF search, and nearby place
-  search show disclosures before sending data to the corresponding service or bot.
+- External translation, GIF search, and nearby place search show disclosures
+  before sending data to the corresponding service or bot.
+- A user's registration date is estimated on the device from the user ID. Asking
+  a bot for a more precise date is optional and shows what will be sent first.
 - Fetching missing music artwork from Apple's iTunes Search service is off by
   default. The setting explains which track information is sent when enabled.
 - AyuGram language packs are cached, with network refreshes limited to once per day.
@@ -162,6 +164,8 @@ and its contributors.
 - [Kotatogram](https://github.com/kotatogram/kotatogram-desktop)
 - [64Gram](https://github.com/TDesktop-x64/tdesktop)
 - [Forkgram](https://github.com/forkgram/tdesktop)
+- [Nnngram](https://github.com/NextAlone/Nnngram) for the user ID and registration
+  date reference points
 
 ### Libraries used
 

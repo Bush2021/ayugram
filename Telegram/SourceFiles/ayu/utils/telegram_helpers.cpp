@@ -15,6 +15,7 @@
 #include "ayu/data/entities.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/features/registration_date/registration_date.h"
 #include "ayu/secret/secret_chats.h"
 #include "core/core_settings.h"
 #include "core/application.h"
@@ -121,6 +122,67 @@ const auto regDateBotUsername = u"exteraAuthBot"_q;
 
 constexpr auto regDateBotFallbackId = 6247153446L;
 const auto regDateBotFallbackUsername = u"ayugrambot"_q;
+
+[[nodiscard]] TextWithEntities LocalRegistrationEstimate(
+		not_null<UserData*> user) {
+	using AyuFeatures::RegistrationDate::Bound;
+	const auto estimate = AyuFeatures::RegistrationDate::EstimateForUser(
+		uint64(getBareID(user)));
+	const auto parsed = base::unixtime::parse(estimate.date).date();
+	const auto date = tr::marked(
+		langMonthOfYearFull(parsed.month(), parsed.year()));
+	if (user->isSelf()) {
+		switch (estimate.bound) {
+		case Bound::Before:
+			return tr::ayu_CreationDateSelfEarlier(
+				tr::now,
+				lt_item,
+				date,
+				tr::rich);
+		case Bound::After:
+			return tr::ayu_CreationDateSelfLater(
+				tr::now,
+				lt_item,
+				date,
+				tr::rich);
+		case Bound::Around:
+			break;
+		}
+		return tr::ayu_CreationDateSelfApproximately(
+			tr::now,
+			lt_item,
+			date,
+			tr::rich);
+	}
+	const auto name = tr::marked(user->name());
+	switch (estimate.bound) {
+	case Bound::Before:
+		return tr::ayu_CreationDateUserEarlier(
+			tr::now,
+			lt_item1,
+			name,
+			lt_item2,
+			date,
+			tr::rich);
+	case Bound::After:
+		return tr::ayu_CreationDateUserLater(
+			tr::now,
+			lt_item1,
+			name,
+			lt_item2,
+			date,
+			tr::rich);
+	case Bound::Around:
+		break;
+	}
+	return tr::ayu_CreationDateUserApproximately(
+		tr::now,
+		lt_item1,
+		name,
+		lt_item2,
+		date,
+		tr::rich);
+}
 
 const auto kZalgoPattern = QStringLiteral(
 	"\\p{Mn}{3,}|[\\x{202A}-\\x{202E}\\x{2066}-\\x{2069}\\x{200E}\\x{200F}\\x{061C}]");
@@ -1507,14 +1569,19 @@ void getUserRegistrationDate(
 		? regDateBotUsername
 		: regDateBotFallbackUsername;
 	const auto query = u"regdate "_q + QString::number(getBareID(user));
+	auto text = LocalRegistrationEstimate(user);
+	text.append(u"\n"_q);
+	text.append(tr::ayu_RegistrationDateLocalEstimate(tr::now));
+	text.append(u"\n\n"_q);
+	text.append(tr::ayu_RegistrationDateDisclosure(
+		tr::now,
+		lt_query,
+		tr::bold(query),
+		lt_bot,
+		tr::bold(u"@"_q + botUsername),
+		tr::marked));
 	controller->show(Ui::MakeConfirmBox({
-		.text = tr::ayu_RegistrationDateDisclosure(
-			tr::now,
-			lt_query,
-			tr::bold(query),
-			lt_bot,
-			tr::bold(u"@"_q + botUsername),
-			tr::marked),
+		.text = std::move(text),
 		.confirmed = [=](Fn<void()> close) {
 			close();
 			requestUserRegistrationDate(
@@ -1524,6 +1591,7 @@ void getUserRegistrationDate(
 				callback);
 		},
 		.confirmText = tr::ayu_RegistrationDateDisclosureConfirm(),
+		.cancelText = tr::lng_close(),
 	}));
 }
 
