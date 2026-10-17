@@ -9320,6 +9320,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SettingsBackupInvalid" = "This file is not an AyuGram settings backup.";
 "ayu_SettingsBackupImportFailed" = "Could not import the settings. Nothing was changed.";
 "ayu_SettingsBackupWriteFailed" = "Could not write the file.";
+"ayu_SelectBetween" = "Select Between";
+"ayu_SelectBetweenLimit#one" = "You can select up to {count} message.";
+"ayu_SelectBetweenLimit#other" = "You can select up to {count} messages.";
 "ayu_LinksHeader" = "Links";
 "ayu_LinksChannel" = "Channel";
 "ayu_LinksChats" = "Chats";

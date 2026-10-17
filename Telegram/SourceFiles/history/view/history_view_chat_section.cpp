@@ -508,6 +508,10 @@ ChatWidget::ChatWidget(
 	) | rpl::on_next([=] {
 		AyuFeatures::MessageShot::Wrapper(_inner, [=] { clearSelected(); });
 	}, _topBar->lifetime());
+	_topBar->selectBetweenRequest(
+	) | rpl::on_next([=] {
+		_inner->selectBetween();
+	}, _topBar->lifetime());
 	_topBar->forwardSelectionRequest(
 	) | rpl::on_next([=] {
 		confirmForwardSelected();
@@ -5169,6 +5173,7 @@ void ChatWidget::listSelectionChanged(SelectedItems &&items) {
 			++state.canForwardCount;
 		}
 	}
+	state.canSelectBetween = _inner->canSelectBetween();
 	_topBar->showSelected(state);
 	if (_chooseForReport && _chooseForReport->active) {
 		_bottom->updateReportMessagesText(state.count);

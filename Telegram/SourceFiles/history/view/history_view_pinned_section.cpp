@@ -160,6 +160,10 @@ PinnedWidget::PinnedWidget(
 	) | rpl::on_next([=] {
 		AyuFeatures::MessageShot::Wrapper(_inner, [=] { clearSelected(); });
 	}, _topBar->lifetime());
+	_topBar->selectBetweenRequest(
+	) | rpl::on_next([=] {
+		_inner->selectBetween();
+	}, _topBar->lifetime());
 	_topBar->forwardSelectionRequest(
 	) | rpl::on_next([=] {
 		confirmForwardSelected();
@@ -710,6 +714,7 @@ void PinnedWidget::listSelectionChanged(SelectedItems &&items) {
 			++state.canForwardCount;
 		}
 	}
+	state.canSelectBetween = _inner->canSelectBetween();
 	_topBar->showSelected(state);
 }
 

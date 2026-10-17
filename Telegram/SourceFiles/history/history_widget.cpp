@@ -1231,6 +1231,12 @@ HistoryWidget::HistoryWidget(
 	) | rpl::on_next([=] {
 		messageShotSelected();
 	}, _topBar->lifetime());
+	_topBar->selectBetweenRequest(
+	) | rpl::on_next([=] {
+		if (_list) {
+			_list->selectBetween();
+		}
+	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::on_next([=] {
 		clearSelected();
@@ -11295,6 +11301,7 @@ void HistoryWidget::updateTopBarSelection() {
 	}
 
 	auto selectedState = _list->getSelectionState();
+	selectedState.canSelectBetween = _list->canSelectBetween();
 	_nonEmptySelection = (selectedState.count > 0)
 		|| selectedState.textSelected;
 	_topBar->showSelected(selectedState);

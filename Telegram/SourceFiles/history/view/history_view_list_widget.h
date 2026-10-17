@@ -381,6 +381,8 @@ public:
 	void selectItemsUpTo(not_null<HistoryItem*> item);
 	[[nodiscard]] bool canSelectItemsUpTo(
 		not_null<HistoryItem*> item) const;
+	[[nodiscard]] bool canSelectBetween() const;
+	void selectBetween();
 	void showEditCaptionUploadLayer(not_null<HistoryItem*> item);
 	void setChooseReportReason(Data::ReportInput reportInput);
 	void clearChooseReportReason();
@@ -840,6 +842,7 @@ private:
 		not_null<HistoryItem*> from,
 		not_null<HistoryItem*> to,
 		int max) const;
+	[[nodiscard]] std::optional<HistoryItemsList> selectBetweenItems() const;
 
 	SelectedMap::iterator itemUnderPressSelection();
 	SelectedMap::const_iterator itemUnderPressSelection() const;

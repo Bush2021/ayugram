@@ -63,6 +63,16 @@ plain text. Importing first saves the current settings to `tdata/ayu_backups`, t
 restarts the app. Privacy, folders and other cloud settings are kept by Telegram and
 are not part of the file.
 
+### Selecting a range of messages
+
+When unselected messages sit between the selected ones, the selection bar shows Select
+Between. It selects every message from the first selected message to the last. To
+select a range, select its first and last messages, then click Select Between. To
+extend the range, select a message above or below it and click Select Between again.
+At most 100 messages can be selected; if the range holds more, the selection stays as
+it was and a notice says so. In topics and comment threads, only the messages near the
+visible part are loaded, so extend a long range there in steps.
+
 ### Privacy and external requests
 
 This fork removes AyuGram's remote configuration service and crash report upload

@@ -188,6 +188,8 @@ public:
 	[[nodiscard]] auto getSelectedEphemeral() const
 		-> std::vector<not_null<HistoryItem*>>;
 	[[nodiscard]] bool hasSelectedItems() const;
+	[[nodiscard]] bool canSelectBetween();
+	void selectBetween();
 	[[nodiscard]] HistoryView::SelectionModeResult inSelectionMode() const;
 	[[nodiscard]] HistoryView::SelectionModeResult inSelectionMode(
 		const Element *view) const;
@@ -529,6 +531,7 @@ private:
 		not_null<SelectedItems*> toItems,
 		not_null<HistoryItem*> item,
 		SelectAction action) const;
+	[[nodiscard]] std::optional<HistoryItemsList> selectBetweenItems();
 	void changeAccessibilitySelection(int index, SelectAction action);
 	void extendAccessibilitySelection(int oldIndex, int newIndex);
 	void forwardItem(FullMsgId itemId);

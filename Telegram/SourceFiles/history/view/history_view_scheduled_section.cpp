@@ -222,6 +222,10 @@ ScheduledWidget::ScheduledWidget(
 	) | rpl::on_next([=] {
 		AyuFeatures::MessageShot::Wrapper(_inner, [=] { clearSelected(); });
 	}, _topBar->lifetime());
+	_topBar->selectBetweenRequest(
+	) | rpl::on_next([=] {
+		_inner->selectBetween();
+	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::on_next([=] {
 		clearSelected();
@@ -1532,6 +1536,7 @@ void ScheduledWidget::listSelectionChanged(SelectedItems &&items) {
 			++state.canSendNowCount;
 		}
 	}
+	state.canSelectBetween = _inner->canSelectBetween();
 	_topBar->showSelected(state);
 	if (items.empty()
 		&& !(_inner->hasFocus() && Ui::ScreenReaderModeActive())) {

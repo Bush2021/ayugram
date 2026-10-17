@@ -2047,6 +2047,83 @@ void ListWidget::selectItemsUpTo(not_null<HistoryItem*> item) {
 	update();
 }
 
+std::optional<HistoryItemsList> ListWidget::selectBetweenItems() const {
+	auto result = HistoryItemsList();
+	if (hasSelectRestriction()) {
+		return result;
+	}
+	const auto &groups = session().data().groups();
+	auto first = int(_items.size());
+	auto last = -1;
+	for (const auto &entry : _selected) {
+		const auto item = session().data().message(entry.first);
+		if (!item) {
+			continue;
+		}
+		const auto group = groups.find(item);
+		const auto view = viewForItem(group
+			? group->items.front().get()
+			: item);
+		if (!view) {
+			continue;
+		}
+		const auto i = ranges::find(_items, not_null{ view });
+		if (i != end(_items)) {
+			first = std::min(first, int(i - begin(_items)));
+			last = std::max(last, int(i - begin(_items)));
+		}
+	}
+	const auto selectable = [&](not_null<HistoryItem*> item) {
+		return !isMessageHidden(item)
+			&& _delegate->listIsItemGoodForSelection(item);
+	};
+	const auto limit = MaxSelectedItems - int(_selected.size());
+	for (auto index = first + 1; index < last; ++index) {
+		const auto view = _items[index];
+		if (view->isHidden()) {
+			continue;
+		}
+		const auto row = view->data();
+		const auto group = groups.find(row);
+		const auto single = HistoryItemsList{ row };
+		const auto &items = group ? group->items : single;
+		if (!ranges::all_of(items, selectable)) {
+			continue;
+		}
+		for (const auto &item : items) {
+			if (!_selected.contains(item->fullId())) {
+				result.push_back(item);
+			}
+		}
+		if (int(result.size()) > limit) {
+			return std::nullopt;
+		}
+	}
+	return result;
+}
+
+bool ListWidget::canSelectBetween() const {
+	const auto items = selectBetweenItems();
+	return !items || !items->empty();
+}
+
+void ListWidget::selectBetween() {
+	const auto items = selectBetweenItems();
+	if (!items) {
+		_delegate->listUiShow()->showToast(tr::ayu_SelectBetweenLimit(
+			tr::now,
+			lt_count,
+			int(MaxSelectedItems)));
+		return;
+	}
+	for (const auto &item : *items) {
+		addToSelection(_selected, item);
+	}
+	_accessibilitySelectionAnchor = nullptr;
+	pushSelectedItems();
+	update();
+}
+
 void ListWidget::showEditCaptionUploadLayer(not_null<HistoryItem*> item) {
 	if (const auto view = viewForItem(item)) {
 		if (item->isUploading()) {

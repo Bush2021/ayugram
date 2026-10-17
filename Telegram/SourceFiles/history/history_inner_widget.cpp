@@ -6188,6 +6188,83 @@ void HistoryInner::changeSelectionAsGroup(
 	}
 }
 
+std::optional<HistoryItemsList> HistoryInner::selectBetweenItems() {
+	auto result = HistoryItemsList();
+	if (hasSelectRestriction()) {
+		return result;
+	}
+	const auto &groups = session().data().groups();
+	auto first = (Element*)nullptr;
+	auto last = (Element*)nullptr;
+	auto firstTop = 0;
+	auto lastTop = 0;
+	for (const auto &item : _selected) {
+		const auto group = groups.find(item);
+		const auto view = viewByItem(group ? group->items.front() : item);
+		const auto top = itemTop(view);
+		if (top < 0) {
+			continue;
+		} else if (!first || top < firstTop) {
+			first = view;
+			firstTop = top;
+		}
+		if (!last || top > lastTop) {
+			last = view;
+			lastTop = top;
+		}
+	}
+	if (first == last) {
+		return result;
+	}
+	const auto selectable = [](not_null<HistoryItem*> item) {
+		return !isMessageHidden(item) && item->canBeSelected();
+	};
+	const auto limit = MaxSelectedItems - int(_selected.size());
+	for (auto view = nextItem(first); view != last; view = nextItem(view)) {
+		if (!view) {
+			return HistoryItemsList();
+		}
+		const auto row = view->data();
+		const auto group = groups.find(row);
+		const auto single = HistoryItemsList{ row };
+		const auto &items = group ? group->items : single;
+		if (!ranges::all_of(items, selectable)) {
+			continue;
+		}
+		for (const auto &item : items) {
+			if (!_selected.contains(item)) {
+				result.push_back(item);
+			}
+		}
+		if (int(result.size()) > limit) {
+			return std::nullopt;
+		}
+	}
+	return result;
+}
+
+bool HistoryInner::canSelectBetween() {
+	const auto items = selectBetweenItems();
+	return !items || !items->empty();
+}
+
+void HistoryInner::selectBetween() {
+	const auto items = selectBetweenItems();
+	if (!items) {
+		_controller->showToast(tr::ayu_SelectBetweenLimit(
+			tr::now,
+			lt_count,
+			int(MaxSelectedItems)));
+		return;
+	}
+	for (const auto &item : *items) {
+		addToSelection(&_selected, item);
+	}
+	_accessibilitySelectionAnchor = nullptr;
+	update();
+	_widget->updateTopBarSelection();
+}
+
 void HistoryInner::setAccessibilityFocusedItem(
 		int index,
 		HistoryItem *item) {
