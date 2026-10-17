@@ -7,6 +7,7 @@
 #include "ayu/ui/settings/settings_general.h"
 
 #include "base/platform/base_platform_info.h"
+#include "ayu/ui/boxes/link_preview_rules_box.h"
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
@@ -483,6 +484,19 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.title = tr::ayu_ImproveLinkPreviews(),
 		.getter = &AyuSettings::improveLinkPreviews,
 		.setter = &AyuSettings::setImproveLinkPreviews,
+	});
+	builder.addButton({
+		.id = u"ayu/linkPreviewRules"_q,
+		.title = tr::ayu_LinkPreviewRules(),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->linkPreviewRulesValue(
+		) | rpl::map([](const auto &rules) {
+			return QString::number(int(rules.size()));
+		}),
+		.onClick = [=] {
+			controller->show(Box(Ui::LinkPreviewRulesBox));
+		},
+		.shown = settings->improveLinkPreviewsValue(),
 	});
 	ayu.addSettingToggle({
 		.id = u"ayu/fetchMissingMusicCovers"_q,

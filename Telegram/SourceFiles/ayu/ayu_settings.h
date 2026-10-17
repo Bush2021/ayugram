@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2026
 #pragma once
 
+#include "ayu/features/link_preview/link_preview_rules.h"
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
 #include "rpl/lifetime.h"
@@ -433,6 +434,7 @@ public:
 	[[nodiscard]] bool cjkSpacingWhenSending() const { return _cjkSpacingWhenSending.current(); }
 	[[nodiscard]] bool cjkSpacingWhenEditing() const { return _cjkSpacingWhenEditing.current(); }
 	[[nodiscard]] bool showForwardOriginalDate() const { return _showForwardOriginalDate.current(); }
+	[[nodiscard]] const std::vector<AyuFeatures::LinkPreviewRules::Rule> &linkPreviewRules() const { return _linkPreviewRules.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -526,6 +528,7 @@ public:
 	void setCjkSpacingWhenSending(bool val);
 	void setCjkSpacingWhenEditing(bool val);
 	void setShowForwardOriginalDate(bool val);
+	void setLinkPreviewRules(std::vector<AyuFeatures::LinkPreviewRules::Rule> val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -702,6 +705,7 @@ public:
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
 	[[nodiscard]] rpl::producer<bool> showForwardOriginalDateChanges() const { return _showForwardOriginalDate.changes(); }
+	[[nodiscard]] rpl::producer<std::vector<AyuFeatures::LinkPreviewRules::Rule>> linkPreviewRulesValue() const { return _linkPreviewRules.value(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -803,6 +807,8 @@ private:
 	rpl::variable<bool> _cjkSpacingWhenSending = false;
 	rpl::variable<bool> _cjkSpacingWhenEditing = false;
 	rpl::variable<bool> _showForwardOriginalDate = false;
+	rpl::variable<std::vector<AyuFeatures::LinkPreviewRules::Rule>> _linkPreviewRules
+		= AyuFeatures::LinkPreviewRules::Defaults();
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

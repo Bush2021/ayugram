@@ -69,6 +69,8 @@ paths. Built-in automatic updates are disabled; download updates from this repos
 
 - Ads have three modes: Show Ads, Camouflage, and Strict Block. Camouflage requests
   ads but hides them; Strict Block skips ad requests.
+- The domains that Improve Link Previews uses can be edited as rules, one per line,
+  such as `x.com fixupx.com`. A `*.` prefix covers subdomains and can keep them.
 - Session details show more fields: API ID, platform, creation date, whether the
   session accepts secret chats and calls, and the server region.
 - Compatibility fixes preserve AyuGram settings as upstream UI code changes,

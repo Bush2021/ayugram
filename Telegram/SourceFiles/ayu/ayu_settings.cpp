@@ -48,6 +48,35 @@ void resetTranslationCache() {
 	}
 }
 
+[[nodiscard]] json LinkPreviewRulesToJson(
+		const std::vector<AyuFeatures::LinkPreviewRules::Rule> &rules) {
+	auto result = json::array();
+	for (const auto &rule : rules) {
+		result.push_back(json{ { "from", rule.from }, { "to", rule.to } });
+	}
+	return result;
+}
+
+[[nodiscard]] auto LinkPreviewRulesFromJson(const json &value)
+-> std::vector<AyuFeatures::LinkPreviewRules::Rule> {
+	auto result = std::vector<AyuFeatures::LinkPreviewRules::Rule>();
+	for (const auto &entry : value) {
+		if (!entry.is_object()
+			|| !entry.contains("from")
+			|| !entry["from"].is_string()
+			|| !entry.contains("to")
+			|| !entry["to"].is_string()) {
+			continue;
+		}
+		if (const auto rule = AyuFeatures::LinkPreviewRules::MakeRule(
+				entry["from"].get<QString>(),
+				entry["to"].get<QString>())) {
+			result.push_back(*rule);
+		}
+	}
+	return result;
+}
+
 rpl::lifetime lifetime; // idk reactivity dies when placed in `GhostModeAccountSettings` as field
 
 } // namespace
@@ -1292,6 +1321,13 @@ void AyuSettings::setShowForwardOriginalDate(bool val) {
 	save();
 }
 
+void AyuSettings::setLinkPreviewRules(
+		std::vector<AyuFeatures::LinkPreviewRules::Rule> val) {
+	if (_linkPreviewRules.current() == val) return;
+	_linkPreviewRules = std::move(val);
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1395,6 +1431,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"cjkSpacingWhenSending", s._cjkSpacingWhenSending.current()},
 		{"cjkSpacingWhenEditing", s._cjkSpacingWhenEditing.current()},
 		{"showForwardOriginalDate", s._showForwardOriginalDate.current()},
+		{"linkPreviewRules", LinkPreviewRulesToJson(s._linkPreviewRules.current())},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1513,6 +1550,9 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._cjkSpacingWhenSending = j.value("cjkSpacingWhenSending", defaults._cjkSpacingWhenSending.current());
 	s._cjkSpacingWhenEditing = j.value("cjkSpacingWhenEditing", defaults._cjkSpacingWhenEditing.current());
 	s._showForwardOriginalDate = j.value("showForwardOriginalDate", defaults._showForwardOriginalDate.current());
+	s._linkPreviewRules = (j.contains("linkPreviewRules") && j["linkPreviewRules"].is_array())
+		? LinkPreviewRulesFromJson(j["linkPreviewRules"])
+		: defaults._linkPreviewRules.current();
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

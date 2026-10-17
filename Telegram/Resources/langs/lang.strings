@@ -9297,6 +9297,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CjkSpacingWhenEditing" = "When Editing";
 "ayu_CjkSpacingDescription" = "Adds a space between Chinese or Japanese characters and Latin letters or digits, like pangu.js. In messages, only the display changes. When sending or editing, the space becomes part of the text. Code, links and mentions stay untouched.";
 "ayu_ShowForwardOriginalDate" = "Show Original Date of Forwarded Messages";
+"ayu_LinkPreviewRules" = "Link Preview Rules";
+"ayu_LinkPreviewRulesPlaceholder" = "One rule per line";
+"ayu_LinkPreviewRulesAbout" = "Each line holds a domain and the domain that builds its preview, for example x.com fixupx.com. A rule also covers the www. address. Start a domain with *. to cover its subdomains, and start the replacement with *. to keep them. Messages keep the original link.";
+"ayu_LinkPreviewRulesInvalidLine" = "Line {line} is not a valid rule.";
 "ayu_LinksHeader" = "Links";
 "ayu_LinksChannel" = "Channel";
 "ayu_LinksChats" = "Chats";
