@@ -65,6 +65,7 @@ Every merge must preserve these paths:
 ## Fork-owned (not merged from upstream)
 
 - `.github/ISSUE_TEMPLATE/`: this fork's own issue forms and support policy. On conflict keep ours whole. Do not fold upstream template changes in.
+- `.github/CONTRIBUTING.md`: this fork's contribution policy. Pull requests are not accepted. On conflict keep ours whole.
 ## Hands-off (owned by tg/ayu upstream)
 
 Editing these in this repo causes recurring merge conflicts. Put fork-specific rules in `FORK.md` or a skill, not these files:

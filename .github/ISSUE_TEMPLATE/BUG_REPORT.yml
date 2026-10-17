@@ -1,6 +1,5 @@
 name: Bug report
 description: Builds from this repository only. Questions and requests for help are out of scope.
-labels: [bug]
 body:
   - type: markdown
     attributes:

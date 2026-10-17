@@ -1,11 +1,10 @@
 name: Feature request
 description: Implemented at the maintainer's discretion. Questions and requests for help are out of scope.
-labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        This is a personal fork. Whether a request gets implemented is entirely my call, and there is no timeline. A high-quality pull request is the reliable way to get a feature in.
+        This is a personal fork. Whether a request gets implemented is entirely my call, and there is no timeline. Pull requests are not accepted.
 
         A change to behaviour owned by Telegram Desktop or AyuGram has to be kept working through every upstream merge, so it is rarely accepted here. Suggest it upstream instead.
 
@@ -65,7 +64,6 @@ body:
     attributes:
       label: Your contribution
       options:
-        - I will submit a pull request
         - I can test development builds
         - Neither
     validations:
