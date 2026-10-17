@@ -9,6 +9,7 @@
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/donate_qr_box.h"
+#include "ayu/ui/boxes/settings_backup_box.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
 #include "boxes/abstract_box.h"
@@ -23,6 +24,7 @@
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
@@ -184,6 +186,22 @@ void BuildOtherThings(SectionBuilder &builder) {
 		.onClick = [=] {
 			Core::Application::RegisterUrlScheme();
 			controller->showToast(tr::lng_box_done(tr::now));
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/exportSettings"_q,
+		.title = tr::ayu_SettingsBackupExport(),
+		.icon = { &st::menuIconExport },
+		.onClick = [=] {
+			controller->show(Box(Ui::ExportSettingsBox, controller));
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/importSettings"_q,
+		.title = tr::ayu_SettingsBackupImport(),
+		.icon = { &st::menuIconImportTheme },
+		.onClick = [=] {
+			Ui::ImportSettings(controller);
 		},
 	});
 	builder.addButton({

@@ -200,6 +200,8 @@ set(ayugram_files
         ayu/ui/boxes/import_filters_box.h
         ayu/ui/boxes/link_preview_rules_box.cpp
         ayu/ui/boxes/link_preview_rules_box.h
+        ayu/ui/boxes/settings_backup_box.cpp
+        ayu/ui/boxes/settings_backup_box.h
         ayu/ui/boxes/theme_selector_box.cpp
         ayu/ui/boxes/theme_selector_box.h
         ayu/ui/boxes/message_shot_box.cpp
@@ -240,6 +242,8 @@ set(ayugram_files
         ayu/features/link_preview/link_preview_rules.h
         ayu/features/registration_date/registration_date.cpp
         ayu/features/registration_date/registration_date.h
+        ayu/features/settings_backup/settings_backup.cpp
+        ayu/features/settings_backup/settings_backup.h
         ayu/features/message_shot/message_shot.cpp
         ayu/features/message_shot/message_shot.h
         ayu/features/message_shot/message_shot_theme_state.cpp

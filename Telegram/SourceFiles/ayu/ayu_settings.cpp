@@ -502,6 +502,10 @@ void OpenAiTranslationSettings::apply(
 	AyuSettings::save();
 }
 
+std::string_view OpenAiTranslationSettings::ApiKeyPref() {
+	return kOpenAiTranslationApiKeyPref;
+}
+
 bool OpenAiTranslationSettings::loadApiKey(Core::Settings &settings) {
 	const auto stored = settings.readPref<QString>(
 		kOpenAiTranslationApiKeyPref);

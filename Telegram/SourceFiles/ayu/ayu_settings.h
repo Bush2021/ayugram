@@ -262,6 +262,7 @@ public:
 	[[nodiscard]] static QString DefaultApiBaseOrEndpoint();
 	[[nodiscard]] static QString DefaultSystemPrompt();
 	[[nodiscard]] static QString DefaultPromptTemplate();
+	[[nodiscard]] static std::string_view ApiKeyPref();
 
 	[[nodiscard]] const QString &model() const { return _model.current(); }
 	[[nodiscard]] const QString &apiBaseOrEndpoint() const { return _apiBaseOrEndpoint.current(); }

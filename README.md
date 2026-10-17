@@ -52,6 +52,17 @@ bubble still shows when the message arrived in the chat. The original time inclu
 seconds when Show Message Seconds is on. Turn it on in AyuGram's Chats settings, under
 Messages.
 
+### Settings backup
+
+Export Settings and Import Settings on AyuGram's Other page save and restore one JSON
+file. It holds the Telegram Desktop settings, experimental settings, keyboard
+shortcuts, the local settings of each logged-in account, AyuGram settings and message
+filters. Window positions, devices, the download folder and the interface scale stay
+on the device. The API key and proxies are included only when you select them, as
+plain text. Importing first saves the current settings to `tdata/ayu_backups`, then
+restarts the app. Privacy, folders and other cloud settings are kept by Telegram and
+are not part of the file.
+
 ### Privacy and external requests
 
 This fork removes AyuGram's remote configuration service and crash report upload

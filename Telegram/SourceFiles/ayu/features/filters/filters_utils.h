@@ -52,6 +52,9 @@ public:
 
 	static QString extractAllText(not_null<HistoryItem*> item, const Data::Group *group);
 
+	ApplyChanges prepareChanges(const QJsonObject &response);
+	void applyChanges(const ApplyChanges &changes);
+
 private:
 	FilterUtils()
 		: _manager(std::make_unique<QNetworkAccessManager>()) {
@@ -59,9 +62,6 @@ private:
 
 	void handleResponse(const QByteArray &response);
 	void gotFailure(const QNetworkReply::NetworkError &error);
-
-	ApplyChanges prepareChanges(const QJsonObject &response);
-	void applyChanges(const ApplyChanges &changes);
 
 	std::unique_ptr<QNetworkAccessManager> _manager = nullptr;
 };
