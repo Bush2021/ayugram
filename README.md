@@ -27,6 +27,15 @@ A separate Qt 5 build remains available for older Windows versions.
 Translation language preferences are stored by language name so they survive
 switching between the Qt 5 and Qt 6 builds.
 
+### Rare scripts on Windows
+
+Characters that the interface font lacks use the fonts Windows itself falls back to,
+such as Sans Serif Collection and Segoe UI Historic. Text in scripts like Linear A,
+Tai Tham, Yi or Bamum renders no matter how many other fonts are installed, instead
+of showing boxes. A character that no installed font covers shows the usual box
+rather than a black block. Windows 10 has no Sans Serif Collection, so some of these
+scripts still show boxes there.
+
 ### OpenAI translation
 
 Use OpenAI or a compatible service for message translation. The model, API endpoint,
