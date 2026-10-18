@@ -82,6 +82,15 @@ At most 100 messages can be selected; if the range holds more, the selection sta
 it was and a notice says so. In topics and comment threads, only the messages near the
 visible part are loaded, so extend a long range there in steps.
 
+### Mention by ID
+
+Typing @ and a user ID in the message field, such as @123456789, makes the mention
+list suggest that user. In groups with Hide Members turned on, members who aren't
+admins see only admins in that list, so typing an ID lets them mention members who
+have no username. The suggestion appears only for someone the app already knows, such
+as a contact or someone whose profile you opened. Choosing it inserts a mention with
+their name, or their @username if they have one.
+
 ### Privacy and external requests
 
 This fork removes AyuGram's remote configuration service and crash report upload

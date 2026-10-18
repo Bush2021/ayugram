@@ -74,6 +74,19 @@ constexpr auto kEphemeralHintHoverDelay = crl::time(500);
 	return usernames.empty() ? user->username() : usernames.front();
 }
 
+[[nodiscard]] UserData *MentionUserById(
+		not_null<Main::Session*> session,
+		const QString &query) {
+	const auto id = query.toULongLong();
+	if (!id
+		|| id > PeerId::kChatTypeMask
+		|| QString::number(id) != query) {
+		return nullptr;
+	}
+	const auto user = session->data().userLoaded(UserId(id));
+	return (user && !user->isInaccessible()) ? user : nullptr;
+}
+
 [[nodiscard]] Data::BotStatus BotStatusFor(
 		ChatData *chat,
 		ChannelData *channel) {
@@ -576,6 +589,9 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 		};
 
 		const auto listAllSuggestions = _filter.isEmpty();
+		if (const auto user = MentionUserById(_session, _filter)) {
+			pushMentionRow(user, Source::MentionCandidate);
+		}
 		if (_addInlineBots) {
 			for (const auto &user : _session->recentInlineBots().list()) {
 				if (user->isInaccessible()
