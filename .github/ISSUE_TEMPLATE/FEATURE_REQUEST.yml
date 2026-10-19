@@ -33,7 +33,7 @@ body:
     attributes:
       label: Area
       options:
-        - Added by this fork (Qt 6 build, OpenAI translation, privacy controls, ad modes, secret chats)
+        - Added by this fork (OpenAI translation, privacy controls, ad modes, secret chats)
         - AyuGram feature
         - Telegram Desktop behaviour
         - Builds, packaging, or releases

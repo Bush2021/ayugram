@@ -27,20 +27,17 @@ Identify every defect the newest relevant failed GitHub Actions run exposes, fix
 - Upstream-owned code gets the smallest change that compiles, matching the surrounding style. Say plainly in the report that `/sync-tg` will conflict there once upstream fixes it themselves.
 - Do not weaken a workflow, disable a warning, or relax a build setting to make a failure disappear.
 
-## Commit, push, and re-trigger=
+## Commit, push, and re-trigger
 
-Carry the fix onto the build shim branch, per `FORK.md`:
+Commit the fix on `dev` and push it.
 
-Confirm with `git range-diff origin/vs2026...vs2026` that the shim commits replayed unchanged before force-pushing.
+Then trigger all three build workflows:
 
-Then trigger all four build workflows:
-
-| Workflow         | Ref      |
-| ---------------- | -------- |
-| `Windows`        | `dev`    |
-| `macOS`          | `dev`    |
-| `macOS packaged` | `dev`    |
-| `Windows`        | `vs2026` |
+| Workflow         | Ref   |
+| ---------------- | ----- |
+| `Windows`        | `dev` |
+| `macOS`          | `dev` |
+| `macOS packaged` | `dev` |
 
 ```
 gh workflow run "<workflow>" --repo Bush2021/ayugram --ref <ref>
@@ -48,7 +45,7 @@ gh workflow run "<workflow>" --repo Bush2021/ayugram --ref <ref>
 
 ## Iterate
 
-Each round clears what the previous one could reach before the build stopped. When a triggered run fails again, run the whole loop from the top — read every failed job, fix everything they expose, commit, push, rebase, trigger — without asking for confirmation each round. Keep going until the matrix is green or a stop condition below applies.
+Each round clears what the previous one could reach before the build stopped. When a triggered run fails again, run the whole loop from the top — read every failed job, fix everything they expose, commit, push, trigger — without asking for confirmation each round. Keep going until the matrix is green or a stop condition below applies.
 
 ## Stop and report instead
 

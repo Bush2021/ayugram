@@ -15,11 +15,6 @@ This is `Bush2021/ayugram`, a fork of `AyuGram/AyuGramDesktop`, which forks `tel
 
 - **`/sync-tg`** — merge `tg/dev` into `dev`. Conflict rule: **keep both features** — preserve ayu, update ayu code to match upstream API changes; don't revert upstream.
 - **`/sync-ayu`** — reconstruct durable fork intent on the latest `ayu/dev`. It drops upstream-equivalent and temporary history, preserves merge-only behavior, reconciles fork submodules, and requires exact `--force-with-lease` pushes after verification.
-- **`vs2026` branch** — thin shim of VS 2026 build adjustments on top of `dev`. After any change to `dev`:
-  ```bash
-  git checkout vs2026 && git rebase dev && git push --force-with-lease origin vs2026 && git checkout dev
-  ```
-  If vs2026 grows beyond build adjustments, fold the non-VS-specific parts into `dev`.
 
 ## Forked submodules
 

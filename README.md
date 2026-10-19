@@ -13,19 +13,17 @@ with those features in mind, and changes are built on GitHub Actions runners.
 
 Development builds are available from [Actions](#development-builds).
 [Releases](https://github.com/Bush2021/ayugram/releases) follow upstream version
-releases. Windows users can choose between Qt 5 and Qt 6 builds.
+releases.
 
 ## What this fork adds
 
-### Windows Qt 6 builds
+### Qt 6 adjustments on Windows
 
-The Qt 6 build targets Windows 10 and later. It makes the Qt RHI renderer available
-on Windows x64, with a Direct3D 11 rendering path on supported hardware. It also
-includes adjustments to CJK font fallback and fixes for Qt 6 popup menu behavior.
-A separate Qt 5 build remains available for older Windows versions.
+The Windows build uses Qt 6 like upstream. This fork adjusts its CJK font fallback
+and fixes Qt 6 popup menu behavior.
 
 Translation language preferences are stored by language name so they survive
-switching between the Qt 5 and Qt 6 builds.
+moving from an older Qt 5 build to a Qt 6 build.
 
 ### Rare scripts on Windows
 
@@ -133,19 +131,18 @@ folder that belongs alongside the executable.
 
 | Build | Workflow and branch | Artifact |
 | --- | --- | --- |
-| Windows x64, Qt 6 (Windows 10+) | [Windows / vs2026](https://github.com/Bush2021/ayugram/actions/workflows/win.yml?query=branch%3Avs2026) | `AyuGram x64 qt6 Ninja Multi-Config` |
-| Windows x64, Qt 5 | [Windows / dev](https://github.com/Bush2021/ayugram/actions/workflows/win.yml?query=branch%3Adev) | `AyuGram x64 Ninja Multi-Config` |
+| Windows x64 | [Windows / dev](https://github.com/Bush2021/ayugram/actions/workflows/win.yml?query=branch%3Adev) | `AyuGram x64 Ninja Multi-Config` |
 | macOS, universal | [macOS / dev](https://github.com/Bush2021/ayugram/actions/workflows/mac.yml?query=branch%3Adev) | `AyuGram` |
 
-The two Windows builds share a workflow name, so check the branch before downloading.
 Development builds can contain features added since the latest release. Artifacts
 expire, so use a recent successful run if an older download is unavailable.
 
 ### Releases
 
 Download versioned packages from [Releases](https://github.com/Bush2021/ayugram/releases).
-The Windows Qt 6 package has `_Qt6_win10+` in its filename; the other Windows x64
-package uses Qt 5. macOS packages have `_macOS_universal` in their filenames.
+Windows packages have `_windows_x64` in their filenames, and macOS packages have
+`_macOS_universal`. Older releases also have a `_Qt6_win10+` Windows package; the
+`_windows_x64` package in those releases uses Qt 5.
 
 Releases follow upstream releases. For newer changes between releases, use the
 Actions builds above. All of these builds require manual updates.
@@ -154,7 +151,6 @@ Actions builds above. All of these builds require manual updates.
 
 See the build instructions for [Windows](docs/building-win.md),
 [macOS](docs/building-mac.md), and [Linux](docs/building-linux.md).
-Use the `vs2026` branch for this fork's Windows Qt 6 build configuration.
 
 For upstream AyuGram packages distributed through Winget, Scoop, Homebrew, or Linux
 package repositories, see the [upstream download instructions](https://github.com/AyuGram/AyuGramDesktop#downloads).

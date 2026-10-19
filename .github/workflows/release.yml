@@ -88,27 +88,16 @@ jobs:
 
           mac_run="$(latest_successful_run mac.yml dev)"
           windows_run="$(latest_successful_run win.yml dev)"
-          qt6_run="$(latest_successful_run win.yml vs2026)"
 
           mac_id="$(jq -r '.id // empty' <<< "$mac_run")"
           windows_id="$(jq -r '.id // empty' <<< "$windows_run")"
-          qt6_id="$(jq -r '.id // empty' <<< "$qt6_run")"
           [[ -n "$mac_id" ]] || fail "No successful macOS run was found on dev."
           [[ -n "$windows_id" ]] || fail "No successful Windows run was found on dev."
-          [[ -n "$qt6_id" ]] || fail "No successful Windows run was found on vs2026."
 
           mac_sha="$(jq -r '.head_sha' <<< "$mac_run")"
           windows_sha="$(jq -r '.head_sha' <<< "$windows_run")"
-          qt6_sha="$(jq -r '.head_sha' <<< "$qt6_run")"
           [[ "$mac_sha" == "$windows_sha" ]] || fail \
             "Latest macOS and Windows dev runs use different commits."
-
-          comparison="$(gh api \
-            "repos/$GITHUB_REPOSITORY/compare/$windows_sha...$qt6_sha")"
-          merge_base="$(jq -r '.merge_base_commit.sha' <<< "$comparison")"
-          behind_by="$(jq -r '.behind_by' <<< "$comparison")"
-          [[ "$merge_base" == "$windows_sha" && "$behind_by" == "0" ]] \
-            || fail "Latest vs2026 run does not contain the dev build commit."
 
           version_file="$(gh api --method GET \
             "repos/$GITHUB_REPOSITORY/contents/Telegram/build/version" \
@@ -137,10 +126,8 @@ jobs:
           {
             echo "release_label=$release_label"
             echo "dev_sha=$windows_sha"
-            echo "qt6_sha=$qt6_sha"
             echo "mac_id=$mac_id"
             echo "windows_id=$windows_id"
-            echo "qt6_id=$qt6_id"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -150,7 +137,6 @@ jobs:
             echo "| --- | --- | --- |"
             echo "| macOS dev | [$mac_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$mac_id) | \`$mac_sha\` |"
             echo "| Windows dev | [$windows_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$windows_id) | \`$windows_sha\` |"
-            echo "| Windows vs2026 | [$qt6_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$qt6_id) | \`$qt6_sha\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Download and verify artifacts
@@ -159,7 +145,6 @@ jobs:
           RELEASE_LABEL: ${{ steps.builds.outputs.release_label }}
           MAC_RUN_ID: ${{ steps.builds.outputs.mac_id }}
           WINDOWS_RUN_ID: ${{ steps.builds.outputs.windows_id }}
-          QT6_RUN_ID: ${{ steps.builds.outputs.qt6_id }}
         run: |
           set -euo pipefail
 
@@ -212,10 +197,6 @@ jobs:
             "$WINDOWS_RUN_ID" \
             "AyuGram x64 Ninja Multi-Config" \
             "release-assets/AyuGram_v${RELEASE_LABEL}_windows_x64.zip"
-          download_artifact \
-            "$QT6_RUN_ID" \
-            "AyuGram x64 qt6 Ninja Multi-Config" \
-            "release-assets/AyuGram_v${RELEASE_LABEL}_windows_x64_Qt6_win10+.zip"
 
           {
             echo

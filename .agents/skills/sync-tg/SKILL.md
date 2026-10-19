@@ -1,13 +1,13 @@
 ---
 name: sync-tg
-description: Merge Telegram Desktop upstream tg/dev into local dev while preserving AyuGram features, branding, resources, and forked-submodule histories. Use when asked to sync, update, or merge this repository with Telegram Desktop upstream and carry the result through the vs2026 branch and optional CI dispatch.
+description: Merge Telegram Desktop upstream tg/dev into local dev while preserving AyuGram features, branding, resources, and forked-submodule histories. Use when asked to sync, update, or merge this repository with Telegram Desktop upstream and offer an optional CI dispatch.
 ---
 
 # Sync Telegram Desktop
 
 ## Outcome
 
-Merge current `tg/dev` into `dev` without losing Telegram changes or the AyuGram fork. Leave every submodule at an intentional commit, keep `vs2026` as a thin branch on the new `dev`, and clearly distinguish local completion from publication. Do not build.
+Merge current `tg/dev` into `dev` without losing Telegram changes or the AyuGram fork. Leave every submodule at an intentional commit and clearly distinguish local completion from publication. Do not build.
 
 Read `AGENTS.md` and `FORK.md` first. Treat `FORK.md` as the source of truth for remotes, protected fork surfaces, forked submodules, and branch roles.
 
@@ -34,7 +34,6 @@ The merge is locally complete only when:
 - the merge contains the intended Telegram parent and preserves the AyuGram behavior;
 - every protected-surface difference from the starting snapshot is reviewed and intentional;
 - all submodules are clean, aligned with their recorded commits, and forked pointers belong to the intended fork histories;
-- the parent worktree is clean and the checkout has returned to `dev`;
-- `vs2026` has been rebased onto the finalized `dev` while retaining only its Visual Studio compatibility delta.
+- the parent worktree is clean and the checkout has returned to `dev`.
 
-Publish only the parts the user approves. Treat pushes of forked submodules, `dev`, and the rewritten `vs2026` as separate external effects. Offer the repository's macOS and Windows workflow dispatches after publication, but run them only with fresh approval. Report which branches and workflows remain local, published, dispatched, or unverified.
+Publish only the parts the user approves. Treat pushes of forked submodules and `dev` as separate external effects. Offer the repository's macOS and Windows workflow dispatches after publication, but run them only with fresh approval. Report which branches and workflows remain local, published, dispatched, or unverified.

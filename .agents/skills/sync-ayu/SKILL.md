@@ -7,7 +7,7 @@ description: Curate and reconstruct AyuGram Desktop fork work on the latest ayu/
 
 ## Outcome
 
-Reconstruct `dev` on current `ayu/dev` as a small, coherent history containing only the durable Bush-specific delta. Preserve Ayu's newer implementations, all still-required fork behavior, and meaningful merge-only resolutions. Reconcile forked submodules, update the thin `vs2026` branch, and do not build.
+Reconstruct `dev` on current `ayu/dev` as a small, coherent history containing only the durable Bush-specific delta. Preserve Ayu's newer implementations, all still-required fork behavior, and meaningful merge-only resolutions. Reconcile forked submodules and do not build.
 
 Read `AGENTS.md` and `FORK.md` first. Treat `FORK.md` as the source of truth for ownership, protected surfaces, remotes, and branch roles.
 
@@ -43,7 +43,7 @@ Preserve the fork's current product policy unless the user explicitly changes it
 - Keep `Telegram/lib_icu` on its published Ayu history unless the user explicitly approves transferring it to a user-controlled fork.
 - Require the parent gitlink to match the finalized submodule tip. A published fork tip must also be reachable from the exact advertised remote ref before the parent may be published.
 - Reconstruct the result on a temporary branch from current `ayu/dev`. Create one coherent commit per surviving topic. Fold repairs and historical workarounds into the topic they complete. Keep unrelated intent separate.
-- Move local `dev` only after the reconstructed tree and history pass verification. Rebase `vs2026` onto that result and preserve only its intended Visual Studio compatibility delta.
+- Move local `dev` only after the reconstructed tree and history pass verification.
 
 ## Completion contract
 
@@ -55,6 +55,6 @@ Local reconstruction is complete only when:
 - parent and submodule worktrees are clean and every gitlink is intentional;
 - all dropped work is demonstrably redundant, obsolete, temporary, or reverted;
 - the curated history contains coherent topics rather than replayed merge chronology;
-- `dev` and `vs2026` satisfy the branch roles in `FORK.md`.
+- `dev` satisfies the branch role in `FORK.md`.
 
-For publication, present one exact ordered batch containing each remote URL, full ref, observed old object ID, proposed new object ID, and lease. Publish rewritten Bush-owned submodules before the parent, then `dev`, then `vs2026`. Read each advertised ref back before continuing. Stop on the first failed lease or mismatch. Keep backups and report the exact published and unpublished state until the entire approved batch verifies successfully.
+For publication, present one exact ordered batch containing each remote URL, full ref, observed old object ID, proposed new object ID, and lease. Publish rewritten Bush-owned submodules before the parent, then `dev`. Read each advertised ref back before continuing. Stop on the first failed lease or mismatch. Keep backups and report the exact published and unpublished state until the entire approved batch verifies successfully.

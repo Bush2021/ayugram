@@ -32,10 +32,10 @@ body:
     id: build
     attributes:
       label: Build
-      description: The Qt 6 release package has `_Qt6_win10+` in its file name. In a running build, hover over the version text at the bottom of the main menu. The tooltip shows the Qt version.
+      description: Windows packages from v7.3.1 and earlier use Qt 5 unless the file name has `_Qt6_win10+`; later Windows packages use Qt 6. In a running build, hover over the version text at the bottom of the main menu. The tooltip shows the Qt version.
       options:
         - Windows x64, Qt 6
-        - Windows x64, Qt 5
+        - Windows x64, Qt 5 (v7.3.1 and earlier)
         - macOS
         - Built from source
     validations:
