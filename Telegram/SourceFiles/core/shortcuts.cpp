@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "base/event_filter.h"
 #include "base/parse_helper.h"
+#include "base/qt/qt_possible_keys.h"
 #include "core/application.h"
 #include "core/version.h"
 #include "mainwindow.h"
@@ -20,7 +21,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QAction>
 #include <QShortcut>
-#include <QtGui/private/qkeymapper_p.h>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
@@ -398,7 +398,7 @@ bool Manager::handles(const QKeySequence &sequence) const {
 bool Manager::matchesCommand(
 		not_null<QKeyEvent*> event,
 		Command command) const {
-	for (const auto &combination : QKeyMapper::possibleKeys(event)) {
+	for (const auto &combination : base::PossibleKeys(event)) {
 		const auto i = _shortcuts.find(QKeySequence(combination));
 		if (i == end(_shortcuts)) {
 			continue;
@@ -1079,6 +1079,19 @@ bool AllowWithoutModifiers(int key) {
 		Qt::Key_ScrollLock,
 	};
 	return (key >= 0x80) && !ranges::contains(service, key);
+}
+
+QString ToDisplayString(const QKeySequence &sequence) {
+	auto result = sequence.toString();
+	if (!Platform::IsMac()) {
+		return result;
+	}
+	// Qt swaps modifiers on mac: Cmd arrives as "Ctrl+", Control as "Meta+".
+	return result
+		.replace(u"Ctrl+"_q, QString(QChar(0x2318)))
+		.replace(u"Meta+"_q, QString(QChar(0x2303)))
+		.replace(u"Alt+"_q, QString(QChar(0x2325)))
+		.replace(u"Shift+"_q, QString(QChar(0x21E7)));
 }
 
 void Finish() {

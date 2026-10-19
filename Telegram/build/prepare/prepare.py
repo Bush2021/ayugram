@@ -527,7 +527,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 11f9322e5f7102ecc0a6dd39abc3682f61ead65f
+    git checkout fe957833b84525e634a8d776a7f834ed536d9a21
 mac:
     sed -i '' "s/10.13/$MACOSX_DEPLOYMENT_TARGET/g" macos_meson_*.txt
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
@@ -1425,7 +1425,7 @@ stage('openal-soft', """
     git clone https://github.com/telegramdesktop/openal-soft.git
     cd openal-soft
 win:
-    git checkout 291c0fdbbd
+    git checkout 00cb9b649c
     cmake -B build . ^
         -D LIBTYPE:STRING=STATIC ^
         -D FORCE_STATIC_VCRT=ON ^
@@ -1682,20 +1682,24 @@ win:
 else: # qt > '6'
     qtAngleCmake = os.path.realpath(os.path.join(
         scriptPath, '../../../cmake/external/angle/qt.cmake')).replace('\\', '/')
+    # checkouts share Libraries, so the cache key gets the content, not the path
+    modifiedEnv['QT_ANGLE_CMAKE'] = qtAngleCmake
     branch = 'v$QT' + ('-lts-lgpl' if qt.startswith('6.2.') else '')
     stage('qt_' + qt, """
     git clone -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
     cd qt_$QT
     git submodule update --init --recursive --progress qtbase qtimageformats qtshadertools qtsvg
 depends:patches/qtbase_""" + qt + """/*.patch
+depends:patches/qtsvg_""" + qt + """/*.patch
 win32_win64:
 depends:qt6_windows7/*.patch
-depends:""" + qtAngleCmake + """
+version:""" + computeFileHash(qtAngleCmake) + """
 mac:
     if [ -d "../patches/qt6_highsierra" ]; then
         find "$PWD/../patches/qt6_highsierra" -maxdepth 1 -name "*.patch" -print0 | sort -z | xargs -0 git -C qtbase apply -v
     fi
     find $PWD/../patches/qtbase_$QT -type f -print0 | sort -z | xargs -0 git -C qtbase apply -v
+    find $PWD/../patches/qtsvg_$QT -type f -print0 | sort -z | xargs -0 git -C qtsvg apply -v
     sed -i.bak 's/tqtc-//' {qtimageformats,qtsvg}/dependencies.yaml
 
     CONFIGURATIONS=-debug
@@ -1750,6 +1754,14 @@ win:
             exit /b 1
         )
     )
+    cd ..\\qtsvg
+    for /r %%i in (..\\..\\patches\\qtsvg_%QT%\\*) do (
+        git apply %%i --ignore-whitespace -v
+        if errorlevel 1 (
+            echo ERROR: Applying patch %%~nxi failed!
+            exit /b 1
+        )
+    )
     cd ..
 
     SET CONFIGURATIONS=-debug
@@ -1791,7 +1803,7 @@ win:
         -D ZLIB_WINAPI ^
         -- ^
 win32_win64:
-        -D CMAKE_PROJECT_QtBase_INCLUDE:FILEPATH=""" + '"' + qtAngleCmake + '"' + """ ^
+        -D CMAKE_PROJECT_QtBase_INCLUDE:FILEPATH="%QT_ANGLE_CMAKE%" ^
         -D DESKTOP_APP_ANGLE_DIR:PATH="%LIBS_DIR%\\tg_angle" ^
 win:
         -D OPENSSL_FOUND=1 ^

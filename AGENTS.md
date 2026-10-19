@@ -343,6 +343,9 @@ publication at a construction seam).
 - Never add a `Co-Authored-By:` line or any tool/assistant attribution trailer.
 - Never add `Autotask:`/attempt or other workflow markers. Commits should read
   like normal project history.
+- Never create backup branches or tags before a rebase, reorder, squash or any
+  other history rewrite. The branch reflog keeps the old tip; report its sha
+  as the undo path instead.
 
 ## Local Storage Serialization
 
