@@ -1210,6 +1210,12 @@ void TopBarWidget::updateControlsGeometry() {
 	const auto backButtonTop = selectedButtonsTop + st::topBarHeight;
 	auto buttonsLeft = st::topBarActionSkip
 		+ (_controller->adaptive().isOneColumn() ? 0 : st::lineWidth);
+	const auto shownButtons = std::max(
+		int(!_forward->isHidden())
+			+ int(!_sendNow->isHidden())
+			+ int(!_delete->isHidden())
+			+ int(!_messageShot->isHidden()),
+		1);
 	auto buttonsWidth = (_forward->isHidden() ? 0 : _forward->contentWidth())
 		+ (_sendNow->isHidden() ? 0 : _sendNow->contentWidth())
 		+ (_delete->isHidden() ? 0 : _delete->contentWidth())
@@ -1218,12 +1224,12 @@ void TopBarWidget::updateControlsGeometry() {
 			? 0
 			: (_selectBetween->width() + st::topBarActionSkip))
 		+ _clear->width();
-	buttonsWidth += buttonsLeft + st::topBarActionSkip * 3;
+	buttonsWidth += buttonsLeft + st::topBarActionSkip * (shownButtons + 1);
 
 	auto widthLeft = std::min(
 		width() - buttonsWidth,
-		-2 * st::defaultActiveButton.width);
-	auto buttonFullWidth = std::min(-(widthLeft / 2), 0);
+		-shownButtons * st::defaultActiveButton.width);
+	auto buttonFullWidth = std::min(-(widthLeft / shownButtons), 0);
 	_forward->setFullWidth(buttonFullWidth);
 	_sendNow->setFullWidth(buttonFullWidth);
 	_delete->setFullWidth(buttonFullWidth);
