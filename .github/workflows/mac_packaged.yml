@@ -2,6 +2,11 @@ name: macOS packaged
 
 on:
   workflow_dispatch:
+    inputs:
+      only_libs:
+        description: "Only build and cache libraries"
+        type: boolean
+        default: false
 
 jobs:
 
@@ -26,7 +31,7 @@ jobs:
       RUST_PATCHES: "aec474953ff7ee9b6e4cd9b8658288ea86d124f3"
       RUST_TOOLCHAIN: "1.96.1"
       UPLOAD_ARTIFACT: "true"
-      ONLY_CACHE: "false"
+      ONLY_CACHE: ${{ inputs.only_libs && 'true' || 'false' }}
       MANUAL_CACHING: "1"
       AUTO_CACHING: "1"
 
@@ -67,7 +72,7 @@ jobs:
 
       - name: RNNoise cache.
         id: cache-rnnoise
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.LibrariesPath }}/local/rnnoise
           key: ${{ runner.OS }}-rnnoise-${{ env.RNNOISE }}-${{ env.CACHE_KEY }}
@@ -86,7 +91,7 @@ jobs:
 
       - name: WebRTC cache.
         id: cache-webrtc
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.LibrariesPath }}/local/tg_owt
           key: ${{ runner.OS }}-webrtc-${{ env.WEBRTC }}-${{ env.CACHE_KEY }}
@@ -105,7 +110,7 @@ jobs:
 
       - name: TDE2E cache.
         id: cache-tde2e
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.LibrariesPath }}/local/tde2e
           key: ${{ runner.OS }}-tde2e-${{ env.TDE2E }}-${{ env.CACHE_KEY }}
@@ -127,7 +132,7 @@ jobs:
 
       - name: Rust libraries cache.
         id: cache-tdesktop-rust
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.LibrariesPath }}/local/tdesktop_rust
           key: ${{ runner.OS }}-tdesktop-rust-${{ env.TLOTTIE }}-${{ env.WALLET_ENGINE }}-${{ env.RUST_PATCHES }}-${{ env.RUST_TOOLCHAIN }}-${{ env.CACHE_KEY }}
@@ -182,6 +187,34 @@ jobs:
           --library --out-dir $prefix/include/wallet_engine \
           target/aarch64-apple-darwin/release/libtdesktop_rust.dylib
 
+      - name: Save RNNoise cache.
+        if: steps.cache-rnnoise.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/rnnoise
+          key: ${{ steps.cache-rnnoise.outputs.cache-primary-key }}
+
+      - name: Save WebRTC cache.
+        if: steps.cache-webrtc.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tg_owt
+          key: ${{ steps.cache-webrtc.outputs.cache-primary-key }}
+
+      - name: Save TDE2E cache.
+        if: steps.cache-tde2e.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tde2e
+          key: ${{ steps.cache-tde2e.outputs.cache-primary-key }}
+
+      - name: Save Rust libraries cache.
+        if: steps.cache-tdesktop-rust.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.LibrariesPath }}/local/tdesktop_rust
+          key: ${{ steps.cache-tdesktop-rust.outputs.cache-primary-key }}
+
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
         run: |
@@ -215,14 +248,14 @@ jobs:
           codesign --remove-signature AyuGram.app
 
       - name: Move artifact.
-        if: env.UPLOAD_ARTIFACT == 'true'
+        if: env.ONLY_CACHE == 'false' && env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd $REPO_NAME/build/Release
           mkdir -p artifact
           mv AyuGram.app artifact/
 
       - uses: actions/upload-artifact@v7
-        if: env.UPLOAD_ARTIFACT == 'true'
+        if: env.ONLY_CACHE == 'false' && env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
           name: ${{ env.ARTIFACT_NAME }}
