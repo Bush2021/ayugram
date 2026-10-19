@@ -502,6 +502,7 @@ void Controller::sideBarChanged() {
 
 void Controller::activate() {
 	_widget.activate();
+	Core::App().registerWindowActivation(&_widget);
 }
 
 void Controller::updateIsActiveFocus() {
