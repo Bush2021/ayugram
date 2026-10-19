@@ -26,17 +26,25 @@ QString appIcoPath() {
 		+ u".ico"_q;
 }
 
-void loadAppIco() {
+bool loadAppIco() {
 	const auto &settings = AyuSettings::getInstance();
 	const auto iconPath = appIcoPath();
+	const auto resourcePath = qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings.appIcon());
 
 	auto f = QFile(iconPath);
 	if (f.exists()) {
+		auto resource = QFile(resourcePath);
+		if (f.open(QIODevice::ReadOnly)
+			&& resource.open(QIODevice::ReadOnly)
+			&& f.readAll() == resource.readAll()) {
+			return false;
+		}
+		f.close();
 		f.setPermissions(QFile::WriteOther);
 		f.remove();
 	}
 	f.close();
-	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings.appIcon()), iconPath);
+	return QFile::copy(resourcePath, iconPath);
 }
 
 QImage CreateImage(const QString &name, const QSize resultImageSize, const int padding = 0) {

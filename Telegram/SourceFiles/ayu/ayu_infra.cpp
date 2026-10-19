@@ -11,7 +11,6 @@
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/data/ayu_database.h"
-#include "ayu/ui/ayu_logo.h"
 #include "features/translator/ayu_translator.h"
 #include "lang/lang_instance.h"
 #include "ui/chat/chat_style_radius.h"
@@ -57,7 +56,6 @@ void initTranslator() {
 
 void initIcon() {
 #ifdef Q_OS_WIN
-	AyuAssets::loadAppIco();
 	reloadAppIconFromTaskBar();
 #endif
 }

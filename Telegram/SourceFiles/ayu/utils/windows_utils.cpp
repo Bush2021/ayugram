@@ -15,13 +15,35 @@
 #include <propvarutil.h>
 #include <ShlObj_core.h>
 
-void processIcon(QString shortcut, QString iconPath) {
+bool hasIconLocation(IShellLink *shellLink, const QString &iconPath) {
+	WCHAR location[MAX_PATH] = { 0 };
+	auto index = 0;
+	if (FAILED(shellLink->GetIconLocation(location, MAX_PATH, &index))
+		|| index) {
+		return false;
+	}
+	// The shell may keep the icon path with environment variables.
+	WCHAR expanded[MAX_PATH] = { 0 };
+	const auto size = ExpandEnvironmentStrings(location, expanded, MAX_PATH);
+	if (!size || size > MAX_PATH) {
+		return false;
+	}
+	const auto normalize = [](const QString &path) {
+		return QDir::cleanPath(QDir::fromNativeSeparators(path));
+	};
+	return !normalize(QString::fromWCharArray(expanded)).compare(
+		normalize(iconPath),
+		Qt::CaseInsensitive);
+}
+
+bool processIcon(QString shortcut, QString iconPath) {
 	if (!QFile::exists(shortcut)) {
-		return;
+		return false;
 	}
 
 	IShellLink *pShellLink = NULL;
 	IPersistFile *pPersistFile = NULL;
+	auto changed = false;
 
 	HRESULT hr = CoCreateInstance(CLSID_ShellLink,
 								  NULL,
@@ -33,9 +55,10 @@ void processIcon(QString shortcut, QString iconPath) {
 		if (SUCCEEDED(hr)) {
 			const auto shortcutPath = shortcut.toStdWString();
 
-			if (SUCCEEDED(pPersistFile->Load(shortcutPath.c_str(), STGM_READWRITE))) {
+			if (SUCCEEDED(pPersistFile->Load(shortcutPath.c_str(), STGM_READWRITE))
+				&& !hasIconLocation(pShellLink, iconPath)) {
 				pShellLink->SetIconLocation(iconPath.toStdWString().c_str(), 0);
-				pPersistFile->Save(shortcutPath.c_str(), TRUE);
+				changed = SUCCEEDED(pPersistFile->Save(shortcutPath.c_str(), TRUE));
 			}
 
 			pPersistFile->Release();
@@ -43,24 +66,25 @@ void processIcon(QString shortcut, QString iconPath) {
 
 		pShellLink->Release();
 	}
+	return changed;
 }
 
-void processLegacy(const QString &iconPath) {
+bool processLegacy(const QString &iconPath) {
 	const auto appdata = QDir::fromNativeSeparators(qgetenv("APPDATA"));
 	auto shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/AyuGram Desktop.lnk";
 	if (!QFile::exists(shortcut)) {
 		shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/AyuGram.lnk";
 	}
 	if (!QFile::exists(shortcut)) {
-		return;
+		return false;
 	}
 
-	processIcon(shortcut, iconPath);
+	return processIcon(shortcut, iconPath);
 }
 
-void processNewPinned(const QString &iconPath) {
+bool processNewPinned(const QString &iconPath) {
 	if (!SUCCEEDED(CoInitialize(0))) {
-		return;
+		return false;
 	}
 	const auto coGuard = gsl::finally([]
 	{
@@ -72,7 +96,7 @@ void processNewPinned(const QString &iconPath) {
 
 	const auto srcid = Platform::AppUserModelId::MyExecutablePathId();
 	if (!srcid) {
-		return;
+		return false;
 	}
 
 	WIN32_FIND_DATA findData;
@@ -84,9 +108,10 @@ void processNewPinned(const QString &iconPath) {
 		0,
 		0);
 	if (findHandle == INVALID_HANDLE_VALUE) {
-		return;
+		return false;
 	}
 
+	auto changed = false;
 	do {
 		std::wstring fname = native + findData.cFileName;
 		const auto filePath = QString::fromStdWString(fname);
@@ -123,20 +148,21 @@ void processNewPinned(const QString &iconPath) {
 				continue;
 			}
 
-			processIcon(filePath, iconPath);
+			changed |= processIcon(filePath, iconPath);
 		}
 	} while (FindNextFile(findHandle, &findData));
 	DWORD errorCode = GetLastError();
 	if (errorCode && errorCode != ERROR_NO_MORE_FILES) {
-		return;
+		return changed;
 	}
 	FindClose(findHandle);
+	return changed;
 }
 
-void processNewShortcuts(const QString &iconPath) {
+bool processNewShortcuts(const QString &iconPath) {
 	const auto path = Platform::AppUserModelId::systemShortcutPath();
 	if (path.isEmpty()) {
-		return;
+		return false;
 	}
 
 	const auto shortcuts = {
@@ -144,6 +170,7 @@ void processNewShortcuts(const QString &iconPath) {
 		path + u"AyuGram/AyuGram.lnk"_q,
 		path + u"AyuGram.lnk"_q,
 	};
+	auto changed = false;
 	for (const auto &shortcut : shortcuts) {
 		const auto native = QDir::toNativeSeparators(shortcut).toStdWString();
 
@@ -152,18 +179,23 @@ void processNewShortcuts(const QString &iconPath) {
 			continue;
 		}
 
-		processIcon(QString::fromStdWString(native), iconPath);
+		changed |= processIcon(QString::fromStdWString(native), iconPath);
 	}
+	return changed;
 }
 
 void reloadAppIconFromTaskBar() {
+	auto changed = AyuAssets::loadAppIco();
 	const auto iconPath = AyuAssets::appIcoPath();
 
-	processNewPinned(iconPath);
-	processNewShortcuts(iconPath);
-	processLegacy(iconPath);
+	changed |= processNewPinned(iconPath);
+	changed |= processNewShortcuts(iconPath);
+	changed |= processLegacy(iconPath);
 
-	SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
+	// Flushes every icon in the shell, so a launch with nothing to update skips it.
+	if (changed) {
+		SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
+	}
 }
 
 #endif

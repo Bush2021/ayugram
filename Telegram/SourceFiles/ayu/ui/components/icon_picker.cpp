@@ -41,7 +41,6 @@ const auto rows = static_cast<int>(icons.size()) / IconPicker::kColumns
 
 void applyIcon() {
 #ifdef Q_OS_WIN
-	AyuAssets::loadAppIco();
 	reloadAppIconFromTaskBar();
 #endif
 
