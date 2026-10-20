@@ -2447,11 +2447,6 @@ Dialogs::EntryState SessionController::dialogsEntryStateCurrent() const {
 	return _dialogsEntryState.current();
 }
 
-auto SessionController::dialogsEntryStateValue() const
--> rpl::producer<Dialogs::EntryState> {
-	return _dialogsEntryState.value();
-}
-
 bool SessionController::switchInlineQuery(
 		Dialogs::EntryState to,
 		not_null<UserData*> bot,

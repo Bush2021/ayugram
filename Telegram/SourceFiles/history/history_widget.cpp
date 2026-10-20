@@ -4739,18 +4739,6 @@ void HistoryWidget::updateControlsVisibility() {
 	updateMouseTracking();
 }
 
-void HistoryWidget::hideFieldIfVisible() {
-	if (_field->isHidden() && _richDraftPreview->isHidden()) {
-		return;
-	} else if (Ui::InFocusChain(_field)) {
-		setFocus();
-	}
-	_field->hide();
-	_richDraftPreview->hide();
-	updateControlsGeometry();
-	update();
-}
-
 void HistoryWidget::showAboutTopPromotion() {
 	Expects(_history != nullptr);
 	Expects(_list != nullptr);
@@ -10949,12 +10937,6 @@ bool HistoryWidget::cancelReply(bool lastKeyboardUsed) {
 		}
 	}
 	return wasReply;
-}
-
-void HistoryWidget::cancelReplyAfterMediaSend(bool lastKeyboardUsed) {
-	if (cancelReplyOrSuggest(lastKeyboardUsed)) {
-		saveCloudDraft();
-	}
 }
 
 int HistoryWidget::countMembersDropdownHeightMax() const {

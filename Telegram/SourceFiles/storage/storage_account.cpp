@@ -1865,10 +1865,6 @@ bool Account::hasDraftCursors(PeerId peer) {
 	return _draftCursorsMap.contains(peer);
 }
 
-bool Account::hasDraft(PeerId peer) {
-	return _draftsMap.contains(peer);
-}
-
 // AyuGram: ayu/secret chats.
 void Account::writeSecretChats(const QByteArray &serialized) {
 	if (serialized.isEmpty()) {
