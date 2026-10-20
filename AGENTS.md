@@ -2,76 +2,13 @@ Read @FORK.md for this project's fork-management rules (remotes, forked-submodul
 
 For fork-management tasks use the project skills under `.claude/commands/`: `/sync-tg`, `/sync-ayu`.
 
-# Agent Guide for Telegram Desktop
+# Agent Guide for AyuGram Desktop
 
-This guide defines repository-wide instructions for coding agents working with the Telegram Desktop codebase.
+This guide defines repository-wide instructions for coding agents working with the AyuGram Desktop (Telegram Desktop fork) codebase.
 
 Avoid building the project.
 
 If you're asked to create a Pull Request, then clearly state in PR description that it was AI generated.
-
-## AI Tasks
-
-In this repository "task" is a specific term. It always means one work record in
-the sibling `ai-tdesktop` repository, never a `TODO` comment, a checklist item,
-or a unit of work invented during the current conversation. "The tasks", "the
-queue", "the board", "what's most pressing", and a bare task slug all refer to
-that queue.
-
-- The queue lives in `../ai-tdesktop`, a sibling of this checkout, with one
-  record per directory under `tasks/YYYY/MM/DD/<slug>/`. A task id is that dated
-  path, for example `2026/07/18/fix-community-forward`, and it is the only
-  durable link between a source commit and its task. Linked slot worktrees live
-  in `../ai-tdesktop-worktrees`. Read `../ai-tdesktop/AGENTS.md` before doing
-  anything inside that repository.
-- Each record holds `task.md` — one `# ` title line, then one self-contained
-  paragraph that is the task's description wherever it is summarized — and
-  `state.yaml` with `status`, `type`, `depends_on`, `claimed_by`, and dates.
-  Open statuses are `todo`, `in-progress`, `blocked`, and `split-required`;
-  `approved` is completed history, and `split.yaml` / `superseded.yaml` mark
-  retired records.
-- To browse the queue, read those files directly. Do not run `python3 ai.py`: it
-  is a full-screen browser for the user's own terminal and refuses to run in a
-  pipe. A compact open listing:
-
-```bash
-cd ../ai-tdesktop && for state in tasks/*/*/*/*/state.yaml; do
-  status=$(sed -n 's/^status: //p' "$state")
-  case "$status" in todo|in-progress|blocked|split-required)
-    dir=$(dirname "$state")
-    printf '%-14s %-70s %s\n' "$status" "${dir#tasks/}" \
-      "$(sed -n '1s/^# //p' "$dir/task.md")";;
-  esac
-done | sort
-```
-
-- When ranking open work by urgency, use `in-progress`, then `blocked`, then
-  `split-required`, then ready `todo` (no `claimed_by`, and every `depends_on`
-  already `approved`), then `todo` still waiting on a dependency. Say who owns
-  claimed work. This checkout's tag is the `Telegram/build/ai-machine-tag` value
-  plus the checkout folder name, such as `macbook-tdesktop`, and work claimed by
-  another checkout is never taken over without an explicit human reassignment.
-- Browsing is read-only. Listing, summarizing, comparing, or recommending tasks
-  never edits `state.yaml`, publishes a lifecycle commit, or starts
-  implementation, no matter how small the task looks.
-- Acting on an existing queue task goes through the workflow skills instead of
-  by hand: `perform-task <slug or full id>` starts or resumes and performs
-  exactly one known task, and `continue <batch specification>` runs the batch
-  of tasks the specification selects. Source commits owned by a task use the
-  three-line form described under `## Commits`.
-- A request the user makes in conversation is ordinary work: do it directly in
-  this checkout. Do not write it to the ignored `../ai-tdesktop/inbox/inbox.md`,
-  and do not run `process-inbox` or `continue` over it, unless the user asks for
-  that. The queue's planning, review and evidence campaign costs hours, so
-  spending it on a request the user expected you to just do is a real error, not
-  thoroughness.
-- You may *offer* the queue when the work genuinely earns it: a large or
-  ambiguous change, one whose correctness needs a real testing campaign, or one
-  that is safety-, security- or data-safety-critical. Make the offer in one
-  line, say why, and route it only after the user approves. Absent approval,
-  implement it directly and say what you skipped.
-- Never guess between similarly named tasks. Report the matching full ids and
-  let the user choose.
 
 ## Working from Codex on Windows + WSL
 
@@ -238,7 +175,7 @@ older `kKeysCount`. The characteristic failure is:
   `Local::readLangPack()`.
 
 If this exact startup failure repeats twice, do not change the implementation,
-test overlay, or portable account. Rebuild every object once by following the
+or portable account. Rebuild every object once by following the
 `out/build` deletion in "### Forcing a full recompile on macOS" exactly as
 written there, its precondition and checks included, never with an Xcode clean
 (see the macOS statement in "### Build Commands" under
@@ -250,9 +187,9 @@ the blocker. Do not loop clean rebuilds.
 
 Start only when no build of this checkout is running and this checkout's exact
 Telegram process is stopped. Never stop any other process for this procedure.
-Outside the autonomous `continue` / `perform-task` workflow, stopping that
-process follows "### Build output locks": the user may be testing it, so ask
-the user first and never terminate it without explicit permission. Then
+Stopping that process follows "### Build output locks": the user may be
+testing it, so ask the user first and never terminate it without explicit
+permission. Then
 rebuild every object by deleting the intermediate tree `out/build`, never with
 an Xcode clean (see the macOS statement in "### Build Commands" under
 "## Build Configuration").
@@ -313,18 +250,17 @@ Telegram or debugger before rebuilding.
 ## Debug-Only Code
 
 Production translation units stay free of debug machinery. The permanent test
-harness lives in `Telegram/SourceFiles/test/`, and the disposable `-testagent`
-overlay owns per-task instrumentation; production code carries at most a thin
-single-call seam (a `Test::Fire()`-style waitpoint or a live-object
+harness lives in `Telegram/SourceFiles/test/`; production code carries at most
+a thin single-call seam (a `Test::Fire()`-style waitpoint or a live-object
 publication at a construction seam).
 
 - Do not add `#ifdef _DEBUG` blocks, debug-only types, debug state, mutexes,
   counters, or observation structs to production headers or sources. When a
   behavior cannot be observed without such machinery, that is a harness gap:
-  extend the `test/` helpers or the overlay instead.
+  extend the `test/` helpers instead.
 - Never commit debugging machinery interleaved with working code in the same
   translation unit. A permanent helper belongs under `test/`; a temporary one
-  belongs in the overlay and is never retained.
+  is never retained.
 - Exceptions exist — a few `#ifdef _DEBUG` hooks are deliberately kept in
   production files — but they are exceptions and each new one needs a solid,
   stated reason. "The test needed it" is not one.
@@ -341,8 +277,6 @@ publication at a construction seam).
 - Add a short plain-language body only when the subject can't carry it (what
   was done, not the technical how) — a line or two at most.
 - Never add a `Co-Authored-By:` line or any tool/assistant attribution trailer.
-- Never add `Autotask:`/attempt or other workflow markers. Commits should read
-  like normal project history.
 - Never create backup branches or tags before a rebase, reorder, squash or any
   other history rewrite. The branch reflog keeps the old tip; report its sha
   as the undo path instead.
@@ -400,6 +334,28 @@ _limit = kDefaultLimit; // the server rejects anything larger
 // WHY: the server sends the id before the peer exists, so the row is
 // created empty and filled on the next update, or the list flickers
 // on every reconnect.
+```
+
+**AyuGram includes in upstream files:**
+
+When an upstream (Telegram Desktop) file needs an extra include for AyuGram
+code, never mix it into the upstream include list. Put all such includes in a
+separate block after the last upstream include, headed by `// AyuGram includes`,
+with one empty line before the marker and two empty lines after the block.
+If the file already has this block, append to it instead of creating another.
+Files under `Telegram/SourceFiles/ayu/` don't need the marker.
+
+```cpp
+#include "storage/file_upload.h"
+#include "storage/storage_account.h"
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+#include "window/window_controller.h"
+
+
+namespace {
 ```
 
 **Style and formatting rules** are in `REVIEW.md` — see that file for empty-line-before-closing-brace, operator placement in multi-line expressions, if-with-initializer, and other mechanical style rules.
