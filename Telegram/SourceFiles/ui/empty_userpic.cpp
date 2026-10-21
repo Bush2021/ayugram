@@ -502,12 +502,6 @@ void EmptyUserpic::PaintHiddenAuthor(
 	PaintHiddenAuthorInner(p, x, y, size, fg);
 }
 
-QImage EmptyUserpic::GenerateHiddenAuthor(int size) {
-	return Generate(size, [&](QPainter &p) {
-		PaintHiddenAuthor(p, 0, 0, size, size);
-	});
-}
-
 void EmptyUserpic::PaintMyNotes(
 		QPainter &p,
 		int x,
@@ -541,12 +535,6 @@ void EmptyUserpic::PaintMyNotes(
 	PaintMyNotesInner(p, x, y, size, fg);
 }
 
-QImage EmptyUserpic::GenerateMyNotes(int size) {
-	return Generate(size, [&](QPainter &p) {
-		PaintMyNotes(p, 0, 0, size, size);
-	});
-}
-
 void EmptyUserpic::PaintCurrency(
 		QPainter &p,
 		int x,
@@ -578,12 +566,6 @@ void EmptyUserpic::PaintCurrency(
 	p.drawEllipse(x, y, size, size);
 
 	PaintCurrencyInner(p, x, y, size, fg);
-}
-
-QImage EmptyUserpic::GenerateCurrency(int size) {
-	return Generate(size, [&](QPainter &p) {
-		PaintCurrency(p, 0, 0, size, size);
-	});
 }
 
 std::pair<uint64, uint64> EmptyUserpic::uniqueKey() const {

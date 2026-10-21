@@ -238,18 +238,6 @@ void UserData::setPeerGiftsCount(int count) {
 	}
 }
 
-bool UserData::hasPrivateForwardName() const {
-	return !_privateForwardName.isEmpty();
-}
-
-QString UserData::privateForwardName() const {
-	return _privateForwardName;
-}
-
-void UserData::setPrivateForwardName(const QString &name) {
-	_privateForwardName = name;
-}
-
 const std::optional<QString> &UserData::gramAddress() const {
 	return _gramAddress;
 }
@@ -786,10 +774,6 @@ Data::StarsRating UserData::starsRating() const {
 	return _starsRating;
 }
 
-bool UserData::canAddContact() const {
-	return canShareThisContact() && !isContact();
-}
-
 bool UserData::canShareThisContactFast() const {
 	return !_phone.isEmpty();
 }
@@ -1028,8 +1012,6 @@ void ApplyUserUpdate(
 		user->setThemeToken(QString());
 	}
 	user->setTranslationDisabled(update.is_translations_disabled());
-	user->setPrivateForwardName(
-		update.vprivate_forward_name().value_or_empty());
 
 	if (const auto info = user->botInfo.get()) {
 		const auto group = update.vbot_group_admin_rights()
