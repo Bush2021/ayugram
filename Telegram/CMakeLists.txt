@@ -227,6 +227,8 @@ set(ayugram_files
         ayu/libs/sqlite/sqlite3.c
         ayu/libs/sqlite/sqlite3.h
         ayu/libs/sqlite/sqlite_orm.h
+        ayu/features/message_selection/select_between.cpp
+        ayu/features/message_selection/select_between.h
         ayu/features/streamer_mode/platform/linux/streamer_mode_linux.cpp
         ayu/features/streamer_mode/platform/linux/streamer_mode_linux.h
         ayu/features/streamer_mode/platform/mac/streamer_mode_mac.mm

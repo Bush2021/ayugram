@@ -140,10 +140,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/filters/filters_cache_controller.h"
+#include "ayu/features/message_selection/select_between.h"
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/ui/settings/filters/edit_filter.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_document_media.h"
+#include "data/data_history_messages.h"
 
 
 namespace {
@@ -413,6 +415,20 @@ HistoryInner::HistoryInner(
 	[=] { return window()->isActiveWindow(); })
 , _scrollDateCheck([this] { scrollDateCheck(); })
 , _scrollDateHideTimer([this] { scrollDateHideByTimer(); }) {
+	_selectBetween = std::make_unique<AyuFeatures::SelectBetween>(
+		&session(),
+		[=](Data::MessagePosition around, int before, int after) {
+			return Data::HistoryMessagesViewer(_history, around, before, after);
+		},
+		[=](not_null<HistoryItem*> a, not_null<HistoryItem*> b) {
+			return (a->history() != b->history())
+				? (a->history() == _migrated)
+				: (a->position() < b->position());
+		},
+		[](not_null<HistoryItem*> item) {
+			return !isMessageHidden(item) && item->canBeSelected();
+		},
+		[=] { _widget->updateTopBarSelection(); });
 	_history->delegateMixin()->setCurrent(this);
 	if (_migrated) {
 		_migrated->delegateMixin()->setCurrent(this);
@@ -6194,81 +6210,33 @@ void HistoryInner::changeSelectionAsGroup(
 	}
 }
 
-std::optional<HistoryItemsList> HistoryInner::selectBetweenItems() {
-	auto result = HistoryItemsList();
-	if (hasSelectRestriction()) {
-		return result;
-	}
-	const auto &groups = session().data().groups();
-	auto first = (Element*)nullptr;
-	auto last = (Element*)nullptr;
-	auto firstTop = 0;
-	auto lastTop = 0;
-	for (const auto &item : _selected) {
-		const auto group = groups.find(item);
-		const auto view = viewByItem(group ? group->items.front() : item);
-		const auto top = itemTop(view);
-		if (top < 0) {
-			continue;
-		} else if (!first || top < firstTop) {
-			first = view;
-			firstTop = top;
-		}
-		if (!last || top > lastTop) {
-			last = view;
-			lastTop = top;
-		}
-	}
-	if (first == last) {
-		return result;
-	}
-	const auto selectable = [](not_null<HistoryItem*> item) {
-		return !isMessageHidden(item) && item->canBeSelected();
-	};
-	const auto limit = MaxSelectedItems - int(_selected.size());
-	for (auto view = nextItem(first); view != last; view = nextItem(view)) {
-		if (!view) {
-			return HistoryItemsList();
-		}
-		const auto row = view->data();
-		const auto group = groups.find(row);
-		const auto single = HistoryItemsList{ row };
-		const auto &items = group ? group->items : single;
-		if (!ranges::all_of(items, selectable)) {
-			continue;
-		}
-		for (const auto &item : items) {
-			if (!_selected.contains(item)) {
-				result.push_back(item);
-			}
-		}
-		if (int(result.size()) > limit) {
-			return std::nullopt;
-		}
-	}
-	return result;
-}
-
 bool HistoryInner::canSelectBetween() {
-	const auto items = selectBetweenItems();
-	return !items || !items->empty();
+	return _selectBetween->update(hasSelectRestriction()
+		? HistoryItemsList()
+		: HistoryItemsList(_selected.begin(), _selected.end()));
 }
 
 void HistoryInner::selectBetween() {
-	const auto items = selectBetweenItems();
-	if (!items) {
-		_controller->showToast(tr::ayu_SelectBetweenLimit(
-			tr::now,
-			lt_count,
-			int(MaxSelectedItems)));
+	if (!canSelectBetween()) {
 		return;
 	}
-	for (const auto &item : *items) {
-		addToSelection(&_selected, item);
-	}
-	_accessibilitySelectionAnchor = nullptr;
-	update();
-	_widget->updateTopBarSelection();
+	_selectBetween->select([=](std::optional<MessageIdsList> ids) {
+		if (!ids) {
+			_controller->showToast(tr::ayu_SelectBetweenLimit(
+				tr::now,
+				lt_count,
+				int(MaxSelectedItems)));
+			return;
+		}
+		for (const auto &id : *ids) {
+			if (const auto item = session().data().message(id)) {
+				addToSelection(&_selected, item);
+			}
+		}
+		_accessibilitySelectionAnchor = nullptr;
+		update();
+		_widget->updateTopBarSelection();
+	});
 }
 
 void HistoryInner::setAccessibilityFocusedItem(

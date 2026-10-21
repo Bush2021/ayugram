@@ -27,6 +27,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 struct ClickHandlerContext;
 struct HistorySelectedTextParts;
 
+namespace AyuFeatures {
+class SelectBetween;
+} // namespace AyuFeatures
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -841,7 +845,6 @@ private:
 		not_null<HistoryItem*> from,
 		not_null<HistoryItem*> to,
 		int max) const;
-	[[nodiscard]] std::optional<HistoryItemsList> selectBetweenItems() const;
 
 	SelectedMap::iterator itemUnderPressSelection();
 	SelectedMap::const_iterator itemUnderPressSelection() const;
@@ -1109,6 +1112,7 @@ private:
 	std::unique_ptr<Ui::ThanosEffectController> _thanosController;
 
 	rpl::lifetime _viewerLifetime;
+	std::unique_ptr<AyuFeatures::SelectBetween> _selectBetween;
 
 };
 

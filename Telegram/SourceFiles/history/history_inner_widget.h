@@ -30,6 +30,10 @@ struct ClickContext;
 struct ClickHandlerContext;
 struct HistorySelectedTextParts;
 
+namespace AyuFeatures {
+class SelectBetween;
+} // namespace AyuFeatures
+
 namespace Data {
 struct Group;
 } // namespace Data
@@ -531,7 +535,6 @@ private:
 		not_null<SelectedItems*> toItems,
 		not_null<HistoryItem*> item,
 		SelectAction action) const;
-	[[nodiscard]] std::optional<HistoryItemsList> selectBetweenItems();
 	void changeAccessibilitySelection(int index, SelectAction action);
 	void extendAccessibilitySelection(int oldIndex, int newIndex);
 	void forwardItem(FullMsgId itemId);
@@ -729,6 +732,7 @@ private:
 	[[nodiscard]] const std::vector<CollapseGap> &collapseGaps() const;
 
 	std::unique_ptr<Ui::ThanosEffectController> _thanosController;
+	std::unique_ptr<AyuFeatures::SelectBetween> _selectBetween;
 
 };
 

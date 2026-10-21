@@ -76,9 +76,9 @@ When unselected messages sit between the selected ones, the selection bar shows 
 Between. It selects every message from the first selected message to the last. To
 select a range, select its first and last messages, then click Select Between. To
 extend the range, select a message above or below it and click Select Between again.
-At most 100 messages can be selected; if the range holds more, the selection stays as
-it was and a notice says so. In topics and comment threads, only the messages near the
-visible part are loaded, so extend a long range there in steps.
+Missing messages in the range load automatically, including in topics and comment
+threads. At most 100 messages can be selected; if the range holds more, the
+selection stays as it was and a notice says so.
 
 ### Mention by ID
 
