@@ -86,6 +86,9 @@ constexpr auto kWaveDuration = crl::time(600);
 constexpr auto kWavePower = 2.4;
 constexpr auto kWaveGlowAlpha = 0.38;
 constexpr auto kWaveTintMix = 0.55;
+// Qt's flattened circle strays from the true one by less than this
+constexpr auto kCircleSlack = 1.;
+constexpr auto kCircleSlackPerRadius = 0.001;
 constexpr auto kDipDuration = crl::time(360);
 constexpr auto kDipDepth = 0.03;
 constexpr auto kFinderSize = 7;
@@ -526,9 +529,51 @@ void PaintAppearanceGradient(
 		* (1. - std::pow(1. - progress, kWavePower));
 }
 
+enum class WaveSide {
+	Outside,
+	Inside,
+	Edge,
+};
+
+[[nodiscard]] WaveSide CircleSide(
+		QPointF center,
+		float64 radius,
+		const std::vector<QRect> &parts) {
+	const auto slack = kCircleSlack + radius * kCircleSlackPerRadius;
+	auto inside = true;
+	auto outside = true;
+	for (const auto &part : parts) {
+		const auto box = QRectF(part);
+		const auto nearest = std::hypot(
+			std::max({ box.left() - center.x(), 0., center.x() - box.right() }),
+			std::max({ box.top() - center.y(), 0., center.y() - box.bottom() }));
+		const auto farthest = std::hypot(
+			std::max(
+				std::abs(box.left() - center.x()),
+				std::abs(box.right() - center.x())),
+			std::max(
+				std::abs(box.top() - center.y()),
+				std::abs(box.bottom() - center.y())));
+		inside = inside && (farthest <= radius - slack);
+		outside = outside && (nearest >= radius + slack);
+	}
+	return inside
+		? WaveSide::Inside
+		: outside
+		? WaveSide::Outside
+		: WaveSide::Edge;
+}
+
+[[nodiscard]] bool MeetsCorner(const QRect &box, const QRect &area) {
+	const auto radius = st::boxRadius;
+	return !box.marginsRemoved({ radius, 0, radius, 0 }).contains(area)
+		&& !box.marginsRemoved({ 0, radius, 0, radius }).contains(area);
+}
+
 void PaintWaveGlow(
 		QPainter &p,
 		const QRect &rect,
+		const QRect &area,
 		QPointF center,
 		float64 radius,
 		float64 progress,
@@ -559,13 +604,32 @@ void PaintWaveGlow(
 	const auto bounds = QRectF(
 		center - QPointF(outer, outer),
 		QSizeF(2. * outer, 2. * outer));
+	const auto fill = bounds.intersected(QRectF(area));
+	auto hq = PainterHighQualityEnabler(p);
+	if (!MeetsCorner(rect, area)) {
+		p.fillRect(fill, gradient);
+		return;
+	}
 	auto rounded = QPainterPath();
 	rounded.addRoundedRect(QRectF(rect), st::boxRadius, st::boxRadius);
-	auto hq = PainterHighQualityEnabler(p);
 	p.save();
-	p.setClipPath(rounded);
-	p.fillRect(bounds.intersected(QRectF(rect)), gradient);
+	p.setClipPath(rounded, Qt::IntersectClip);
+	p.fillRect(fill, gradient);
 	p.restore();
+}
+
+void ClipOutside(
+		QPainter &p,
+		const QRectF &area,
+		const QPainterPath &shapes) {
+	if (shapes.isEmpty()) {
+		return;
+	}
+	auto outside = QPainterPath();
+	outside.setFillRule(Qt::OddEvenFill);
+	outside.addRect(area);
+	outside.addPath(shapes);
+	p.setClipPath(outside, Qt::IntersectClip);
 }
 
 [[nodiscard]] PlaneState ComputePlaneState(
@@ -894,6 +958,23 @@ struct PeerQrSurface::Countdown {
 	std::vector<std::unique_ptr<AnimatedString>> glyphs;
 };
 
+struct PeerQrSurface::Control {
+	base::weak_qptr<QWidget> widget;
+	Fn<QPainterPath()> shape;
+	Fn<float64()> opacity;
+};
+
+struct PeerQrSurface::ControlShapes {
+	struct Fading {
+		QPainterPath path;
+		QPainterPath shown;
+		std::vector<QRect> parts;
+		float64 opacity = 0.;
+	};
+	QPainterPath shown;
+	std::vector<Fading> fading;
+};
+
 int PeerQrCardHeight(int cardWidth, bool withUsername) {
 	return ComputeCardLayout(cardWidth, withUsername).size.height();
 }
@@ -1006,7 +1087,7 @@ PeerQrSurface::PeerQrSurface(
 		_giftField = std::make_unique<PeerQrGiftField>(
 			_giftSource,
 			_appearance.gift,
-			crl::guard(this, [=] { update(); }),
+			crl::guard(this, [=] { updateField(); }),
 			true);
 	}
 }
@@ -1132,14 +1213,20 @@ void PeerQrSurface::setAppearance(
 		return;
 	}
 	const auto wave = animatedNow && !_cardGeometry.isEmpty();
-	auto from = wave ? currentPicture(now) : QImage();
+	auto from = wave ? currentPicture(now, false) : QImage();
+	auto clean = (wave && _wave && !_wave->clean.isNull())
+		? currentPicture(now, true)
+		: QImage();
 	if (wave && (_fieldLeaving || _giftLeaving)) {
+		if (clean.isNull()) {
+			clean = from;
+		}
 		auto p = QPainter(&from);
 		if (_fieldLeaving) {
-			paintField(p, now);
+			paintField(p, now, QPainterPath());
 		}
 		if (_giftLeaving) {
-			paintGift(p, _giftLeaving.get(), now, true);
+			paintGift(p, _giftLeaving.get(), now, true, QPainterPath());
 		}
 		p.end();
 		if (base::take(_fieldLeaving)) {
@@ -1178,7 +1265,7 @@ void PeerQrSurface::setAppearance(
 		_giftField = std::make_unique<PeerQrGiftField>(
 			_giftSource,
 			_appearance.gift,
-			crl::guard(this, [=] { update(); }),
+			crl::guard(this, [=] { updateField(); }),
 			!wave);
 		_entryPending = _entryPending || wave;
 		checkAnimation();
@@ -1199,6 +1286,7 @@ void PeerQrSurface::setAppearance(
 	const auto center = cardRect().center();
 	_wave = Wave{
 		.from = std::move(from),
+		.clean = std::move(clean),
 		.colorsFrom = _shownColors,
 		.tint = ComputeWaveTint(_appearance),
 		.center = center,
@@ -1334,14 +1422,29 @@ PeerQrImageArgs PeerQrSurface::prepareImage() const {
 	};
 }
 
+void PeerQrSurface::addControl(
+		not_null<QWidget*> control,
+		Fn<QPainterPath()> shape,
+		Fn<float64()> opacity) {
+	Expects(control->parentWidget() == this);
+
+	_controls.push_back({
+		.widget = base::make_weak(control),
+		.shape = std::move(shape),
+		.opacity = std::move(opacity),
+	});
+	update();
+}
+
 void PeerQrSurface::paintEvent(QPaintEvent *e) {
 	const auto now = crl::now();
 	if (backgroundStale()) {
 		requestBackground();
 	}
+	const auto controls = controlShapes(e->rect());
 	auto p = QPainter(this);
 	if (_wave) {
-		paintWave(p, now);
+		paintWave(p, now, controls.shown);
 	} else {
 		p.drawImage(0, 0, _background);
 	}
@@ -1351,15 +1454,8 @@ void PeerQrSurface::paintEvent(QPaintEvent *e) {
 	if (layerShown()) {
 		_layer.advance(now, fieldElapsed(now), st::peerQrDriftSpeed);
 	}
-	if (_field) {
-		paintField(p, now);
-	}
-	if (_giftLeaving) {
-		paintGift(p, _giftLeaving.get(), now, true);
-	}
-	if (_giftField) {
-		paintGift(p, _giftField.get(), now, false);
-	}
+	paintLayers(p, now, controls.shown);
+	paintFadingUnderlays(p, now, controls);
 	const auto still = anim::Disabled();
 	const auto elapsed = (_startedAt > 0) ? (now - _startedAt) : 0;
 	auto frame = still
@@ -1574,7 +1670,7 @@ bool PeerQrSurface::animationCallback(crl::time now) {
 		|| (layerShown() && _layer.animating());
 	const auto refresh = [&](QRect region) {
 		if (whole) {
-			update();
+			updateField();
 		} else {
 			update(region);
 		}
@@ -1658,6 +1754,28 @@ void PeerQrSurface::applyBackground(QImage image) {
 		_background.setDevicePixelRatio(ratio);
 	}
 	update();
+}
+
+void PeerQrSurface::setCovered(Fn<QRegion()> covered) {
+	_covered = std::move(covered);
+	update();
+}
+
+QRegion PeerQrSurface::covered() const {
+	return _covered ? _covered() : QRegion();
+}
+
+void PeerQrSurface::updateField() {
+	if (_wave) {
+		update();
+		return;
+	}
+	const auto region = covered();
+	if (region.isEmpty()) {
+		update();
+	} else {
+		update(QRegion(rect()) - region);
+	}
 }
 
 QRectF PeerQrSurface::cardRect() const {
@@ -1847,7 +1965,7 @@ void PeerQrSurface::ensureField() {
 	}
 	_field = std::make_unique<PeerQrEmojiField>(
 		_emojiSource,
-		crl::guard(this, [=] { update(); }));
+		crl::guard(this, [=] { updateField(); }));
 	_field->setTextColor(_colors.foreground);
 	checkAnimation();
 }
@@ -1884,6 +2002,61 @@ bool PeerQrSurface::layerShown() const {
 	return (_field && !_fieldLeaving) || (_giftField != nullptr);
 }
 
+PeerQrSurface::ControlShapes PeerQrSurface::controlShapes(QRect clip) const {
+	auto result = ControlShapes();
+	auto shown = std::vector<QPainterPath>();
+	for (const auto &control : _controls) {
+		const auto widget = control.widget.get();
+		if (!widget || widget->isHidden()) {
+			continue;
+		}
+		const auto opacity = control.opacity ? control.opacity() : 1.;
+		if (opacity <= 0.) {
+			continue;
+		}
+		auto shape = control.shape();
+		if (shape.isEmpty()) {
+			continue;
+		}
+		shape.translate(widget->pos());
+		if (!shape.boundingRect().intersects(QRectF(clip))) {
+			continue;
+		}
+		if (!control.opacity) {
+			result.shown.addPath(shape);
+			shown.push_back(std::move(shape));
+			continue;
+		}
+		const auto part = shape.boundingRect().toAlignedRect();
+		const auto i = ranges::find(
+			result.fading,
+			opacity,
+			&ControlShapes::Fading::opacity);
+		if (i != end(result.fading)) {
+			i->path.addPath(shape);
+			i->parts.push_back(part);
+		} else {
+			result.fading.push_back({
+				.path = std::move(shape),
+				.parts = { part },
+				.opacity = opacity,
+			});
+		}
+	}
+	for (auto &fading : result.fading) {
+		for (const auto &shape : shown) {
+			const auto bounds = shape.boundingRect().toAlignedRect();
+			const auto meets = [&](QRect part) {
+				return part.intersects(bounds);
+			};
+			if (ranges::any_of(fading.parts, meets)) {
+				fading.shown.addPath(shape);
+			}
+		}
+	}
+	return result;
+}
+
 QPainterPath PeerQrSurface::fieldClip(crl::time now, bool leaving) const {
 	auto result = QPainterPath();
 	result.addRoundedRect(QRectF(rect()), st::boxRadius, st::boxRadius);
@@ -1911,10 +2084,35 @@ PeerQrEmojiPaint PeerQrSurface::fieldArgs(crl::time now) const {
 	};
 }
 
-void PeerQrSurface::paintField(QPainter &p, crl::time now) {
+void PeerQrSurface::clipField(
+		QPainter &p,
+		crl::time now,
+		bool leaving,
+		const QPainterPath &shown) const {
+	auto clip = fieldClip(now, leaving);
+	if (!shown.isEmpty()) {
+		const auto radius = float64(st::boxRadius);
+		const auto inner = QRectF(rect()).marginsRemoved(
+			{ radius, radius, radius, radius });
+		// WHY: the shapes become even-odd holes in the field's own clip, which
+		// needs them off its rounded corners; a leaving layer's clip has the
+		// wave circle cut out, where such a hole would turn back into field.
+		if ((leaving && _wave) || !inner.contains(shown.boundingRect())) {
+			ClipOutside(p, QRectF(rect()), shown);
+		} else {
+			clip.addPath(shown);
+		}
+	}
+	p.setClipPath(clip, Qt::IntersectClip);
+}
+
+void PeerQrSurface::paintField(
+		QPainter &p,
+		crl::time now,
+		const QPainterPath &shown) {
 	auto hq = PainterHighQualityEnabler(p);
 	p.save();
-	p.setClipPath(fieldClip(now, _fieldLeaving));
+	clipField(p, now, _fieldLeaving, shown);
 	_field->paint(p, fieldArgs(now));
 	p.restore();
 }
@@ -1923,14 +2121,59 @@ void PeerQrSurface::paintGift(
 		QPainter &p,
 		not_null<PeerQrGiftField*> field,
 		crl::time now,
-		bool leaving) {
+		bool leaving,
+		const QPainterPath &shown) {
 	auto args = fieldArgs(now);
 	args.paused = PowerSaving::On(PowerSaving::kStickersChat);
 	auto hq = PainterHighQualityEnabler(p);
 	p.save();
-	p.setClipPath(fieldClip(now, leaving));
+	clipField(p, now, leaving, shown);
 	field->paint(p, args);
 	p.restore();
+}
+
+void PeerQrSurface::paintLayers(
+		QPainter &p,
+		crl::time now,
+		const QPainterPath &shown) {
+	if (_field) {
+		paintField(p, now, shown);
+	}
+	if (_giftLeaving) {
+		paintGift(p, _giftLeaving.get(), now, true, shown);
+	}
+	if (_giftField) {
+		paintGift(p, _giftField.get(), now, false, shown);
+	}
+}
+
+void PeerQrSurface::paintFadingUnderlays(
+		QPainter &p,
+		crl::time now,
+		const ControlShapes &controls) const {
+	const auto behind = _field
+		|| _giftLeaving
+		|| _giftField
+		|| (_wave && !_wave->clean.isNull());
+	if (controls.fading.empty() || !behind) {
+		return;
+	}
+	const auto tint = _shownColors.control.alphaF();
+	auto hq = PainterHighQualityEnabler(p);
+	for (const auto &fading : controls.fading) {
+		const auto area = fading.path.boundingRect().toAlignedRect();
+		// WHY: the control paints its tint at opacity * tint alpha after this,
+		// so the clean backdrop goes once over the finished picture at the alpha
+		// that makes the backdrop and the tint fade together as one layer.
+		const auto alpha = fading.opacity * (1. - tint)
+			/ (1. - fading.opacity * tint);
+		p.save();
+		p.setClipPath(fading.path, Qt::IntersectClip);
+		ClipOutside(p, QRectF(area), fading.shown);
+		p.setOpacity(alpha);
+		paintClean(p, now, area, fading.parts);
+		p.restore();
+	}
 }
 
 void PeerQrSurface::startFieldEntry(crl::time now) {
@@ -1971,7 +2214,10 @@ void PeerQrSurface::updateWave(crl::time now) {
 		: MixColors(_wave->colorsFrom, _colors, blend));
 }
 
-void PeerQrSurface::paintWave(QPainter &p, crl::time now) const {
+void PeerQrSurface::paintWave(
+		QPainter &p,
+		crl::time now,
+		const QPainterPath &clean) const {
 	const auto &wave = *_wave;
 	const auto progress = std::clamp(
 		float64(now - wave.startedAt) / kWaveDuration,
@@ -1979,10 +2225,16 @@ void PeerQrSurface::paintWave(QPainter &p, crl::time now) const {
 		1.);
 	const auto radius = WaveRadius(wave.farthest, progress);
 	if (radius < wave.farthest) {
+		auto hq = PainterHighQualityEnabler(p);
 		p.drawImage(0, 0, wave.from);
+		if (!wave.clean.isNull() && !clean.isEmpty()) {
+			p.save();
+			p.setClipPath(clean, Qt::IntersectClip);
+			p.drawImage(0, 0, wave.clean);
+			p.restore();
+		}
 		auto circle = QPainterPath();
 		circle.addEllipse(wave.center, radius, radius);
-		auto hq = PainterHighQualityEnabler(p);
 		p.save();
 		p.setClipPath(circle);
 		p.drawImage(0, 0, _background);
@@ -1990,10 +2242,50 @@ void PeerQrSurface::paintWave(QPainter &p, crl::time now) const {
 	} else {
 		p.drawImage(0, 0, _background);
 	}
-	PaintWaveGlow(p, rect(), wave.center, radius, progress, wave.tint);
+	PaintWaveGlow(p, rect(), rect(), wave.center, radius, progress, wave.tint);
 }
 
-QImage PeerQrSurface::currentPicture(crl::time now) const {
+void PeerQrSurface::paintClean(
+		QPainter &p,
+		crl::time now,
+		QRect area,
+		const std::vector<QRect> &parts) const {
+	if (!_wave) {
+		p.drawImage(0, 0, _background);
+		return;
+	}
+	const auto &wave = *_wave;
+	const auto progress = std::clamp(
+		float64(now - wave.startedAt) / kWaveDuration,
+		0.,
+		1.);
+	const auto radius = WaveRadius(wave.farthest, progress);
+	const auto &old = wave.clean.isNull() ? wave.from : wave.clean;
+	const auto side = (radius < wave.farthest)
+		? CircleSide(wave.center, radius, parts)
+		: WaveSide::Inside;
+	if (side == WaveSide::Inside) {
+		p.drawImage(0, 0, _background);
+	} else if (side == WaveSide::Outside) {
+		p.drawImage(0, 0, old);
+	} else {
+		auto circle = QPainterPath();
+		circle.addEllipse(wave.center, radius, radius);
+		p.save();
+		// each pixel gets exactly one of the two pictures
+		p.setRenderHint(QPainter::Antialiasing, false);
+		p.save();
+		ClipOutside(p, QRectF(area), circle);
+		p.drawImage(0, 0, old);
+		p.restore();
+		p.setClipPath(circle, Qt::IntersectClip);
+		p.drawImage(0, 0, _background);
+		p.restore();
+	}
+	PaintWaveGlow(p, rect(), area, wave.center, radius, progress, wave.tint);
+}
+
+QImage PeerQrSurface::currentPicture(crl::time now, bool clean) const {
 	if (!_wave) {
 		return _background;
 	}
@@ -2001,8 +2293,12 @@ QImage PeerQrSurface::currentPicture(crl::time now) const {
 	auto result = QImage(size() * ratio, QImage::Format_ARGB32_Premultiplied);
 	result.setDevicePixelRatio(ratio);
 	result.fill(Qt::transparent);
+	auto area = QPainterPath();
+	if (clean) {
+		area.addRect(QRectF(rect()));
+	}
 	auto p = QPainter(&result);
-	paintWave(p, now);
+	paintWave(p, now, area);
 	p.end();
 	return result;
 }
