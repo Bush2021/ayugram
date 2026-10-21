@@ -583,6 +583,31 @@ bool OpenTonConnectQuery(
 	return true;
 }
 
+bool ResolveContactToken(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto token = params.value(u"token"_q);
+	if (token.isEmpty()) {
+		controller->showToast(tr::lng_contact_link_invalid(tr::now));
+		return true;
+	}
+	const auto myContext = context.value<ClickHandlerContext>();
+	controller->window().activate();
+	controller->showPeerByLink(Window::PeerByLinkInfo{
+		.contactToken = token,
+		.noPaidToken = params.value(u"free"_q),
+		.clickFromMessageId = myContext.itemId,
+	});
+	return true;
+}
+
 bool ResolveUsernameOrPhone(
 		Window::SessionController *controller,
 		const Match &match,
@@ -757,6 +782,7 @@ bool ResolveUsernameOrPhone(
 			: Window::RepliesByLinkInfo{ v::null },
 		.resolveType = resolveType,
 		.referral = referral,
+		.noPaidToken = params.value(u"free"_q),
 		.startToken = startToken,
 		.startAdminRights = adminRights,
 		.startAutoSubmit = myContext.botStartAutoSubmit,
@@ -1883,6 +1909,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolveUsernameOrPhone
 		},
 		{
+			u"^contact/?(?:\\?([^#]*))?(?:#.*)?$"_q,
+			ResolveContactToken
+		},
+		{
 			u"^privatepost/?\\?(.+)(#|$)"_q,
 			ResolvePrivatePost
 		},
@@ -2095,7 +2125,18 @@ QString TryConvertUrlToLocal(QString url) {
 	auto telegramMeMatch = regex_match(u"^(https?://)?(www\\.)?(telegram\\.(me|dog)|t\\.me)/(.+)$"_q, url, matchOptions);
 	if (telegramMeMatch) {
 		const auto query = telegramMeMatch->capturedView(5);
-		if (const auto phoneMatch = regex_match(u"^\\+([0-9]+)(\\?|$)"_q, query, matchOptions)) {
+		if (const auto contactMatch = regex_match(
+				u"^contact/([^?#]*)(?:\\?([^#]*))?(?:#.*)?$"_q,
+				query,
+				matchOptions)) {
+			const auto token = QUrl::fromPercentEncoding(
+				contactMatch->captured(1).toUtf8());
+			const auto encoded = QString::fromLatin1(
+				QUrl::toPercentEncoding(token, ":"));
+			const auto params = contactMatch->captured(2);
+			return u"tg://contact?token="_q + encoded
+				+ (params.isEmpty() ? QString() : '&' + params);
+		} else if (const auto phoneMatch = regex_match(u"^\\+([0-9]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto params = query.mid(phoneMatch->captured(0).size()).toString();
 			return u"tg://resolve?phone="_q + phoneMatch->captured(1) + (params.isEmpty() ? QString() : '&' + params);
 		} else if (const auto joinChatMatch = regex_match(u"^(joinchat/|\\+|\\%20)([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
@@ -2329,10 +2370,7 @@ bool StartUrlRequiresActivate(const QString &url) {
 void ResolveAndShowUniqueGift(
 		std::shared_ptr<ChatHelpers::Show> show,
 		const QString &slug,
-		::Settings::CreditsEntryBoxStyleOverrides st,
-		Fn<void(QString)> fail,
-		Fn<bool(const Data::StarGift &)> validate,
-		std::shared_ptr<const ::Settings::UniqueGiftCoverActions> actions) {
+		::Settings::CreditsEntryBoxStyleOverrides st) {
 	struct Request {
 		base::weak_ptr<Main::Session> weak;
 		QString slug;
@@ -2361,12 +2399,6 @@ void ResolveAndShowUniqueGift(
 		const auto &data = result.data();
 		session->data().processUsers(data.vusers());
 		if (const auto gift = Api::FromTL(session, data.vgift())) {
-			if (validate && !validate(*gift)) {
-				if (fail) {
-					fail(u"GIFT_ADDRESS_MISMATCH"_q);
-				}
-				return;
-			}
 			Core::App().hideMediaView();
 
 			using namespace ::Settings;
@@ -2376,16 +2408,12 @@ void ResolveAndShowUniqueGift(
 				*gift,
 				StarGiftResaleInfo(),
 				st,
-				actions));
+				nullptr));
 			show->activate();
-		} else if (fail) {
-			fail(u"RESPONSE_PARSE_FAILED"_q);
 		}
 	}).fail([=](const MTP::Error &error) {
 		clear();
-		if (fail) {
-			fail(error.type());
-		} else if (!Ui::ShowGiftErrorToast(show, error)) {
+		if (!Ui::ShowGiftErrorToast(show, error)) {
 			show->showToast(u"Error: "_q + error.type());
 		}
 	}).send();
@@ -2393,15 +2421,8 @@ void ResolveAndShowUniqueGift(
 
 void ResolveAndShowUniqueGift(
 		std::shared_ptr<ChatHelpers::Show> show,
-		const QString &slug,
-		Fn<void(QString)> fail,
-		Fn<bool(const Data::StarGift &)> validate) {
-	ResolveAndShowUniqueGift(
-		std::move(show),
-		slug,
-		{},
-		std::move(fail),
-		std::move(validate));
+		const QString &slug) {
+	ResolveAndShowUniqueGift(std::move(show), slug, {});
 }
 
 TimeId ParseVideoTimestamp(QStringView value) {

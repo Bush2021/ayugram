@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_key_modifiers.h"
 #include "base/algorithm.h"
 #include "base/options.h"
+#include "iv/iv_rich_page.h"
 #include "lang/lang_keys.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/effects/spoiler_mess.h"
@@ -113,6 +114,16 @@ base::options::toggle FastButtonsModeOption({
 		lt_task,
 		names.back(),
 		tr::marked);
+}
+
+[[nodiscard]] std::shared_ptr<const Iv::RichQuote> RichQuoteFromMTP(
+		not_null<Main::Session*> session,
+		const MTPVector<MTPRichText> &fragments,
+		tl::conditional<MTPint> offset) {
+	return Iv::ParseRichQuote(
+		session,
+		fragments,
+		offset ? std::make_optional(offset->v) : std::nullopt);
 }
 
 } // namespace
@@ -420,6 +431,7 @@ void HistoryMessageForwarded::create(
 ReplyFields ReplyFields::clone(not_null<HistoryItem*> parent) const {
 	return {
 		.quote = quote,
+		.richQuote = richQuote,
 		.externalMedia = (externalMedia
 			? externalMedia->clone(parent)
 			: nullptr),
@@ -435,6 +447,20 @@ ReplyFields ReplyFields::clone(not_null<HistoryItem*> parent) const {
 		.quoteOffset = quoteOffset,
 		.manualQuote = manualQuote,
 		.topicPost = topicPost,
+	};
+}
+
+const TextWithEntities &ReplyFields::displayQuote() const {
+	return richQuote ? richQuote->text : quote;
+}
+
+MessageHighlightId ReplyFields::highlight() const {
+	return {
+		.quote = manualQuote ? quote : TextWithEntities(),
+		.quoteOffset = int(quoteOffset),
+		.todoItemId = todoItemId,
+		.pollOption = pollOption,
+		.richQuote = manualQuote ? richQuote : nullptr,
 	};
 }
 
@@ -474,13 +500,22 @@ ReplyFields ReplyFieldsFromMTP(
 		if (const auto media = data.vreply_media()) {
 			result.externalMedia = HistoryItem::CreateMedia(item, *media);
 		}
-		result.quote = TextWithEntities{
-			qs(data.vquote_text().value_or_empty()),
-			Api::EntitiesFromMTP(
+		// WHY: the server rejects a flat copy of a rich quote, so the flat
+		// fields stay empty and replyTo() resends it only as richQuote.
+		if (const auto rich = data.vquote_rich()) {
+			result.richQuote = RichQuoteFromMTP(
 				&owner->session(),
-				data.vquote_entities().value_or_empty()),
-		};
-		result.quoteOffset = data.vquote_offset().value_or_empty();
+				*rich,
+				data.vquote_offset());
+		} else {
+			result.quote = TextWithEntities{
+				qs(data.vquote_text().value_or_empty()),
+				Api::EntitiesFromMTP(
+					&owner->session(),
+					data.vquote_entities().value_or_empty()),
+			};
+			result.quoteOffset = data.vquote_offset().value_or_empty();
+		}
 		result.manualQuote = data.is_quote() ? 1 : 0;
 		return result;
 	}, [&](const MTPDmessageReplyStoryHeader &data) {
@@ -508,13 +543,22 @@ FullReplyTo ReplyToFromMTP(
 			result.messageId.peer = parsed->id;
 		}
 		result.topicRootId = data.vtop_msg_id().value_or_empty();
-		result.quote = TextWithEntities{
-			qs(data.vquote_text().value_or_empty()),
-			Api::EntitiesFromMTP(
-				&history->session(),
-				data.vquote_entities().value_or_empty()),
-		};
-		result.quoteOffset = data.vquote_offset().value_or_empty();
+		if (const auto rich = data.vquote_rich()) {
+			if (!rich->v.isEmpty()) {
+				result.richQuote = RichQuoteFromMTP(
+					&history->session(),
+					*rich,
+					data.vquote_offset());
+			}
+		} else {
+			result.quote = TextWithEntities{
+				qs(data.vquote_text().value_or_empty()),
+				Api::EntitiesFromMTP(
+					&history->session(),
+					data.vquote_entities().value_or_empty()),
+			};
+			result.quoteOffset = data.vquote_offset().value_or_empty();
+		}
 		result.todoItemId = data.vtodo_item_id().value_or_empty();
 		result.pollOption = data.vpoll_option().value_or_empty();
 		return result;
@@ -595,7 +639,7 @@ void HistoryMessageReply::updateData(
 	}
 
 	const auto asExternal = displayAsExternal(holder);
-	const auto nonEmptyQuote = !_fields.quote.empty()
+	const auto nonEmptyQuote = !_fields.displayQuote().empty()
 		&& (asExternal || _fields.manualQuote);
 	_multiline = !_fields.storyId && (asExternal || nonEmptyQuote);
 

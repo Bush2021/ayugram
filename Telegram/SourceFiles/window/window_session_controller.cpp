@@ -117,6 +117,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_account.h"
 #include "window/themes/window_theme.h"
 #include "window/themes/window_themes_chat.h"
+#include "window/window_no_paid_token.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller_link_info.h"
 #include "settings/cloud_password/settings_cloud_password_input.h"
@@ -430,9 +431,21 @@ bool SessionNavigation::showFrozenError() {
 
 void SessionNavigation::showPeerByLink(const PeerByLinkInfo &info) {
 	Core::App().hideMediaView();
+	if (!info.contactToken.isEmpty()) {
+		_api.request(base::take(_resolveRequestId)).cancel();
+		resolveContactToken(info.contactToken, [=](not_null<PeerData*> peer) {
+			ApplyNoPaidToken(this, peer, info.noPaidToken, [=] {
+				showPeerByLinkResolved(peer, info);
+			});
+		});
+		return;
+	}
+	cancelContactTokenResolve();
 	if (!info.phone.isEmpty()) {
 		resolvePhone(info.phone, [=](not_null<PeerData*> peer) {
-			showPeerByLinkResolved(peer, info);
+			ApplyNoPaidToken(this, peer, info.noPaidToken, [=] {
+				showPeerByLinkResolved(peer, info);
+			});
 		});
 	} else if (!info.chatLinkSlug.isEmpty()) {
 		resolveChatLink(info.chatLinkSlug, [=](
@@ -443,16 +456,18 @@ void SessionNavigation::showPeerByLink(const PeerByLinkInfo &info) {
 		});
 	} else if (const auto name = std::get_if<QString>(&info.usernameOrId)) {
 		resolveUsername(*name, [=](not_null<PeerData*> peer) {
-			if (info.startAutoSubmit) {
-				peer->session().api().blockedPeers().unblock(
-					peer,
-					[=](bool) { showPeerByLinkResolved(peer, info); },
-					true);
-			} else if (info.joinChannel && peer->isChannel()) {
-				peer->session().api().joinChannel(peer->asChannel());
-			} else {
-				showPeerByLinkResolved(peer, info);
-			}
+			ApplyNoPaidToken(this, peer, info.noPaidToken, [=] {
+				if (info.startAutoSubmit) {
+					peer->session().api().blockedPeers().unblock(
+						peer,
+						[=](bool) { showPeerByLinkResolved(peer, info); },
+						true);
+				} else if (info.joinChannel && peer->isChannel()) {
+					peer->session().api().joinChannel(peer->asChannel());
+				} else {
+					showPeerByLinkResolved(peer, info);
+				}
+			});
 		}, info.referral);
 	} else if (const auto id = std::get_if<ChannelId>(&info.usernameOrId)) {
 		resolveChannelById(*id, [=](not_null<ChannelData*> channel) {
@@ -2472,7 +2487,8 @@ bool SessionController::switchInlineQuery(
 		Ui::kQFixedMax
 	};
 	if (to.currentReplyTo.messageId.msg == to.currentReplyTo.topicRootId
-		&& to.currentReplyTo.quote.empty()) {
+		&& to.currentReplyTo.quote.empty()
+		&& !to.currentReplyTo.richQuote) {
 		to.currentReplyTo.messageId.msg = MsgId();
 	}
 	if (!history->suggestDraftAllowed()) {

@@ -851,8 +851,9 @@ void HistoryInner::setupSwipeReplyAndBack() {
 					.messageId = exact->fullId(),
 					.quote = selected.highlight.quote,
 					.quoteOffset = selected.highlight.quoteOffset,
+					.richQuote = selected.highlight.richQuote,
 				});
-				if (!selected.highlight.quote.empty()) {
+				if (selected) {
 					_widget->clearSelected();
 				}
 			};
@@ -2863,7 +2864,7 @@ HistoryView::SelectedQuote HistoryInner::selectedQuote(
 	if (!view) {
 		return {};
 	}
-	return view->selectedQuote(_selectedTextSelection);
+	return view->selectedReplyQuote(_selectedTextSelection);
 }
 
 void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
@@ -3415,8 +3416,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					.quote = selected.highlight.quote,
 					.quoteOffset = selected.highlight.quoteOffset,
 					.todoItemId = todoListTaskId,
+					.richQuote = selected.highlight.richQuote,
 				});
-				if (!selected.highlight.quote.empty()) {
+				if (selected) {
 					_widget->clearSelected();
 				}
 			}, &st::menuIconReply);
@@ -6051,6 +6053,10 @@ void HistoryInner::refreshAboutView(bool force) {
 				|| user->isFullLoaded()) {
 				refresh();
 			} else {
+				if (force && _aboutView) {
+					_aboutView = nullptr;
+					updateSize();
+				}
 				session().api().requestFullPeer(user);
 			}
 		}

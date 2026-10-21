@@ -11,6 +11,7 @@ using "boxes/boxes.style";
 using "ui/controls/userpic_button.style";
 using "ui/widgets/widgets.style";
 using "ui/chat/chat.style"; // GroupCallUserpics.
+using "chat_helpers/chat_helpers.style"; // EmojiPan.
 using "dialogs/dialogs.style"; // dialogsDateFont.
 
 InfoToggle {
@@ -1365,3 +1366,30 @@ memberTagPillPadding: margins(5px, -1px, 5px, 0px);
 
 infoSecurityRiskIconSize: 16px;
 infoSecurityRiskIconMargin: margins(0px, 2px, 0px, 0px);
+
+peerQrEmojiPan: EmojiPan(statusEmojiPan) {
+	bg: transparent;
+	categoriesBg: transparent;
+	fadeLeft: icon {{ "fade_horizontal-flip_horizontal", transparent }};
+	fadeRight: icon {{ "fade_horizontal", transparent }};
+	search: TabbedSearch(defaultTabbedSearch) {
+		outer: transparent;
+		fadeLeft: icon {{ "fade_horizontal-flip_horizontal", transparent }};
+		fadeRight: icon {{ "fade_horizontal", transparent }};
+		back: IconButton(defaultTabbedSearchBack) {
+			icon: icon{{ "emoji/emoji_back", emojiSubIconFgActive }};
+			iconOver: icon{{ "emoji/emoji_back", emojiSubIconFgActive }};
+		}
+	}
+	photoButtonIcon: icon {{ "photo_editor/camera-24x24", windowFg }};
+	audioButtonIcon: icon {{ "photo_editor/widget_music", windowFg }};
+	linkButtonIcon: icon {{ "limits/links", windowFg }};
+}
+peerQrEmojiBadgeSize: 14px;
+peerQrEmojiBadgeInset: 6px;
+peerQrEmojiBadgeFont: font(11px semibold);
+peerQrEmojiStripHeight: 44px;
+peerQrEmojiStripSkip: 34px;
+peerQrEmojiStripSize: 26px;
+peerQrEmojiStripPadding: 9px;
+peerQrEmojiStripBottom: 18px;

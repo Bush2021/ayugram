@@ -512,7 +512,7 @@ EmojiListWidget::EmojiListWidget(
 , _freeEffects(std::move(descriptor.freeEffects))
 , _customTextColor(std::move(descriptor.customTextColor))
 , _overBg(st::emojiPanRadius, st().overBg)
-, _markedBg(st::emojiPanRadius, st::stickersEmojiPickerSelectedBg)
+, _markedBg(st::emojiPanRadius, st().markedBg)
 , _premiumMark(std::make_unique<StickerPremiumMark>(
 	&session(),
 	st::emojiPremiumLock))
@@ -615,8 +615,22 @@ EmojiListWidget::EmojiListWidget(
 		Data::AmPremiumValue(&session()),
 		session().premiumPossibleValue()
 	) | rpl::skip(1) | rpl::on_next([=] {
+		if (_features.allCustomEmojiPremium) {
+			const auto required = !session().premium();
+			for (const auto sets : { &_searchSets, &_searchShortcutSets }) {
+				for (auto &set : *sets) {
+					if (set.premiumRequired != required) {
+						set.premiumRequired = required;
+						set.ripple.reset();
+					}
+				}
+			}
+		}
 		refreshCustom();
 		resizeToWidth(width());
+		if (_features.allCustomEmojiPremium) {
+			updateSelected();
+		}
 	}, lifetime());
 
 	rpl::single(
@@ -657,6 +671,12 @@ void EmojiListWidget::setupSearch() {
 void EmojiListWidget::setSearchRightReserved(int value) {
 	if (_search) {
 		_search->setRightReserved(value);
+	}
+}
+
+void EmojiListWidget::refreshSearchColors() {
+	if (_search) {
+		_search->refreshColors();
 	}
 }
 
@@ -1250,6 +1270,8 @@ bool EmojiListWidget::addSearchShortcut(not_null<Data::StickersSet*> set) {
 		.title = set->title,
 		.list = std::move(list),
 		.canRemove = installed,
+		.premiumRequired = _features.allCustomEmojiPremium
+			&& !session().premium(),
 	});
 	return true;
 }
@@ -1302,6 +1324,8 @@ void EmojiListWidget::fillSelectedSearchShortcut() {
 			set->count),
 		.list = std::move(list),
 		.canRemove = installed,
+		.premiumRequired = _features.allCustomEmojiPremium
+			&& !session().premium(),
 	});
 }
 
@@ -1488,6 +1512,12 @@ void EmojiListWidget::setMarkedCustomIds(base::flat_set<DocumentId> ids) {
 		_markedCustomIds = std::move(ids);
 		update();
 	}
+}
+
+void EmojiListWidget::setMarkedCustomPainter(
+		Fn<void(QPainter&, QRect, DocumentId)> painter) {
+	_markedCustomPainter = std::move(painter);
+	update();
 }
 
 void EmojiListWidget::repaintCustom(uint64 setId) {
@@ -2455,11 +2485,13 @@ void EmojiListWidget::paint(
 			}
 			const auto top = info.top + st().headerTop;
 			if (info.premiumRequired) {
-				st::emojiPremiumRequired.paint(
-					p,
-					st().headerLockLeft - st().margin.left(),
-					top,
-					width());
+				const auto &lock = st::emojiPremiumRequired;
+				const auto left = st().headerLockLeft - st().margin.left();
+				if (st().bg->c.alpha() > 0) {
+					lock.paint(p, left, top, width());
+				} else {
+					lock.paint(p, left, top, width(), st().headerFg->c);
+				}
 			}
 			const auto textBaseline = top + st::emojiPanHeaderFont->ascent;
 			p.setFont(st::emojiPanHeaderFont);
@@ -2572,6 +2604,12 @@ void EmojiListWidget::paint(
 						const auto set = info.section - _staticCount;
 						drawCustom(p, context, w, set, index);
 					}
+					if (marked && _markedCustomPainter && !_grabbingChosen) {
+						_markedCustomPainter(
+							p,
+							style::rtlrect(QRect(w, st::emojiPanArea), width()),
+							lookupCustomEmoji(index, info.section).document->id);
+					}
 				}
 			}
 		}
@@ -2600,13 +2638,24 @@ void EmojiListWidget::drawCollapsedBadge(
 	const auto buttonx = position.x() + (_singleSize.width() - buttonw) / 2;
 	const auto buttony = position.y() + (_singleSize.height() - buttonh) / 2;
 	const auto textOffset = (normal <= available) ? 0 : -st::lineWidth;
-	_collapsedBg.paint(p, QRect(buttonx, buttony, buttonw, buttonh));
-	p.setPen(this->st().bg);
-	p.setFont(st.style.font);
-	p.drawText(
-		buttonx + (buttonw - textWidth) / 2 + textOffset,
-		(buttony + st.textTop + st.style.font->ascent),
-		text);
+	const auto rect = QRect(buttonx, buttony, buttonw, buttonh);
+	const auto textLeft = buttonx + (buttonw - textWidth) / 2 + textOffset;
+	const auto textBaseline = buttony + st.textTop + st.style.font->ascent;
+	if (this->st().bg->c.alpha() > 0) {
+		_collapsedBg.paint(p, rect);
+		p.setPen(this->st().bg);
+		p.setFont(st.style.font);
+		p.drawText(textLeft, textBaseline, text);
+		return;
+	}
+	// A transparent panel has no colour to write the count in, so cut it out.
+	auto pill = QPainterPath();
+	pill.addRoundedRect(rect, st.height / 2, st.height / 2);
+	auto cut = QPainterPath();
+	cut.setFillRule(Qt::WindingFill);
+	cut.addText(textLeft, textBaseline, st.style.font, text);
+	auto hq = PainterHighQualityEnabler(p);
+	p.fillPath(pill.subtracted(cut), this->st().headerFg);
 }
 
 void EmojiListWidget::drawRecent(
@@ -3156,7 +3205,9 @@ QRect EmojiListWidget::colorButtonRect(const SectionInfo &info) const {
 bool EmojiListWidget::hasRemoveButton(int index) const {
 	if (_searchMode) {
 		if (index > 0 && index <= int(_searchSets.size())) {
-			return searchSetBySection(index).canRemove;
+			const auto &set = searchSetBySection(index);
+			return set.canRemove
+				&& !(_features.allCustomEmojiPremium && set.premiumRequired);
 		}
 		return false;
 	}
@@ -3217,6 +3268,21 @@ QRect EmojiListWidget::addButtonRect(int index) const {
 	return buttonRect(sectionInfo(index), _add);
 }
 
+bool EmojiListWidget::hasUnlockButton(int index) const {
+	if (_searchMode) {
+		if (index > 0 && index <= int(_searchSets.size())) {
+			return searchSetBySection(index).premiumRequired;
+		}
+		return false;
+	}
+	if (index < _staticCount
+		|| index >= _staticCount + _custom.size()) {
+		return false;
+	}
+	const auto &set = _custom[index - _staticCount];
+	return set.premiumRequired;
+}
+
 QRect EmojiListWidget::unlockButtonRect(int index) const {
 	Expects((_searchMode
 			&& index > 0
@@ -3264,6 +3330,9 @@ QRect EmojiListWidget::buttonRect(
 }
 
 auto EmojiListWidget::rightButton(int index) const -> const RightButton & {
+	if (_features.allCustomEmojiPremium && hasUnlockButton(index)) {
+		return _unlock;
+	}
 	if (_searchMode) {
 		Expects(index > 0 && index <= int(_searchSets.size()));
 
@@ -3493,11 +3562,13 @@ void EmojiListWidget::refreshCustom() {
 	auto old = base::take(_custom);
 	const auto session = &this->session();
 	const auto premiumPossible = session->premiumPossible();
-	const auto onlyUnicodeEmoji = _onlyUnicodeEmoji || !premiumPossible;
+	const auto allCustomEmojiPremium = _features.allCustomEmojiPremium;
+	const auto onlyUnicodeEmoji = _onlyUnicodeEmoji
+		|| (!allCustomEmojiPremium && !premiumPossible);
 	const auto premiumMayBeBought = (!onlyUnicodeEmoji)
-		&& premiumPossible
+		&& (allCustomEmojiPremium || premiumPossible)
 		&& !session->premium()
-		&& !_allowWithoutPremium;
+		&& (allCustomEmojiPremium || !_allowWithoutPremium);
 	const auto owner = &session->data();
 	const auto &sets = owner->stickers().sets();
 	const auto &settings = AyuSettings::getInstance();
@@ -3540,7 +3611,7 @@ void EmojiListWidget::refreshCustom() {
 		if (!megagroup && sortAsInstalled != installed) {
 			return;
 		}
-		auto premium = false;
+		auto premium = allCustomEmojiPremium;
 		const auto &list = it->second->stickers;
 		const auto i = ranges::find(old, setId, &CustomSet::id);
 		if (i != end(old)) {
@@ -3864,10 +3935,12 @@ std::vector<StickerIcon> EmojiListWidget::fillIcons() {
 		if (custom.id == Data::Stickers::MegagroupSetId) {
 			result.emplace_back(Data::Stickers::MegagroupSetId);
 			result.back().megagroup = _megagroupSet;
-			continue;
+		} else {
+			const auto set = custom.set;
+			result.emplace_back(set, custom.thumbnailDocument, esize, esize);
 		}
-		const auto set = custom.set;
-		result.emplace_back(set, custom.thumbnailDocument, esize, esize);
+		result.back().premiumRequired = _features.allCustomEmojiPremium
+			&& custom.premiumRequired;
 	}
 	return result;
 }

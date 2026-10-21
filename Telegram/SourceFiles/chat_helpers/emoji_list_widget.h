@@ -154,8 +154,11 @@ public:
 	void provideRecent(const std::vector<EmojiStatusId> &customRecentList);
 
 	void setMarkedCustomIds(base::flat_set<DocumentId> ids);
+	void setMarkedCustomPainter(
+		Fn<void(QPainter&, QRect, DocumentId)> painter);
 
 	void setSearchRightReserved(int value);
+	void refreshSearchColors();
 
 	void prepareExpanding();
 	void paintExpanding(
@@ -436,6 +439,7 @@ private:
 	[[nodiscard]] QRect removeButtonRect(const SectionInfo &info) const;
 	[[nodiscard]] bool hasAddButton(int index) const;
 	[[nodiscard]] QRect addButtonRect(int index) const;
+	[[nodiscard]] bool hasUnlockButton(int index) const;
 	[[nodiscard]] QRect unlockButtonRect(int index) const;
 	[[nodiscard]] bool hasButton(int index) const;
 	[[nodiscard]] QRect buttonRect(int index) const;
@@ -536,6 +540,7 @@ private:
 	Ui::RoundRect _overBg;
 	Ui::RoundRect _markedBg;
 	base::flat_set<DocumentId> _markedCustomIds;
+	Fn<void(QPainter&, QRect, DocumentId)> _markedCustomPainter;
 	QImage _searchExpandCache;
 
 	std::unique_ptr<StickerPremiumMark> _premiumMark;
