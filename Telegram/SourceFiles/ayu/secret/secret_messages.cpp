@@ -367,7 +367,8 @@ template <typename Data>
 			MTPVector<MTPMessageEntity>(), // quote_entities
 			MTPint(), // quote_offset
 			MTPint(), // todo_item_id
-			MTPbytes()); // poll_option
+			MTPbytes(), // poll_option
+			MTPVector<MTPRichText>()); // quote_rich
 	}
 	auto media = MediaFromRecord(session, record);
 	const auto flags = Flag::f_from_id
