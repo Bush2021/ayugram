@@ -175,7 +175,7 @@ void SendKeySequence(
 
 // Same name Qt uses for the native "Hide %1" / "Quit %1" items.
 [[nodiscard]] QString BundleApplicationName() {
-	const auto name = [[NSBundle mainBundle]
+	const id name = [[NSBundle mainBundle]
 		objectForInfoDictionaryKey:@"CFBundleName"];
 	return [name isKindOfClass:[NSString class]]
 		? QString::fromNSString(name)
@@ -219,7 +219,7 @@ bool Manager::clipboardHasText() {
 void Manager::retranslate() {
 	if (const auto loaderClass = NSClassFromString(@"QCocoaMenuLoader")) {
 		if ([loaderClass respondsToSelector:@selector(sharedMenuLoader)]) {
-			if (const auto loader = [loaderClass performSelector:@selector(sharedMenuLoader)]) {
+			if (const id loader = [loaderClass performSelector:@selector(sharedMenuLoader)]) {
 				if ([loader respondsToSelector:@selector(qtTranslateApplicationMenu)]) {
 					[loader performSelector:@selector(qtTranslateApplicationMenu)];
 				}
@@ -779,6 +779,8 @@ void Manager::buildWindowMenu(QMenu *window) {
 				w->widget()->showFromTray();
 			}
 		});
+
+	[NSApp setWindowsMenu:window->toNSMenu()];
 }
 
 void Manager::buildMenu() {
@@ -813,6 +815,7 @@ void Manager::create() {
 void Manager::destroy() {
 	_scheduledUpdate.reset();
 	_lifetime.destroy();
+	[NSApp setWindowsMenu:nil];
 	_menuBar.reset();
 	_file = _edit = _window = nullptr;
 	_languageBound = false;

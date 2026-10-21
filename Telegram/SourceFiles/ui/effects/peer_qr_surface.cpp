@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/effects/peer_qr_surface.h"
 
+#include "base/qt/qt_common_adapters.h"
 #include "base/weak_qptr.h"
 #include "qr/qr_generate.h"
 #include "ui/effects/animated_string.h"
@@ -336,6 +337,17 @@ struct BackgroundRequest {
 	return { text.left(best), text.mid(best) };
 }
 
+[[nodiscard]] bool LinesFit(
+		const QStringList &lines,
+		const QFontMetricsF &metrics,
+		int available,
+		int bandHeight) {
+	return (lines.size() * metrics.height() <= bandHeight)
+		&& ranges::all_of(lines, [&](const QString &line) {
+			return metrics.horizontalAdvance(line) <= available;
+		});
+}
+
 [[nodiscard]] UsernameFit FitUsername(
 		const QString &text,
 		int available,
@@ -345,22 +357,28 @@ struct BackgroundRequest {
 	if (text.isEmpty()) {
 		return {};
 	}
+	const auto single = QStringList{ text };
+	const auto fitsLine = [&](const QFont &font) {
+		return LinesFit(single, QFontMetricsF(font), available, bandHeight);
+	};
 	for (const auto &font : steps) {
-		const auto metrics = QFontMetricsF(font);
-		if (metrics.horizontalAdvance(text) <= available
-			&& metrics.height() <= bandHeight) {
-			return { .font = font, .lines = { text } };
+		if (fitsLine(font)) {
+			return { .font = font, .lines = single };
 		}
 	}
 	auto font = steps.back();
-	for (auto size = font.pixelSize(); ; --size) {
+	const auto small = font.pixelSize();
+	for (auto size = small - 1; size >= floorPixelSize; --size) {
+		font.setPixelSize(size);
+		if (fitsLine(font)) {
+			return { .font = font, .lines = single };
+		}
+	}
+	for (auto size = small; ; --size) {
 		font.setPixelSize(size);
 		const auto metrics = QFontMetricsF(font);
 		auto lines = SplitInTwoLines(text, metrics);
-		const auto fits = (2 * metrics.height() <= bandHeight)
-			&& ranges::all_of(lines, [&](const QString &line) {
-				return metrics.horizontalAdvance(line) <= available;
-			});
+		const auto fits = LinesFit(lines, metrics, available, bandHeight);
 		if (fits || size <= floorPixelSize) {
 			return { .font = font, .lines = std::move(lines) };
 		}
@@ -968,6 +986,7 @@ PeerQrSurface::PeerQrSurface(
 , _card(std::make_unique<Card>())
 , _corners(Images::CornersMask(st::boxRadius))
 , _animation([=](crl::time now) { return animationCallback(now); }) {
+	setAttribute(Qt::WA_AcceptTouchEvents);
 	sizeValue() | rpl::skip(1) | rpl::on_next([=] {
 		composeNow();
 	}, lifetime());
@@ -1227,6 +1246,10 @@ rpl::producer<PeerQrColors> PeerQrSurface::colorsValue() const {
 	return _colorsChanges.events_starting_with_copy(_shownColors);
 }
 
+rpl::producer<not_null<QTouchEvent*>> PeerQrSurface::touchPresses() const {
+	return _touchPresses.events();
+}
+
 PeerQrImageArgs PeerQrSurface::prepareImage() const {
 	const auto scaled = [](int value) {
 		const auto recovered = value * 100. / style::Scale();
@@ -1242,16 +1265,36 @@ PeerQrImageArgs PeerQrSurface::prepareImage() const {
 	};
 	const auto width = scaled(st::peerQrCardWidth);
 	const auto layout = ComputeCardLayout(width, !_username.isEmpty());
-	auto fit = FitUsername(
-		_username,
-		width - 2 * scaled(st::peerQrUsernameSkip),
-		layout.band.height(),
-		{
-			scaledFont(st::peerQrUsernameLarge),
-			scaledFont(st::peerQrUsernameMedium),
-			scaledFont(st::peerQrUsernameSmall),
-		},
-		scaled(st::peerQrUsernameMin));
+	const auto available = width - 2 * scaled(st::peerQrUsernameSkip);
+	auto fit = UsernameFit();
+	if (_cardGeometry.isEmpty()) {
+		fit = FitUsername(
+			_username,
+			available,
+			layout.band.height(),
+			{
+				scaledFont(st::peerQrUsernameLarge),
+				scaledFont(st::peerQrUsernameMedium),
+				scaledFont(st::peerQrUsernameSmall),
+			},
+			scaled(st::peerQrUsernameMin));
+	} else if (!_card->content.username.lines.isEmpty()) {
+		fit = _card->content.username;
+		// WHY: the image keeps the screen's lines, and Qt advances do not scale
+		// exactly, so a converted size that overflows shrinks until it fits.
+		for (auto pixels = scaled(fit.font.pixelSize()); ; --pixels) {
+			fit.font.setPixelSize(pixels);
+			const auto metrics = QFontMetricsF(fit.font);
+			const auto fits = LinesFit(
+				fit.lines,
+				metrics,
+				available,
+				layout.band.height());
+			if (fits || pixels <= 1) {
+				break;
+			}
+		}
+	}
 	return {
 		.appearance = _appearance,
 		.colors = _colors,
@@ -1391,10 +1434,31 @@ void PeerQrSurface::paintCountdown(QPainter &p) {
 	p.restore();
 }
 
+bool PeerQrSurface::eventHook(QEvent *e) {
+	const auto type = e->type();
+	if (type == QEvent::TouchBegin
+		|| type == QEvent::TouchUpdate
+		|| type == QEvent::TouchEnd
+		|| type == QEvent::TouchCancel) {
+		const auto touch = static_cast<QTouchEvent*>(e);
+		const auto device = touch->device();
+		if (device
+			&& device->type() == base::TouchDevice::TouchScreen
+			&& handleTouch(touch)) {
+			touch->accept();
+			return true;
+		}
+	} else if (type == QEvent::WindowDeactivate) {
+		stopTouchSwipe();
+	}
+	return RpWidget::eventHook(e);
+}
+
 void PeerQrSurface::mousePressEvent(QMouseEvent *e) {
 	if (e->button() == Qt::LeftButton
 		&& layerShown()
-		&& !cardRect().contains(QPointF(e->pos()))) {
+		&& !cardRect().contains(QPointF(e->pos()))
+		&& !_touchId) {
 		_layer.press(e->pos(), crl::now());
 	} else {
 		e->ignore();
@@ -1402,7 +1466,7 @@ void PeerQrSurface::mousePressEvent(QMouseEvent *e) {
 }
 
 void PeerQrSurface::mouseMoveEvent(QMouseEvent *e) {
-	if (_layer.pressed()) {
+	if (_layer.pressed() && !_touchId) {
 		_layer.move(e->pos(), crl::now());
 		update();
 	} else {
@@ -1411,12 +1475,77 @@ void PeerQrSurface::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void PeerQrSurface::mouseReleaseEvent(QMouseEvent *e) {
-	if (e->button() == Qt::LeftButton && _layer.pressed()) {
+	if (e->button() == Qt::LeftButton && _layer.pressed() && !_touchId) {
 		_layer.release(crl::now(), !anim::Disabled());
 		checkAnimation();
 		update();
 	} else {
 		e->ignore();
+	}
+}
+
+bool PeerQrSurface::handleTouch(not_null<QTouchEvent*> e) {
+	const auto &points = e->touchPoints();
+	switch (e->type()) {
+	case QEvent::TouchBegin: {
+		stopTouchSwipe();
+		_touchId = std::nullopt;
+		if (points.isEmpty() || !layerShown() || _layer.pressed()) {
+			return false;
+		}
+		const auto &point = points.front();
+		const auto position = point.pos();
+		if (cardRect().contains(position) || childAt(position.toPoint())) {
+			return false;
+		}
+		_touchId = point.id();
+		_layer.press(position, crl::now());
+		_touchPresses.fire_copy(e);
+		return true;
+	}
+	case QEvent::TouchUpdate:
+	case QEvent::TouchEnd: {
+		if (!_touchId) {
+			return false;
+		}
+		const auto i = ranges::find(
+			points,
+			*_touchId,
+			&QTouchEvent::TouchPoint::id);
+		if (i != points.end() && _layer.pressed()) {
+			const auto state = int(i->state());
+			if (state == int(Qt::TouchPointMoved)) {
+				_layer.move(i->pos(), crl::now());
+				update();
+			} else if (state == int(Qt::TouchPointReleased)) {
+				_layer.release(crl::now(), !anim::Disabled());
+				checkAnimation();
+				update();
+			}
+		}
+		if (e->type() == QEvent::TouchEnd) {
+			stopTouchSwipe();
+			_touchId = std::nullopt;
+		}
+		// Qt synthesizes mouse events from any touch event left unaccepted.
+		return true;
+	}
+	case QEvent::TouchCancel:
+		if (!_touchId) {
+			return false;
+		}
+		stopTouchSwipe();
+		_touchId = std::nullopt;
+		return true;
+	default:
+		return false;
+	}
+}
+
+void PeerQrSurface::stopTouchSwipe() {
+	if (_touchId && _layer.pressed()) {
+		_layer.release(crl::now(), false);
+		update();
 	}
 }
 
