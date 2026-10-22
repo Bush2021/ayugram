@@ -12,6 +12,7 @@ should call.
 | [test_agent](test_agent.md) | API | Runtime gate, startup overrides and fixture access |
 | [test_runner](test_runner.md) | API | Stages, bounded readiness and exact-object actions |
 | [test_gated_stage](test_gated_stage.md) | Self-test | Self-test for explicit gated skips |
+| [test_session_gate](test_session_gate.md) | API | Test-account gate, switching, restoration and explicit production legs |
 | [test_log](test_log.md) | API | Evidence logs, assertions and telemetry formatting |
 | [test_log_lines](test_log_lines.md) | Self-test | Self-test for one physical record per log call |
 | [test_text_reads](test_text_reads.md) | API | Space-normalized text assertions |
@@ -34,6 +35,7 @@ should call.
 | [test_via_window](test_via_window.md) | Self-test | Self-test for window-mapped captures |
 | [test_toast_capture](test_toast_capture.md) | API | Isolated toast-subtree captures |
 | [test_hover](test_hover.md) | Self-test | Self-test for click/drag hover cleanup |
+| [test_press_origin](test_press_origin.md) | Self-test | Self-test for press-point ripple origins |
 | [test_activation](test_activation.md) | Self-test | Self-test for injected window activation |
 | [test_box_button](test_box_button.md) | API | Resolve and click shell footer buttons |
 | [test_ink](test_ink.md) | API | Painted bands, ink, color and contrast measurements |

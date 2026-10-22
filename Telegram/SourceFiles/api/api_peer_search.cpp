@@ -21,6 +21,7 @@ namespace Api {
 namespace {
 
 constexpr auto kMinSponsoredQueryLength = 4;
+constexpr auto kTypedLimit = 50;
 
 } // namespace
 
@@ -71,17 +72,16 @@ void PeerSearch::request(
 	const auto requestedBefore = cache.requested;
 	cache.requested = true;
 	cache.result.query = _query;
-	if (_query.size() < kMinSponsoredQueryLength) {
+	if (_type != Type::WithSponsored
+		|| _query.size() < kMinSponsoredQueryLength) {
 		cache.sponsoredReady = true;
 		cache.sponsoredMode = adsMode;
-	} else if (_type == Type::WithSponsored) {
-		if (settings.disableAdsStrictly()) {
-			cache.sponsoredReady = true;
-			cache.sponsoredMode = AdsMode::Strict;
-			cache.result.sponsored.clear();
-		} else if (!cache.sponsoredReady || needsSponsoredRefresh) {
-			requestSponsored();
-		}
+	} else if (settings.disableAdsStrictly()) {
+		cache.sponsoredReady = true;
+		cache.sponsoredMode = AdsMode::Strict;
+		cache.result.sponsored.clear();
+	} else if (!cache.sponsoredReady || needsSponsoredRefresh) {
+		requestSponsored();
 	}
 	if (!cache.peersReady && !requestedBefore) {
 		requestPeers();
@@ -89,10 +89,17 @@ void PeerSearch::request(
 }
 
 void PeerSearch::requestPeers() {
+	using Flag = MTPcontacts_Search::Flag;
+	const auto flags = (_type == Type::Channels)
+		? Flag::f_broadcasts
+		: (_type == Type::Bots)
+		? Flag::f_bots
+		: Flag();
+	const auto typed = (flags != Flag());
 	const auto requestId = _session->api().request(MTPcontacts_Search(
-		MTP_flags(0),
+		MTP_flags(flags),
 		MTP_string(_query),
-		MTP_int(SearchPeopleLimit)
+		MTP_int(typed ? kTypedLimit : SearchPeopleLimit)
 	)).done([=](const MTPcontacts_Found &result, mtpRequestId requestId) {
 		const auto &data = result.data();
 		_session->data().processUsers(data.vusers());
