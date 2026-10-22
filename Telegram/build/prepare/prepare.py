@@ -992,8 +992,9 @@ mac:
 stage('libwebp', """
     git clone -b v1.6.0 https://github.com/webmproject/libwebp.git
     cd libwebp
-win:
+win_debug:
     nmake /f Makefile.vc CFG=debug-static OBJDIR=out RTLIBCFG=static all
+win:
     nmake /f Makefile.vc CFG=release-static OBJDIR=out RTLIBCFG=static all
     copy out\\release-static\\$X8664\\lib\\libwebp.lib out\\release-static\\$X8664\\lib\\webp.lib
     copy out\\release-static\\$X8664\\lib\\libwebpdemux.lib out\\release-static\\$X8664\\lib\\webpdemux.lib
@@ -1781,8 +1782,7 @@ win:
     configure -prefix "%LIBS_DIR%\\Qt-%QT%" ^
         %CONFIGURATIONS% ^
         %ASSERTS% ^
-        -force-debug-info ^
-        -opensource ^
+        """ + ('' if 'skip-debug' in options else '-force-debug-info ^\n        ') + """-opensource ^
         -confirm-license ^
         -static ^
         -static-runtime ^
