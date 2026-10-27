@@ -668,7 +668,9 @@ Main::Session &HistoryInner::session() const {
 void HistoryInner::setupSharingDisallowed() {
 	Expects(_peer != nullptr);
 
-	if (const auto user = _peer->asUser()) {
+	if (_peer->isSecretChat()) {
+		_sharingDisallowed = true;
+	} else if (const auto user = _peer->asUser()) {
 		_sharingDisallowed = rpl::combine(
 			Data::PeerFlagValue(user, UserDataFlag::NoForwardsMyEnabled),
 			Data::PeerFlagValue(user, UserDataFlag::NoForwardsPeerEnabled)
