@@ -1241,7 +1241,7 @@ void Widget::chosenRow(const ChosenRow &row) {
 		if (_subsectionTopBar) {
 			_subsectionTopBar->toggleSearch(false, anim::type::instant);
 		} else {
-			escape();
+			escape({ .jumpBackToSearchedChat = true, .leaveSearch = true });
 		}
 	}
 	updateForceDisplayWide();
@@ -3125,7 +3125,11 @@ void Widget::slideFinished() {
 }
 
 void Widget::escape() {
-	if (!cancelSearch({ .jumpBackToSearchedChat = true })) {
+	escape({ .jumpBackToSearchedChat = true });
+}
+
+void Widget::escape(CancelSearchOptions options) {
+	if (!cancelSearch(options)) {
 		if (const auto forum = controller()->shownForum().current()) {
 			const auto id = controller()->windowId();
 			const auto initial = id.forum();
@@ -3983,6 +3987,9 @@ void Widget::dragEnterEvent(QDragEnterEvent *e) {
 	} else if (ComputeMimeDataState(data) != MimeDataState::None) {
 		e->setDropAction(Qt::CopyAction);
 		e->accept();
+	} else if (data->hasText()) {
+		e->setDropAction(Qt::CopyAction);
+		e->accept();
 	}
 	_chooseByDragTimer.cancel();
 }
@@ -4037,6 +4044,8 @@ void Widget::updateDragInScroll(bool inScroll) {
 }
 
 void Widget::dropEvent(QDropEvent *e) {
+	using namespace Storage;
+
 	_chooseByDragTimer.cancel();
 	if (_scroll->geometry().contains(e->pos())) {
 		const auto globalPosition = mapToGlobal(e->pos());
@@ -4046,9 +4055,14 @@ void Widget::dropEvent(QDropEvent *e) {
 		if (thread) {
 			e->setDropAction(Qt::CopyAction);
 			e->accept();
-			controller()->content()->filesOrForwardDrop(
-				thread,
-				e->mimeData());
+			const auto data = e->mimeData();
+			if (!data->hasFormat(u"application/x-td-forward"_q)
+				&& ComputeMimeDataState(data) == MimeDataState::None
+				&& data->hasText()) {
+				controller()->content()->textDrop(thread, data);
+			} else {
+				controller()->content()->filesOrForwardDrop(thread, data);
+			}
 			if (!thread->owningHistory()->isForum()) {
 				hideChildList();
 			}
@@ -5228,7 +5242,7 @@ bool Widget::cancelSearch(CancelSearchOptions options) {
 			|| _suggestions->tabsOnly());
 	if (clearingSuggestionsQuery) {
 		setSearchQuery(QString());
-		if (!options.forceFullCancel) {
+		if (!options.forceFullCancel && !options.leaveSearch) {
 			return true;
 		}
 	}

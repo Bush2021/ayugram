@@ -1632,11 +1632,14 @@ void SendFilesBox::generatePreviewFrom(int fromBlock) {
 	auto albumStart = -1;
 	for (auto i = fromItem, till = int(_list.files.size()); i != till; ++i) {
 		const auto type = _list.files[i].type;
+		// A video turned into a GIF leaves the album when it is sent.
+		const auto separate = _list.files[i].sendsVideoAsGif();
 		if (albumStart >= 0) {
 			const auto albumCount = (i - albumStart);
 			if ((type == Type::File)
 				|| (type == Type::None)
 				|| (type == Type::Music)
+				|| separate
 				|| (albumCount == Ui::MaxAlbumItems())) {
 				pushBlock(std::exchange(albumStart, -1), i);
 			} else {
@@ -1645,7 +1648,8 @@ void SendFilesBox::generatePreviewFrom(int fromBlock) {
 		}
 		if (type != Type::File
 			&& type != Type::Music
-			&& type != Type::None) {
+			&& type != Type::None
+			&& !separate) {
 			if (albumStart < 0) {
 				albumStart = i;
 			}

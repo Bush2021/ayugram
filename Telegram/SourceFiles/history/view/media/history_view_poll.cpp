@@ -1826,9 +1826,7 @@ struct Poll::Options : public Poll::Part {
 	void checkSendingAnimation() const;
 	void unloadHeavyPart() override;
 
-	[[nodiscard]] int countAnswerContentWidth(
-		const Answer &answer,
-		int innerWidth) const;
+	[[nodiscard]] int countAnswerContentWidth(int innerWidth) const;
 	[[nodiscard]] int countVotesExtraHeight(
 		const Answer &answer,
 		int textWidth) const;
@@ -2015,9 +2013,7 @@ TextState Poll::Options::textState(
 				const auto aleft = left
 					+ st::historyPollAnswerPadding.left();
 				const auto atop = tshift + geometry.textTop;
-				const auto textWidth = countAnswerContentWidth(
-					answer,
-					innerWidth);
+				const auto textWidth = countAnswerContentWidth(innerWidth);
 				const auto textState = answer.text.getStateLeft(
 					point - QPoint(aleft, atop),
 					textWidth,
@@ -2223,16 +2219,16 @@ QSize Poll::countOptimalSize() {
 	auto maxWidth = st::msgFileMinWidth;
 	accumulate_max(maxWidth, paddings + _headerPart->_description.maxWidth());
 	accumulate_max(maxWidth, paddings + _headerPart->_question.maxWidth());
+	const auto anyMedia = _optionsPart->_anyAnswerHasMedia
+		? (PollAnswerMediaSize() + PollAnswerMediaSkip())
+		: 0;
 	for (const auto &answer : _optionsPart->_answers) {
-		const auto media = answer.thumbnail
-			? (PollAnswerMediaSize() + PollAnswerMediaSkip())
-			: 0;
 		accumulate_max(
 			maxWidth,
 			paddings
 			+ st::historyPollAnswerPadding.left()
 			+ answer.text.maxWidth()
-			+ media
+			+ anyMedia
 			+ st::historyPollAnswerPadding.right());
 	}
 
@@ -2401,13 +2397,11 @@ void Poll::setAddOptionActive(bool active) {
 	}
 }
 
-int Poll::Options::countAnswerContentWidth(
-		const Answer &answer,
-		int innerWidth) const {
+int Poll::Options::countAnswerContentWidth(int innerWidth) const {
 	const auto answerWidth = innerWidth
 		- st::historyPollAnswerPadding.left()
 		- st::historyPollAnswerPadding.right();
-	const auto mediaWidth = answer.thumbnail
+	const auto mediaWidth = _anyAnswerHasMedia
 		? (PollAnswerMediaSize() + PollAnswerMediaSkip())
 		: 0;
 	return std::max(1, answerWidth - mediaWidth);
@@ -2448,7 +2442,7 @@ auto Poll::Options::countAnswerGeometry(
 	int innerWidth) const
 -> AnswerGeometry {
 	const auto media = answer.thumbnail ? PollAnswerMediaSize() : 0;
-	const auto textWidth = countAnswerContentWidth(answer, innerWidth);
+	const auto textWidth = countAnswerContentWidth(innerWidth);
 	const auto &padding = answer.thumbnail
 		? st::historyPollAnswerPadding
 		: st::historyPollAnswerPaddingNoMedia;
@@ -3736,7 +3730,7 @@ void Poll::Options::paintAnswer(
 		- st::historyPollAnswerPadding.left()
 		- st::historyPollAnswerPadding.right();
 	const auto media = answer.thumbnail ? PollAnswerMediaSize() : 0;
-	const auto textWidth = countAnswerContentWidth(answer, width);
+	const auto textWidth = countAnswerContentWidth(width);
 	const auto textContentHeight = answer.text.countHeight(textWidth);
 	const auto multilineAnswer = (textContentHeight
 		> st::historyPollPercentFont->height);

@@ -3660,9 +3660,6 @@ void ListWidget::copySelectedText(bool withImageText) {
 		.blocks = getSelectedRichBlocks(),
 		.withImageText = withImageText,
 	});
-	if (hasSelectedItems()) {
-		clearSelected();
-	}
 }
 
 MessageIdsList ListWidget::getSelectedIds() const {
