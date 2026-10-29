@@ -3514,8 +3514,8 @@ void InnerWidget::handleChatListEntryRefreshes() {
 
 		if (event.existenceChanged) {
 			if (!entry->inChatList()) {
-				if (key == _menuRow.key && _menu) {
-					InvokeQueued(this, [=] { _menu = nullptr; });
+				if (key == _menuRow.key) {
+					closeMenuForRemovedRow();
 				}
 				if (_selected && _selected->key() == key) {
 					_selected = nullptr;
@@ -3978,6 +3978,7 @@ void InnerWidget::refreshShownList() {
 		? session().data().chatsFilters().chatsList(_filterId)->indexed()
 		: session().data().chatsList(_openedFolder)->indexed();
 	if (_shownList != list) {
+		clearPressed();
 		_shownList->unfreeze();
 		_shownList = list;
 		_shownList->updateHeights(_narrowRatio);
@@ -4247,6 +4248,12 @@ void InnerWidget::contextMenuEvent(QContextMenuEvent *e) {
 			selectByMouse(globalPosition);
 		}
 	});
+	const auto close = [=] { closeMenuForRemovedRow(); };
+	if (const auto topic = row.key.topic()) {
+		topic->destroyed() | rpl::on_next(close, _menu->lifetime());
+	} else if (const auto sublist = row.key.sublist()) {
+		sublist->destroyed() | rpl::on_next(close, _menu->lifetime());
+	}
 	if (_menu->empty()) {
 		_menu = nullptr;
 	} else {
@@ -4317,6 +4324,12 @@ void InnerWidget::showSponsoredMenu(int peerSearchIndex, QPoint globalPos) {
 		_menu = nullptr;
 	} else {
 		_menu->popup(globalPos);
+	}
+}
+
+void InnerWidget::closeMenuForRemovedRow() {
+	if (base::take(_menuRow).key && _menu) {
+		InvokeQueued(_menu.get(), [=] { _menu = nullptr; });
 	}
 }
 

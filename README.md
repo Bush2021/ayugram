@@ -17,6 +17,11 @@ releases.
 
 ## What this fork adds
 
+### Profile music covers
+
+The profile keeps AyuGram's album-cover card below Telegram's music and balance
+pills. Missing covers can be fetched, and the card can use colors from the cover.
+
 ### Qt 6 adjustments on Windows
 
 The Windows build uses Qt 6 like upstream. This fork adjusts its CJK font fallback

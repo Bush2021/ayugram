@@ -84,6 +84,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/history_view_characters_limit.h"
 #include "history/view/controls/history_view_compose_ai_button.h"
 #include "history/view/controls/history_view_compose_ai_tooltip.h"
+#include "history/view/controls/history_view_bot_menu_hold.h"
 #include "history/view/controls/history_view_compose_media_edit_manager.h"
 #include "history/view/controls/history_view_compose_stash_hint.h"
 #include "history/view/controls/history_view_forward_panel.h"
@@ -95,7 +96,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/history_view_webpage_processor.h"
 #include "history/view/history_view_reply.h"
 #include "history/view/history_view_schedule_box.h"
-#include "history/view/history_view_webpage_preview.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "inline_bots/inline_results_widget.h"
 #include "inline_bots/inline_bot_result.h"
@@ -4518,7 +4518,7 @@ void ComposeControls::initVoiceRecordBar() {
 		updateAiButtonVisibility();
 		updateSendAsFileVisibility();
 		updateExpandButtonVisibility();
-	}, _wrap->lifetime());
+	}, _recordingStateLifetime);
 
 	_voiceRecordBar->setStartRecordingFilter([=] {
 		const auto error = [&]() -> Data::SendError {
@@ -4605,7 +4605,8 @@ void ComposeControls::initVoiceRecordBar() {
 		return Ui::AppInFocus();
 	}) | rpl::on_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
-		if (showRecordButton()
+		if (_history
+			&& showRecordButton()
 			&& Data::CanSendAnything(_history->peer, !_topicRootId)) {
 			const auto isVoice = request->check(Command::RecordVoice, 1);
 			const auto isRound = !isVoice
@@ -4618,7 +4619,8 @@ void ComposeControls::initVoiceRecordBar() {
 				return false;
 			});
 		}
-		_field
+		_history
+			&& _field
 			&& _field->isVisible()
 			&& Data::CanSendTexts(_history->peer)
 			&& request->check(Command::ComposeAiApplyInPlace, 1)
@@ -4633,11 +4635,15 @@ void ComposeControls::initVoiceRecordBar() {
 				return true;
 			});
 		_preview
-			&& (_previewShown || _preview->draft().removed)
+			&& (_previewShown
+				|| _preview->draft().removed
+				|| _preview->disabled())
 			&& request->check(Command::ToggleWebPagePreview, 1)
 			&& request->handle([=] {
 				if (_previewShown) {
 					_preview->apply({ .removed = true });
+				} else if (_preview->disabled()) {
+					_preview->setDisabled(false);
 				} else {
 					_preview->apply({}, true);
 				}
@@ -5635,6 +5641,20 @@ bool ComposeControls::refreshBotMenuButton() {
 			},
 			[=] { updateControlsGeometry(_wrap->size()); },
 			session().data().customEmojiManager().factory());
+		_botMenu->lifetime().make_state<Controls::BotMenuHoldTracker>(
+			_botMenu.get(),
+			Controls::kBotMenuHoldDuration,
+			[=] {
+				if (!_autocomplete) {
+					return;
+				} else if (_autocomplete->isHidden()) {
+					_autocomplete->showFiltered(
+						_history->peer,
+						u"/"_q,
+						true);
+				}
+				_autocomplete->startPressDragSelect();
+			});
 		_botMenuPeer = bot->id;
 		orderControls();
 	}

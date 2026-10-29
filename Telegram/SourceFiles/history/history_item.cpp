@@ -259,6 +259,39 @@ template <typename T>
 	return { Ui::FillAmountAndCurrency(amount, currency) };
 }
 
+[[nodiscard]] PreparedServiceText PrepareGiftCostText(
+		not_null<PeerData*> from,
+		not_null<PeerData*> peer,
+		bool isSelf,
+		int64 amount,
+		const QString &currency) {
+	auto result = PreparedServiceText();
+	const auto cost = AmountAndStarCurrency(amount, currency);
+	const auto anonymous = from->isServiceUser();
+	if (anonymous) {
+		result.text = tr::lng_action_gift_received_anonymous(
+			tr::now,
+			lt_cost,
+			cost,
+			tr::marked);
+	} else {
+		result.links.push_back(peer->createOpenLink());
+		result.text = isSelf
+			? tr::lng_action_gift_sent(tr::now,
+				lt_cost,
+				cost,
+				tr::marked)
+			: tr::lng_action_gift_received(
+				tr::now,
+				lt_user,
+				tr::link(peer->shortName(), 1), // Link 1.
+				lt_cost,
+				cost,
+				tr::marked);
+	}
+	return result;
+}
+
 [[nodiscard]] bool IsNavigableForInstantViewMedia(
 		DocumentData *document) {
 	Expects(document != nullptr);
@@ -377,32 +410,30 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 			qs(media.vphone_number()),
 			Data::SharedContact::ParseVcard(qs(media.vvcard())));
 	}, [&](const MTPDmessageMediaGeo &media) -> Result {
-		return media.vgeo().match([&](const MTPDgeoPoint &point) -> Result {
-			return std::make_unique<Data::MediaLocation>(
-				item,
-				Data::LocationPoint(point));
-		}, [](const MTPDgeoPointEmpty &) -> Result {
+		const auto point = Data::LocationPoint::FromMTP(media.vgeo());
+		if (!point) {
 			return nullptr;
-		});
+		}
+		return std::make_unique<Data::MediaLocation>(item, *point);
 	}, [&](const MTPDmessageMediaGeoLive &media) -> Result {
-		return media.vgeo().match([&](const MTPDgeoPoint &point) -> Result {
-			return std::make_unique<Data::MediaLocation>(
-				item,
-				Data::LocationPoint(point),
-				media.vperiod().v);
-		}, [](const MTPDgeoPointEmpty &) -> Result {
+		const auto point = Data::LocationPoint::FromMTP(media.vgeo());
+		if (!point) {
 			return nullptr;
-		});
+		}
+		return std::make_unique<Data::MediaLocation>(
+			item,
+			*point,
+			media.vperiod().v);
 	}, [&](const MTPDmessageMediaVenue &media) -> Result {
-		return media.vgeo().match([&](const MTPDgeoPoint &point) -> Result {
-			return std::make_unique<Data::MediaLocation>(
-				item,
-				Data::LocationPoint(point),
-				qs(media.vtitle()),
-				qs(media.vaddress()));
-		}, [](const MTPDgeoPointEmpty &data) -> Result {
+		const auto point = Data::LocationPoint::FromMTP(media.vgeo());
+		if (!point) {
 			return nullptr;
-		});
+		}
+		return std::make_unique<Data::MediaLocation>(
+			item,
+			*point,
+			qs(media.vtitle()),
+			qs(media.vaddress()));
 	}, [&](const MTPDmessageMediaPhoto &media) -> Result {
 		const auto photo = media.vphoto();
 		if (!photo) {
@@ -673,6 +704,7 @@ HistoryItem::HistoryItem(
 	.from = data.vfrom_id() ? peerFromMTP(*data.vfrom_id()) : PeerId(0),
 	.date = data.vdate().v,
 }) {
+	_isServiceMessage = true;
 	data.vaction().match([&](const MTPDmessageActionPhoneCall &data) {
 		createComponents(CreateConfig());
 		_media = std::make_unique<Data::MediaCall>(
@@ -703,6 +735,7 @@ HistoryItem::HistoryItem(
 	PreparedServiceText{ tr::lng_message_empty(
 		tr::now,
 		tr::marked) }) {
+	_isServiceMessage = false;
 }
 
 HistoryItem::HistoryItem(
@@ -711,6 +744,7 @@ HistoryItem::HistoryItem(
 	PreparedServiceText &&message,
 	PhotoData *photo)
 : HistoryItem(history, fields) {
+	_isServiceMessage = true;
 	setServiceText(std::move(message));
 	if (photo) {
 		_media = std::make_unique<Data::MediaPhoto>(
@@ -2277,6 +2311,17 @@ bool HistoryItem::hideLinks() const {
 	return !out() && history()->peer->hideLinks();
 }
 
+bool HistoryItem::hideInlineKeyboard() const {
+	using Flag = ReplyMarkupFlag;
+	const auto markup = inlineReplyMarkup();
+	// Only the client sets these flags, for its own Accept / Decline rows.
+	const auto clientControls = Flag::SuggestionAccept
+		| Flag::SuggestionDecline;
+	return markup
+		&& !(markup->data.flags & clientControls)
+		&& hideLinks();
+}
+
 bool HistoryItem::isHistoryEntry() const {
 	return (_flags & MessageFlag::HistoryEntry);
 }
@@ -2406,6 +2451,9 @@ void HistoryItem::clearMainView() {
 }
 
 void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
+	if (_isServiceMessage) {
+		return;
+	}
 	history()->session().ephemeralMessages().revertAnchored(this);
 
 	int keyboardTop = -1;
@@ -2478,6 +2526,9 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 			refreshMedia(edition.mtpMedia);
 			if (_flags & MessageFlag::Legacy) {
 				_flags &= ~MessageFlag::Legacy;
+			}
+			if (_media && _media->location()) {
+				RemoveComponents(HistoryServiceData::Bit());
 			}
 		}
 	}
@@ -2604,6 +2655,9 @@ void HistoryItem::setStoryFields(not_null<Data::Story*> story) {
 }
 
 void HistoryItem::applyEdition(const MTPDmessageService &message) {
+	if (message.vaction().type() == mtpc_messageActionPhoneCall) {
+		return;
+	}
 	const auto wasNfr = Get<HistoryServiceNoForwardsRequest>();
 	const auto wasActionTaken = wasNfr && wasNfr->actionTaken;
 	const auto wasSublist = savedSublist();
@@ -2636,6 +2690,7 @@ void HistoryItem::applyEdition(const MTPDmessageService &message) {
 		finishEditionToEmpty();
 		_flags &= ~MessageFlag::DisplayFromChecked;
 	} else if (message.vaction().type() == mtpc_messageActionConferenceCall) {
+		_isServiceMessage = true;
 		removeFromSharedMediaIndex();
 		const auto owner = &history()->owner();
 		const auto &data = message.vaction().c_messageActionConferenceCall();
@@ -2802,6 +2857,9 @@ void HistoryItem::applyStreamedDraftFinish(const MTPDmessage &data) {
 }
 
 void HistoryItem::applySentMessage(const MTPDmessage &data) {
+	if (_isServiceMessage) {
+		return;
+	}
 	history()->session().ephemeralMessages().revertAnchored(this);
 
 	if (data.is_invert_media()) {
@@ -2896,6 +2954,9 @@ void HistoryItem::applySentMessage(const MTPDmessage &data) {
 }
 
 void HistoryItem::updateSentContent(const MTPDmessage &data) {
+	if (_isServiceMessage) {
+		return;
+	}
 	updateSentContent({
 		qs(data.vmessage()),
 		Api::EntitiesFromMTP(
@@ -2908,6 +2969,9 @@ void HistoryItem::applySentMessage(
 		const QString &text,
 		const MTPDupdateShortSentMessage &data,
 		bool wasAlready) {
+	if (_isServiceMessage) {
+		return;
+	}
 	const auto existingRichPage = Get<HistoryMessageRichPageSource>();
 	updateSentContent({
 		text,
@@ -2937,6 +3001,9 @@ void HistoryItem::updateSentContent(
 		const TextWithEntities &textWithEntities,
 		const MTPMessageMedia *media,
 		const MTPRichMessage *richMessage) {
+	if (_isServiceMessage) {
+		return;
+	}
 	updateSentContent(
 		textWithEntities,
 		media,
@@ -2948,7 +3015,7 @@ void HistoryItem::updateSentContent(
 		const MTPMessageMedia *media,
 		std::shared_ptr<const Iv::RichPage> richPage,
 		std::shared_ptr<const Iv::RichPage> preservedFullPage) {
-	if (isEditingMedia()) {
+	if (_isServiceMessage || isEditingMedia()) {
 		return;
 	}
 	const auto mediaCheck = media
@@ -3072,6 +3139,7 @@ void HistoryItem::clearMediaAsExpired() {
 	}
 
 	auto &owner = _history->owner();
+	const auto wasServiceMessage = _isServiceMessage;
 	if (const auto document = media->document()) {
 		document->cancel();
 		if (const auto active = document->activeMediaView()) {
@@ -3081,6 +3149,7 @@ void HistoryItem::clearMediaAsExpired() {
 		owner.cache().remove(document->goodThumbnailCacheKey());
 
 		applyEditionToHistoryCleared();
+		_isServiceMessage = wasServiceMessage;
 		auto text = (document->isVideoFile()
 			? tr::lng_ttl_video_expired
 			: document->isVoiceMessage()
@@ -3092,6 +3161,7 @@ void HistoryItem::clearMediaAsExpired() {
 		_flags |= MessageFlag::ReactionsAllowed;
 	} else if (const auto photo = media->photo()) {
 		applyEditionToHistoryCleared();
+		_isServiceMessage = wasServiceMessage;
 		photo->clearLocalCache();
 		updateServiceText({
 			tr::lng_ttl_photo_expired(tr::now, tr::marked)
@@ -5918,6 +5988,7 @@ void HistoryItem::createServiceFromMtp(const MTPDmessage &message) {
 }
 
 void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
+	_isServiceMessage = true;
 	AddComponents(HistoryServiceData::Bit());
 
 	const auto &action = message.vaction();
@@ -7018,37 +7089,16 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto prepareGiftPremium = [&](
 			const MTPDmessageActionGiftPremium &action) {
-		auto result = PreparedServiceText();
 		const auto session = &_history->session();
 		const auto isSelf = _from->isSelf();
 		const auto peer = isSelf ? _history->peer : _from;
 		session->giftBoxStickersPacks().load();
-		const auto amount = action.vamount().v;
-		const auto currency = qs(action.vcurrency());
-		const auto cost = AmountAndStarCurrency(amount, currency);
-		const auto anonymous = _from->isServiceUser();
-		if (anonymous) {
-			result.text = tr::lng_action_gift_received_anonymous(
-				tr::now,
-				lt_cost,
-				cost,
-				tr::marked);
-		} else {
-			result.links.push_back(peer->createOpenLink());
-			result.text = isSelf
-				? tr::lng_action_gift_sent(tr::now,
-					lt_cost,
-					cost,
-					tr::marked)
-				: tr::lng_action_gift_received(
-					tr::now,
-					lt_user,
-					tr::link(peer->shortName(), 1), // Link 1.
-					lt_cost,
-					cost,
-					tr::marked);
-		}
-		return result;
+		return PrepareGiftCostText(
+			_from,
+			peer,
+			isSelf,
+			action.vamount().v,
+			qs(action.vcurrency()));
 	};
 
 	auto prepareTopicCreate = [&](const MTPDmessageActionTopicCreate &action) {
@@ -7381,70 +7431,28 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto prepareGiftStars = [&](
 			const MTPDmessageActionGiftStars &action) {
-		auto result = PreparedServiceText();
 		const auto isSelf = (_from->id == _from->session().userPeerId());
 		const auto peer = isSelf ? _history->peer : _from;
 		_history->session().giftBoxStickersPacks().load();
-		const auto amount = action.vamount().v;
-		const auto currency = qs(action.vcurrency());
-		const auto cost = AmountAndStarCurrency(amount, currency);
-		const auto anonymous = _from->isServiceUser();
-		if (anonymous) {
-			result.text = tr::lng_action_gift_received_anonymous(
-				tr::now,
-				lt_cost,
-				cost,
-				tr::marked);
-		} else {
-			result.links.push_back(peer->createOpenLink());
-			result.text = isSelf
-				? tr::lng_action_gift_sent(tr::now,
-					lt_cost,
-					cost,
-					tr::marked)
-				: tr::lng_action_gift_received(
-					tr::now,
-					lt_user,
-					tr::link(peer->shortName(), 1), // Link 1.
-					lt_cost,
-					cost,
-					tr::marked);
-		}
-		return result;
+		return PrepareGiftCostText(
+			_from,
+			peer,
+			isSelf,
+			action.vamount().v,
+			qs(action.vcurrency()));
 	};
 
 	auto prepareGiftTon = [&](
 			const MTPDmessageActionGiftTon &action) {
-		auto result = PreparedServiceText();
 		const auto isSelf = (_from->id == _from->session().userPeerId());
 		const auto peer = isSelf ? _history->peer : _from;
 		_history->session().giftBoxStickersPacks().tonLoad();
-		const auto amount = action.vamount().v;
-		const auto currency = qs(action.vcurrency());
-		const auto cost = AmountAndStarCurrency(amount, currency);
-		const auto anonymous = _from->isServiceUser();
-		if (anonymous) {
-			result.text = tr::lng_action_gift_received_anonymous(
-				tr::now,
-				lt_cost,
-				cost,
-				tr::marked);
-		} else {
-			result.links.push_back(peer->createOpenLink());
-			result.text = isSelf
-				? tr::lng_action_gift_sent(tr::now,
-					lt_cost,
-					cost,
-					tr::marked)
-				: tr::lng_action_gift_received(
-					tr::now,
-					lt_user,
-					tr::link(peer->shortName(), 1), // Link 1.
-					lt_cost,
-					cost,
-					tr::marked);
-		}
-		return result;
+		return PrepareGiftCostText(
+			_from,
+			peer,
+			isSelf,
+			action.vamount().v,
+			qs(action.vcurrency()));
 	};
 
 	auto prepareGiftPrize = [&](
@@ -8563,16 +8571,19 @@ void HistoryItem::processAction(const MTPMessageAction &action) {
 			std::move(fields));
 	}, [&](const MTPDmessageActionSuggestBirthday &data) {
 		const auto &fields = data.vbirthday().data();
-		_media = std::make_unique<Data::MediaGiftBox>(
-			this,
-			_from,
-			Data::GiftCode{
-				.count = Data::Birthday(
-					fields.vday().v,
-					fields.vmonth().v,
-					fields.vyear().value_or_empty()).serialize(),
-				.type = Data::GiftType::BirthdaySuggest,
-			});
+		const auto birthday = Data::Birthday(
+			fields.vday().v,
+			fields.vmonth().v,
+			fields.vyear().value_or_empty());
+		if (birthday) {
+			_media = std::make_unique<Data::MediaGiftBox>(
+				this,
+				_from,
+				Data::GiftCode{
+					.count = birthday.serialize(),
+					.type = Data::GiftType::BirthdaySuggest,
+				});
+		}
 	}, [&](const MTPDmessageActionStarGiftPurchaseOffer &data) {
 		if (const auto suggestion = Get<HistoryMessageSuggestion>()) {
 			Assert(suggestion->gift != nullptr);
@@ -8824,6 +8835,11 @@ PreparedServiceText HistoryItem::prepareGameScoreText() {
 		if (gamescore && gamescore->msg) {
 			if (const auto media = gamescore->msg->media()) {
 				if (const auto game = media->game()) {
+					auto titleText = game->title;
+					if (gamescore->msg->hideInlineKeyboard()) {
+						setHasHiddenLinks(true);
+						return tr::marked(titleText);
+					}
 					const auto row = 0;
 					const auto column = 0;
 					result.links.push_back(
@@ -8832,7 +8848,6 @@ PreparedServiceText HistoryItem::prepareGameScoreText() {
 							row,
 							column,
 							gamescore->msg->fullId()));
-					auto titleText = game->title;
 					return tr::link(titleText, QString());
 				}
 			}

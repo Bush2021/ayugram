@@ -240,11 +240,24 @@ void Restore(Core::Settings &settings, const Preserved &was) {
 	return true;
 }
 
-void ApplyTelegram(const QJsonObject &object) {
+void ApplyTelegram(const QJsonObject &object, const QString &appVersion) {
+	auto writerVersion = 0;
+	const auto versionParts = appVersion.split('.');
+	if (versionParts.size() == 3) {
+		for (const auto &part : versionParts) {
+			auto ok = false;
+			const auto value = part.toInt(&ok);
+			if (!ok || value < 0 || value >= 1000) {
+				writerVersion = 0;
+				break;
+			}
+			writerVersion = writerVersion * 1000 + value;
+		}
+	}
 	auto &settings = Core::App().settings();
 	const auto was = Preserve(settings);
 	if (const auto core = Decode(object.value(u"core"_q))) {
-		settings.addFromSerialized(*core);
+		settings.addFromSerialized(*core, writerVersion);
 	}
 	Restore(settings, was);
 	PowerSaving::Set(PowerSaving::Flags::from_raw(
@@ -476,7 +489,9 @@ bool Apply(const Backup &backup, const Parts &parts) {
 		return false;
 	}
 	if (use(&Parts::telegram)) {
-		ApplyTelegram(root.value(kTelegram).toObject());
+		ApplyTelegram(
+			root.value(kTelegram).toObject(),
+			root.value(u"appVersion"_q).toString());
 	}
 	if (use(&Parts::secrets)) {
 		ApplySecrets(root.value(kSecrets).toObject());

@@ -1535,7 +1535,6 @@ QSize Message::performCountOptimalSize() {
 		const auto forwarded = item->Get<HistoryMessageForwarded>();
 		const auto via = item->Get<HistoryMessageVia>();
 		const auto entry = logEntryOriginal();
-		const auto check = factcheckBlock();
 		if (forwarded) {
 			forwarded->create(via, item);
 		}
@@ -1545,6 +1544,7 @@ QSize Message::performCountOptimalSize() {
 			mediaDisplayed = media->isDisplayed();
 			media->initDimensions();
 		}
+		const auto check = factcheckBlock();
 		if (check) {
 			check->initDimensions();
 		}
@@ -1600,6 +1600,9 @@ QSize Message::performCountOptimalSize() {
 			if (mediaDisplayed) {
 				minHeight += st::mediaInBubbleSkip;
 			}
+		}
+		if (_viewButton && mediaDisplayed && _invertMedia && withVisibleText) {
+			minHeight += st::mediaInBubbleSkip;
 		}
 		if (!mediaOnTop) {
 			minHeight += st::msgPadding.top();
@@ -3254,9 +3257,10 @@ void Message::paintRichText(
 			rect.width(),
 			std::max(shownHeight - rich->edgeSkips().top(), 0)));
 	}
+	const auto visibleHeight = std::max(rect.height(), 0);
 	rich->article.setVisibleTopBottom(
-		std::clamp(viewportClip.top(), 0, rect.height()),
-		std::clamp(viewportClip.bottom() + 1, 0, rect.height()));
+		std::clamp(viewportClip.top(), 0, visibleHeight),
+		std::clamp(viewportClip.bottom() + 1, 0, visibleHeight));
 	auto articleContext = Iv::Markdown::MarkdownArticlePaintContext(
 		context).translated(-rect.topLeft());
 	if (context.messageSelection && context.messageSelection->isRichPage()) {
@@ -6915,6 +6919,12 @@ int Message::resizeContentGetHeight(int newWidth) {
 				if (mediaDisplayed) {
 					newHeight += st::mediaInBubbleSkip;
 				}
+			}
+			if (_viewButton
+				&& mediaDisplayed
+				&& _invertMedia
+				&& withVisibleText) {
+				newHeight += st::mediaInBubbleSkip;
 			}
 			if (!mediaOnTop) {
 				newHeight += st::msgPadding.top();
