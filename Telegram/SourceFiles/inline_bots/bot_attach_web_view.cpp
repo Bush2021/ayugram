@@ -26,7 +26,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/report_messages_box.h"
 #include "boxes/share_box.h"
 #include "chat_helpers/stickers_lottie.h"
-#include "chat_helpers/tabbed_panel.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/local_url_handlers.h"
@@ -3071,9 +3070,7 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		st::dropdownMenuWithIcons);
 	const auto bots = &peer->session().attachWebView();
 	const auto raw = result.get();
-	auto minimal = 0;
 	if (Data::CanSend(peer, ChatRestriction::SendPhotos, false)) {
-		++minimal;
 		raw->addAction(tr::lng_attach_photo_or_video(tr::now), [=] {
 			attach(true);
 		}, &st::menuIconPhoto);
@@ -3084,14 +3081,12 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		| ChatRestriction::SendMusic
 		| ChatRestriction::SendFiles;
 	if (Data::CanSendAnyOf(peer, fileTypes, false)) {
-		++minimal;
 		raw->addAction(tr::lng_attach_document(tr::now), [=] {
 			attach(false);
 		}, &st::menuIconFile);
 	}
 	const auto moneyIndex = int(raw->actions().size());
 	if (peer->canCreatePolls(false)) {
-		++minimal;
 		raw->addAction(tr::lng_polls_menu_item(tr::now), [=] {
 			const auto action = actionFactory();
 			const auto source = action.options.scheduled
@@ -3110,7 +3105,6 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		}, &st::menuIconCreatePoll);
 	}
 	if (peer->canCreateTodoLists(false)) {
-		++minimal;
 		raw->addAction(tr::lng_todo_menu_item(tr::now), [=] {
 			const auto action = actionFactory();
 			const auto source = action.options.scheduled
@@ -3150,7 +3144,6 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		}, &st::menuIconAddress);
 	}
 	if (Data::CanSend(peer, ChatRestriction::SendMusic, false)) {
-		++minimal;
 		raw->addAction(tr::lng_all_music(tr::now), [=] {
 			const auto box = controller->show(
 				Box(MusicAttachBox, controller, peer, actionFactory));
@@ -3197,11 +3190,7 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 		}, action->lifetime());
 		raw->addAction(std::move(action));
 	}
-	const auto actions = raw->actions().size();
-	const auto onclick = ChatHelpers::ShowPanelOnClick();
-	if (!actions) {
-		return nullptr;
-	} else if (actions <= minimal && !onclick) {
+	if (raw->actions().empty()) {
 		return nullptr;
 	}
 	if (const auto user = peer->asUser()) {

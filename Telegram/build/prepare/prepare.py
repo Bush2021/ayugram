@@ -527,7 +527,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 8b1791a08893e84bc94b3d4ae274747d25852dab
+    git checkout 53e633d8c5455f3ced2cc88c1aa83ed6f64a534f
 mac:
     sed -i '' "s/10.13/$MACOSX_DEPLOYMENT_TARGET/g" macos_meson_*.txt
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
@@ -1844,7 +1844,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout ec71c06aaaed1cfda8669d51cf3b8d5b447b2031
+    git checkout 49ceed3985d8626b3a24bdb14d9c593a115cc6e8
     git submodule update --init --recursive
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg

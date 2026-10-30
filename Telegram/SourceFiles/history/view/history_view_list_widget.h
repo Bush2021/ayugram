@@ -704,6 +704,11 @@ private:
 	void markReadMetricsStale();
 	void registerReadMetricsActivity();
 
+	struct FirstContentHold;
+	void applyViewerSlice(Data::MessagesSlice &&slice);
+	void checkFirstContentHold(not_null<FirstContentHold*> hold);
+	void scheduleFirstContentRelease(not_null<FirstContentHold*> hold);
+
 	void updateAroundPositionFromNearest(int nearestIndex);
 	void refreshRows(const Data::MessagesSlice &old);
 	ScrollTopState countScrollState() const;
@@ -1057,6 +1062,7 @@ private:
 
 	bool _isChatWide = false;
 	bool _refreshingViewer = false;
+	bool _firstContentShown = false;
 	bool _showFinished = false;
 	bool _resizePending = false;
 	std::optional<ElementChatMode> _overrideChatMode;
@@ -1121,6 +1127,7 @@ private:
 	void setupThanosEffect();
 	std::unique_ptr<Ui::ThanosEffectController> _thanosController;
 
+	crl::time _firstContentDeadline = 0;
 	rpl::lifetime _viewerLifetime;
 	std::unique_ptr<AyuFeatures::SelectBetween> _selectBetween;
 
@@ -1138,5 +1145,9 @@ void ConfirmSendNowSelectedItems(not_null<ListWidget*> widget);
 	not_null<HistoryItem*> item);
 [[nodiscard]] CopyRestrictionType SelectRestrictionTypeFor(
 	not_null<PeerData*> peer);
+
+inline constexpr auto kFirstRevealTimeout = crl::time(300);
+
+[[nodiscard]] PeerData *FirstRevealWaitPeer(not_null<HistoryItem*> item);
 
 } // namespace HistoryView
