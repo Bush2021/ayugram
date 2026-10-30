@@ -81,6 +81,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
 #include "base/call_delayed.h"
+#include "base/event_filter.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "core/application.h"
 #include "core/shortcuts.h"
@@ -489,6 +490,10 @@ ChatWidget::ChatWidget(
 	setupRoot();
 
 	_peer->updateFull();
+	const auto settingsPeer = _peer->migrateToOrMe();
+	if (!settingsPeer->barSettings()) {
+		session().api().requestPeerSettings(settingsPeer);
+	}
 	if (const auto channel = _peer->asMegagroup()) {
 		if (!channel->mgInfo->adminsLoaded) {
 			session().api().chatParticipants().requestAdmins(channel);
@@ -604,6 +609,7 @@ ChatWidget::ChatWidget(
 	) | rpl::on_next([=] {
 		onScroll();
 	}, lifetime());
+	setupSendingLanding();
 	if (session().supportMode() && mode() == Mode::History && !_topic) {
 		_supportAutocomplete = std::make_unique<Support::Autocomplete>(
 			this,
@@ -946,6 +952,14 @@ ChatWidget::ChatWidget(
 		}
 		checkSuggestToGigagroup();
 		updateControlsVisibility();
+	}, lifetime());
+
+	session().changes().peerUpdates(
+		_peer,
+		PeerUpdateFlag::BarSettings
+	) | rpl::on_next([=] {
+		checkActivation();
+		_inner->update();
 	}, lifetime());
 
 	session().data().historyAccessLost(
@@ -1771,12 +1785,14 @@ void ChatWidget::setupComposeControls() {
 				return;
 			}
 		}
+		_inner->sendingLandingUserScroll();
 		_scroll->keyPressEvent(e);
 	}, lifetime());
 
 	_composeControls->editLastMessageRequests(
 	) | rpl::on_next([=](not_null<QKeyEvent*> e) {
 		if (!_inner->lastMessageEditRequestNotify()) {
+			_inner->sendingLandingUserScroll();
 			_scroll->keyPressEvent(e);
 		}
 	}, lifetime());
@@ -3843,8 +3859,9 @@ void ChatWidget::finishSending(const Api::SendOptions &options) {
 	_composeControls->hidePanelsAnimated();
 	//if (_previewData && _previewData->pendingTill) previewCancel();
 	doSetInnerFocus();
-	if (!options.scheduled
-		|| AyuSettings::ghost(&session()).isUseScheduledMessages()) {
+	if ((!options.scheduled
+		|| AyuSettings::ghost(&session()).isUseScheduledMessages())
+		&& !_inner->sendingLandingAtBottom()) {
 		showAtEnd();
 	}
 	refreshTopBarActiveChat();
@@ -3854,6 +3871,44 @@ void ChatWidget::finishSending(const Api::SendOptions &options) {
 			&& !_kbReplyTo) {
 		toggleBotKeyboard(true);
 	}
+}
+
+void ChatWidget::setupSendingLanding() {
+	_scroll->setCustomWheelProcess([=](not_null<QWheelEvent*> e) {
+		return _inner->processSendingLandingWheel(e);
+	});
+	for (const auto child : _scroll->children()) {
+		if (const auto bar = dynamic_cast<Ui::ElasticScrollBar*>(child)) {
+			base::install_event_filter(bar, [=](not_null<QEvent*> e) {
+				if (e->type() == QEvent::MouseButtonPress) {
+					_inner->sendingLandingUserScroll();
+				}
+				return base::EventFilterResult::Continue;
+			});
+		}
+	}
+	session().data().newItemAdded(
+	) | rpl::filter([=](not_null<HistoryItem*> item) {
+		return showsSendingItem(item);
+	}) | rpl::on_next([=](not_null<HistoryItem*> item) {
+		_inner->armSendingLanding(item);
+		if (!_inner->sendingLandingAtBottom()) {
+			showAtEnd();
+		}
+	}, lifetime());
+}
+
+bool ChatWidget::showsSendingItem(not_null<HistoryItem*> item) const {
+	if (!item->isSending()
+		|| item->isScheduled()
+		|| item->history() != _history) {
+		return false;
+	} else if (_sublist) {
+		return item->savedSublist() == _sublist;
+	} else if (_repliesRootId) {
+		return item->inThread(_repliesRootId);
+	}
+	return true;
 }
 
 void ChatWidget::showAtPosition(
@@ -5982,6 +6037,11 @@ Ui::ChatPaintContext ChatWidget::listPreparePaintContext(
 		std::move(args));
 	context.gestureHorizontal = _gestureHorizontal;
 	return context;
+}
+
+bool ChatWidget::listMarkingContentRead() {
+	return WindowListDelegate::listMarkingContentRead()
+		&& !_peer->keepIncomingUnread();
 }
 
 base::unique_qptr<Ui::PopupMenu> ChatWidget::listFillSenderUserpicMenu(

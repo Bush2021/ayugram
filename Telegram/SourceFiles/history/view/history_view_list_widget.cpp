@@ -121,6 +121,9 @@ constexpr auto kPreloadedScreensCountFull
 	= kPreloadedScreensCount + 1 + kPreloadedScreensCount;
 constexpr auto kClearUserpicsAfter = 50;
 constexpr auto kScrollDateHideOnDayCrossingTimeout = crl::time(3000);
+constexpr auto kSendingLandingArmTimeout = crl::time(1000);
+constexpr auto kSendingLandingSettleTimeout = crl::time(600);
+constexpr auto kSendingLandingCheckDelay = crl::time(100);
 
 [[nodiscard]] std::unique_ptr<TranslateTracker> MaybeTranslateTracker(
 		History *history) {
@@ -142,16 +145,14 @@ constexpr auto kScrollDateHideOnDayCrossingTimeout = crl::time(3000);
 		|| (context == Context::WelcomeMessages);
 }
 
-[[nodiscard]] bool HasWithheldButtons(not_null<HistoryItem*> item) {
-	if (!item->hideLinks()) {
-		return false;
-	} else if (item->translatedRichPage()) {
-		return true;
-	} else if (!item->hideInlineKeyboard()) {
+[[nodiscard]] bool HasWithheldInlineKeyboard(not_null<HistoryItem*> item) {
+	if (!item->hideInlineKeyboard()) {
 		return false;
 	}
 	const auto markup = item->inlineReplyMarkup();
-	return !markup->inlineKeyboard && !markup->hiddenBy(item->media());
+	return !markup->data.rows.empty()
+		&& !markup->inlineKeyboard
+		&& !markup->hiddenBy(item->media());
 }
 
 } // namespace
@@ -573,6 +574,7 @@ ListWidget::ListWidget(
 , _context(_delegate->listContext())
 , _inverted(_delegate->listInvertedOrder())
 , _itemAverageHeight(itemMinimalHeight())
+, _sendingLandingTimer([=] { checkSendingLanding(); })
 , _pathGradient(
 	MakePathShiftGradient(
 		_delegate->listChatStyle(),
@@ -932,6 +934,7 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 
 	saveScrollState();
 
+	const auto wasKnownTillEnd = _itemsKnownTillEnd;
 	const auto scrolledTillEnd = _itemsKnownTillEnd
 		&& atNewestEdge()
 		&& (_visibleBottom > _visibleTop);
@@ -1040,6 +1043,31 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	const auto markLastAsRead = (scrolledTillEnd && markingMessagesRead());
 	checkUnreadBarCreation(markLastAsRead);
 	restoreScrollState();
+	if (_sendingLanding.active) {
+		auto &landing = _sendingLanding;
+		auto inserted = !wasKnownTillEnd && _itemsKnownTillEnd;
+		for (auto i = begin(landing.landed); i != end(landing.landed);) {
+			if (viewForItem(*i)) {
+				++i;
+			} else {
+				// Dropped from the slice, it lands again when it is back.
+				landing.pending.emplace(*i);
+				i = landing.landed.erase(i);
+			}
+		}
+		for (auto i = begin(landing.pending); i != end(landing.pending);) {
+			if (viewForItem(*i)) {
+				inserted = true;
+				landing.landed.emplace(*i);
+				i = landing.pending.erase(i);
+			} else {
+				++i;
+			}
+		}
+		if (inserted) {
+			landInsertedSending();
+		}
+	}
 	if (Ui::ReleaseItemRevealLift(_itemRevealLift)) {
 		revealItemsCallback();
 	}
@@ -1212,8 +1240,10 @@ void ListWidget::scrollTo(
 		int scrollTop,
 		Data::MessagePosition attachPosition,
 		int delta,
-		AnimatedScroll type) {
+		AnimatedScroll type,
+		crl::time duration) {
 	_scrollToAnimation.stop();
+	_scrollToBottomAnimation = false;
 	if (!delta || _items.empty() || type == AnimatedScroll::None) {
 		_delegate->listScrollTo(scrollTop);
 		return;
@@ -1223,11 +1253,12 @@ void ListWidget::scrollTo(
 		: anim::easeOutCubic;
 	if (delta > 0 && scrollTop == height() - (_visibleBottom - _visibleTop)) {
 		// Animated scroll to bottom.
+		_scrollToBottomAnimation = true;
 		_scrollToAnimation.start(
 			[=] { scrollToAnimationCallback(FullMsgId(), 0); },
 			-delta,
 			0,
-			st::slideDuration,
+			duration ? duration : st::slideDuration,
 			transition);
 		return;
 	}
@@ -1245,12 +1276,16 @@ void ListWidget::scrollTo(
 		[=] { scrollToAnimationCallback(attachToId, relativeFinish); },
 		relativeStart,
 		relativeFinish,
-		st::slideDuration,
+		duration ? duration : st::slideDuration,
 		transition);
 }
 
 bool ListWidget::animatedScrolling() const {
 	return _scrollToAnimation.animating();
+}
+
+bool ListWidget::scrollingToBottom() const {
+	return _scrollToBottomAnimation && _scrollToAnimation.animating();
 }
 
 void ListWidget::scrollToCurrentVoiceMessage(
@@ -1374,6 +1409,9 @@ void ListWidget::showAtPosition(
 		const Window::SectionShow &params,
 		Fn<void(bool found)> done) {
 	const auto showAtUnread = (position == Data::UnreadMessagePosition);
+	if (position != Data::MaxMessagePosition) {
+		cancelSendingLanding();
+	}
 
 	if (showAtUnread && jumpToBottomInsteadOfUnread()) {
 		showAtPosition(Data::MaxMessagePosition, params, std::move(done));
@@ -1466,7 +1504,8 @@ bool ListWidget::showAtPositionNow(
 void ListWidget::computeScrollTo(
 		int to,
 		Data::MessagePosition position,
-		anim::type animated) {
+		anim::type animated,
+		crl::time duration) {
 	const auto currentScrollHeight = (_visibleBottom - _visibleTop);
 	const auto currentScrollTop = _visibleTop;
 	const auto wanted = std::max(
@@ -1480,7 +1519,7 @@ void ListWidget::computeScrollTo(
 		: (std::abs(fullDelta) > limit)
 		? AnimatedScroll::Part
 		: AnimatedScroll::Full;
-	scrollTo(wanted, position, scrollDelta, type);
+	scrollTo(wanted, position, scrollDelta, type, duration);
 }
 
 void ListWidget::checkUnreadBarCreation(bool markLastAsRead) {
@@ -1685,7 +1724,9 @@ void ListWidget::visibleTopBottomUpdated(
 }
 
 void ListWidget::applyUpdatedScrollState() {
-	if (!atNewestEdge() && Ui::ReleaseItemRevealLift(_itemRevealLift)) {
+	if (!atNewestEdge()
+		&& !keepsBottomForSending()
+		&& Ui::ReleaseItemRevealLift(_itemRevealLift)) {
 		revealItemsCallback();
 	}
 	checkMoveToOtherViewer();
@@ -1697,6 +1738,11 @@ bool ListWidget::atNewestEdge() const {
 
 void ListWidget::updateVisibleTopItem() {
 	if (_itemsKnownTillEnd && atNewestEdge()) {
+		if (_sendingLanding.active) {
+			_sendingLanding.reached = true;
+		}
+		_visibleTopItem = nullptr;
+	} else if (keepsBottomForSending()) {
 		_visibleTopItem = nullptr;
 	} else if (_items.empty()) {
 		_visibleTopItem = nullptr;
@@ -2586,6 +2632,8 @@ void ListWidget::checkMoveToOtherViewer() {
 		if (goodIndex >= 0) {
 			preloadAroundMessage(goodIndex);
 		}
+	} else if (preloadBottom) {
+		keepRoomAtTheEnd(preloadIdsLimit);
 	}
 }
 
@@ -2937,6 +2985,166 @@ void ListWidget::liftItemReveal(not_null<HistoryItem*> item, int lift) {
 		lift);
 	if (lifted) {
 		revealItemsCallback();
+	}
+}
+
+void ListWidget::armSendingLanding(not_null<HistoryItem*> item) {
+	if (_inverted) {
+		return;
+	} else if (!_sendingLanding.active) {
+		_sendingLanding.active = true;
+		_sendingLanding.reached = false;
+	}
+	if (_touchScrollState == Ui::TouchScrollState::Auto) {
+		// A fling from before the send must not carry the list away.
+		_touchScrollState = Ui::TouchScrollState::Manual;
+		_touchScrollTimer.cancel();
+		touchResetSpeed();
+	}
+	if (_itemsKnownTillEnd && atNewestEdge()) {
+		_sendingLanding.reached = true;
+	}
+	extendSendingLanding(kSendingLandingArmTimeout);
+	if (viewForItem(item)) {
+		_sendingLanding.landed.emplace(item);
+		landInsertedSending();
+	} else {
+		_sendingLanding.pending.emplace(item);
+		if (_itemsKnownTillEnd && !_sendingLanding.reached) {
+			// Also replaces a slower scroll started before the message.
+			scrollToBottomForSending();
+		}
+	}
+	crl::on_main(this, [=] {
+		if (_sendingLanding.active) {
+			checkMoveToOtherViewer();
+		}
+	});
+}
+
+void ListWidget::sendingLandingUserScroll() {
+	// Only a scroll after the message is in the list wins over landing.
+	if (!_sendingLanding.active || !_sendingLanding.pending.empty()) {
+		return;
+	} else if (scrollingToBottom()) {
+		_scrollToAnimation.stop();
+	}
+	cancelSendingLanding();
+}
+
+bool ListWidget::sendingLandingAtBottom() const {
+	return (_sendingLanding.active && _sendingLanding.reached)
+		|| scrollingToBottom();
+}
+
+bool ListWidget::processSendingLandingWheel(not_null<QWheelEvent*> e) {
+	if (!_sendingLanding.active) {
+		return false;
+	} else if (e->phase() == Qt::ScrollMomentum) {
+		// The rest of a gesture started before the message was sent.
+		return true;
+	} else if (e->angleDelta().y() || e->pixelDelta().y()) {
+		sendingLandingUserScroll();
+	}
+	return false;
+}
+
+bool ListWidget::keepsBottomForSending() const {
+	return _sendingLanding.active
+		&& _sendingLanding.reached
+		&& _itemsKnownTillEnd
+		&& !_scrollToAnimation.animating();
+}
+
+void ListWidget::extendSendingLanding(crl::time duration) {
+	const auto now = crl::now();
+	accumulate_max(
+		_sendingLanding.till,
+		now + duration * anim::SlowMultiplier());
+	_sendingLandingTimer.callOnce(_sendingLanding.till - now);
+}
+
+void ListWidget::checkSendingLanding() {
+	if (!_sendingLanding.active) {
+		return;
+	}
+	const auto now = crl::now();
+	if (now < _sendingLanding.till) {
+		_sendingLandingTimer.callOnce(_sendingLanding.till - now);
+		return;
+	}
+	_sendingLanding.pending.clear();
+	if (!_itemRevealAnimations.empty() || scrollingToBottom()) {
+		_sendingLandingTimer.callOnce(kSendingLandingCheckDelay);
+		return;
+	}
+	cancelSendingLanding();
+}
+
+void ListWidget::cancelSendingLanding() {
+	if (!_sendingLanding.active) {
+		return;
+	}
+	_sendingLanding = SendingLanding();
+	_sendingLandingTimer.cancel();
+	updateVisibleTopItem();
+}
+
+void ListWidget::landInsertedSending() {
+	extendSendingLanding(kSendingLandingSettleTimeout);
+	if (!_itemsKnownTillEnd) {
+		// Refreshing the viewer from inside its own slice is not safe.
+		crl::on_main(this, [=] {
+			if (_sendingLanding.active
+				&& !_itemsKnownTillEnd
+				&& (!_refreshingViewer
+					|| _aroundPosition != Data::MaxMessagePosition)) {
+				showAtPosition(Data::MaxMessagePosition, {});
+			}
+		});
+	} else if (scrollingToBottom()) {
+		return;
+	} else if (atNewestEdge() || _sendingLanding.reached) {
+		_sendingLanding.reached = true;
+		updateVisibleTopItem();
+		restoreScrollPosition();
+	} else {
+		scrollToBottomForSending();
+	}
+}
+
+void ListWidget::scrollToBottomForSending() {
+	// Finish no later than the flight from the field, which follows the item.
+	if (const auto top = scrollTopForPosition(Data::MaxMessagePosition)) {
+		computeScrollTo(
+			*top,
+			Data::MaxMessagePosition,
+			anim::type::normal,
+			st::itemRevealDuration);
+	}
+}
+
+void ListWidget::keepRoomAtTheEnd(int idsLimit) {
+	// A full window drops new messages after its around message, so near
+	// the end keep it around the newest one, leaving room for new ones.
+	if (_inverted
+		|| !_itemsKnownTillEnd
+		|| _refreshingViewer
+		|| _aroundIndex < 0
+		|| _items.empty()
+		|| (int(_items.size()) - 1 - _aroundIndex) <= _idsLimit / 2) {
+		return;
+	}
+	for (auto index = int(_items.size()); index != 0;) {
+		if (_delegate->listIsGoodForAroundPosition(_items[--index])) {
+			if (index != _aroundIndex) {
+				accumulate_max(_idsLimit, idsLimit);
+				_aroundPosition = _items[index]->data()->position();
+				_aroundIndex = index;
+				refreshViewer();
+			}
+			return;
+		}
 	}
 }
 
@@ -3417,7 +3625,9 @@ void ListWidget::paintEvent(QPaintEvent *e) {
 			} else if (item->isUnreadMention()
 				&& !item->isUnreadMedia()) {
 				readContents.insert(item);
-				_highlighter.enqueue({ item });
+				if (markingContentRead) {
+					_highlighter.enqueue({ item });
+				}
 			}
 			if (item->hasUnreadPollVote()) {
 				readContents.insert(item);
@@ -3886,7 +4096,9 @@ Element *ListWidget::strictFindItemByY(int y) const {
 }
 
 auto ListWidget::countScrollState() const -> ScrollTopState {
-	if (_items.empty() || (_itemsKnownTillEnd && atNewestEdge())) {
+	if (_items.empty()
+		|| (_itemsKnownTillEnd && atNewestEdge())
+		|| keepsBottomForSending()) {
 		return { Data::MessagePosition(), 0 };
 	}
 	const auto index = findItemIndexByY(_visibleTop);
@@ -3918,7 +4130,7 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 			const auto elements = accessibleElements();
 			const auto barIndex
 				= accessibilityUnreadBarIndex();
-			if (accessibilityItemAtIndex(
+			if (AccessibilityItemAtIndex(
 					_accessibilityFocusedIndex,
 					elements,
 					barIndex) != _accessibilityFocusedItem) {
@@ -4021,7 +4233,7 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 			const auto elements = accessibleElements();
 			const auto barIndex
 				= accessibilityUnreadBarIndex();
-			const auto item = accessibilityItemAtIndex(
+			const auto item = AccessibilityItemAtIndex(
 				newIndex,
 				elements,
 				barIndex);
@@ -4630,6 +4842,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 		_touchInProgress = true;
 		_horizontalScrollLocked = false;
 		if (_touchScrollState == Ui::TouchScrollState::Auto) {
+			sendingLandingUserScroll();
 			_touchMaybeSelecting = false;
 			_touchScrollState = Ui::TouchScrollState::Acceleration;
 			_touchWaitingAcceleration = true;
@@ -4653,6 +4866,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 			_touchSelectTimer.cancel();
 			_touchMaybeSelecting = false;
 			_touchScroll = true;
+			sendingLandingUserScroll();
 			_touchElastic.start(_touchPos - _touchStart);
 			touchUpdateSpeed();
 		}
@@ -6060,6 +6274,8 @@ void ListWidget::viewReplaced(not_null<const Element*> was, Element *now) {
 }
 
 void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
+	_sendingLanding.pending.remove(item);
+	_sendingLanding.landed.remove(item);
 	if (_reactionsItem.current() == item) {
 		_reactionsItem = nullptr;
 	}
@@ -6313,24 +6529,6 @@ int ListWidget::accessibilityUnreadBarIndex() const {
 	return -1;
 }
 
-HistoryItem *ListWidget::accessibilityItemAtIndex(
-		int index,
-		const std::vector<Element*> &elements,
-		int barIndex) const {
-	// The unread bar row maps to no item: a focused bar is cached as
-	// a null item with a nonnegative index, so it can never be
-	// mistaken for the message it is anchored to when rows shift.
-	if (index < 0 || (barIndex >= 0 && index == barIndex)) {
-		return nullptr;
-	}
-	const auto elementIndex = (barIndex >= 0 && index > barIndex)
-		? (index - 1)
-		: index;
-	return (elementIndex < int(elements.size()))
-		? elements[elementIndex]->data().get()
-		: nullptr;
-}
-
 auto ListWidget::computeActiveColumns(int row) const
 -> const std::vector<HistoryView::MessageSubItem> & {
 	const auto barIndex = accessibilityUnreadBarIndex();
@@ -6441,7 +6639,7 @@ void ListWidget::extendAccessibilitySelection(
 	const auto elements = accessibleElements();
 	const auto barIndex = accessibilityUnreadBarIndex();
 	const auto itemAt = [&](int index) {
-		return accessibilityItemAtIndex(index, elements, barIndex);
+		return AccessibilityItemAtIndex(index, elements, barIndex);
 	};
 	if (oldIndex < 0) {
 		_accessibilitySelectionAnchor = itemAt(newIndex);
@@ -6488,7 +6686,7 @@ void ListWidget::extendAccessibilitySelection(
 
 void ListWidget::playPauseFocusedMedia() {
 	const auto elements = accessibleElements();
-	const auto item = accessibilityItemAtIndex(
+	const auto item = AccessibilityItemAtIndex(
 		_accessibilityFocusedIndex,
 		elements,
 		accessibilityUnreadBarIndex());
@@ -6748,7 +6946,7 @@ void ListWidget::announceAccessibilityFocusedChild() {
 		? (barIndex + 1)
 		: accessibilityNewestIndex(count);
 	const auto elements = accessibleElements();
-	const auto item = accessibilityItemAtIndex(
+	const auto item = AccessibilityItemAtIndex(
 		index,
 		elements,
 		barIndex);
@@ -6855,7 +7053,7 @@ void ListWidget::applyAccessibilityFocus(
 		bool announceAlways) {
 	const auto elements = accessibleElements();
 	const auto barIndex = accessibilityUnreadBarIndex();
-	const auto item = accessibilityItemAtIndex(index, elements, barIndex);
+	const auto item = AccessibilityItemAtIndex(index, elements, barIndex);
 	const auto changed = (_accessibilityFocusedIndex != index)
 		|| (_accessibilityFocusedItem != item);
 	_accessibilitySelectionAnchor = nullptr;
@@ -7074,13 +7272,13 @@ PeerData *FirstRevealWaitPeer(not_null<HistoryItem*> item) {
 	}
 	if (peer->barSettings()) {
 		return nullptr;
-	} else if (HasWithheldButtons(item)) {
+	} else if (HasWithheldInlineKeyboard(item)) {
 		return peer;
 	}
 	const auto &groups = item->history()->owner().groups();
 	if (const auto group = groups.find(item)) {
 		for (const auto &member : group->items) {
-			if (HasWithheldButtons(member)) {
+			if (HasWithheldInlineKeyboard(member)) {
 				return peer;
 			}
 		}

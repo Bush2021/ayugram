@@ -2626,7 +2626,7 @@ void Message::paintFromName(
 		const auto y = trect.top();
 		auto color = nameFg;
 		color.setAlpha(115);
-		const auto id = from ? from->emojiStatusId() : EmojiStatusId();
+		const auto id = from ? fromNameStatusId(from) : EmojiStatusId();
 		if (_fromNameStatus->id != id) {
 			const auto that = const_cast<Message*>(this);
 			_fromNameStatus->custom = id
@@ -2653,7 +2653,7 @@ void Message::paintFromName(
 					y + _fromNameStatus->skip),
 				.paused = context.paused || On(PowerSaving::kEmojiStatus),
 			});
-		} else {
+		} else if (from && from->isPremium()) {
 			st::dialogsPremiumIcon.icon.paint(p, x, y, width(), color);
 		}
 	}
@@ -4363,7 +4363,9 @@ bool Message::getStateFromName(
 		const auto nameWidth = std::min(
 			nameText->maxWidth(),
 			nameAvailableWidth);
-		if (statusWidth && availableWidth > statusWidth) {
+		if (statusWidth
+			&& availableWidth > statusWidth
+			&& (from->isPremium() || fromNameStatusId(from))) {
 			const auto x = availableLeft
 				+ nameWidth
 				- (_fromNameStatus->custom ? (2 * _fromNameStatus->skip) : 0);
@@ -4520,6 +4522,12 @@ void Message::ensureFromNameStatusLink(not_null<PeerData*> peer) const {
 			Settings::ShowEmojiStatusPremium(controller, peer);
 		}
 	});
+}
+
+EmojiStatusId Message::fromNameStatusId(not_null<PeerData*> from) const {
+	return (data()->hideLinks() || from->hideEmojiStatus())
+		? EmojiStatusId()
+		: from->emojiStatusId();
 }
 
 bool Message::getStateTopicButton(
