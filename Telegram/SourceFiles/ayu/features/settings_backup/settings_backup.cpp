@@ -240,9 +240,9 @@ void Restore(Core::Settings &settings, const Preserved &was) {
 	return true;
 }
 
-void ApplyTelegram(const QJsonObject &object, const QString &appVersion) {
+[[nodiscard]] int ReadWriterVersion(const QJsonObject &root) {
 	auto writerVersion = 0;
-	const auto versionParts = appVersion.split('.');
+	const auto versionParts = root.value(u"appVersion"_q).toString().split('.');
 	if (versionParts.size() == 3) {
 		for (const auto &part : versionParts) {
 			auto ok = false;
@@ -254,6 +254,10 @@ void ApplyTelegram(const QJsonObject &object, const QString &appVersion) {
 			writerVersion = writerVersion * 1000 + value;
 		}
 	}
+	return writerVersion;
+}
+
+void ApplyTelegram(const QJsonObject &object, int writerVersion) {
 	auto &settings = Core::App().settings();
 	const auto was = Preserve(settings);
 	if (const auto core = Decode(object.value(u"core"_q))) {
@@ -286,7 +290,7 @@ void ApplyShortcuts(const QJsonArray &shortcuts) {
 	file.write(QJsonDocument(shortcuts).toJson(QJsonDocument::Indented));
 }
 
-void ApplyAccounts(const QJsonObject &accounts) {
+void ApplyAccounts(const QJsonObject &accounts, int writerVersion) {
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
 		if (!account->sessionExists()) {
 			continue;
@@ -301,7 +305,7 @@ void ApplyAccounts(const QJsonObject &accounts) {
 		auto &settings = session->settings();
 		auto unreviewed = settings.unreviewed();
 		const auto setupEmail = settings.setupEmailState();
-		settings.addFromSerialized(*serialized);
+		settings.addFromSerialized(*serialized, writerVersion);
 		settings.setUnreviewed(std::move(unreviewed));
 		settings.setSetupEmailState(setupEmail);
 		session->saveSettings();
@@ -468,6 +472,7 @@ QString SnapshotFolder() {
 
 bool Apply(const Backup &backup, const Parts &parts) {
 	const auto &root = backup.root;
+	const auto writerVersion = ReadWriterVersion(root);
 	const auto use = [&](bool Parts::*part) {
 		return (parts.*part) && (backup.parts.*part);
 	};
@@ -491,7 +496,7 @@ bool Apply(const Backup &backup, const Parts &parts) {
 	if (use(&Parts::telegram)) {
 		ApplyTelegram(
 			root.value(kTelegram).toObject(),
-			root.value(u"appVersion"_q).toString());
+			writerVersion);
 	}
 	if (use(&Parts::secrets)) {
 		ApplySecrets(root.value(kSecrets).toObject());
@@ -500,7 +505,7 @@ bool Apply(const Backup &backup, const Parts &parts) {
 		ApplyShortcuts(root.value(kShortcuts).toArray());
 	}
 	if (use(&Parts::accounts)) {
-		ApplyAccounts(root.value(kAccounts).toObject());
+		ApplyAccounts(root.value(kAccounts).toObject(), writerVersion);
 	}
 	if (use(&Parts::filters)) {
 		ApplyFilters(root.value(kFilters).toObject());

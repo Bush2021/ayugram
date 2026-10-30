@@ -201,6 +201,63 @@ void CheckBlob(LangIdsMigrationReport &report) {
 		u"qt5 file skip migrated"_q);
 }
 
+void CheckAyuPreferences(LangIdsMigrationReport &report) {
+	constexpr auto targetKey = std::string_view("translate-to-language");
+	constexpr auto skipKey = std::string_view("skip-translation-languages");
+	const auto german = LanguageId{ QLocale::German };
+	const auto chinese = LanguageId{ QLocale::Chinese };
+	const auto japanese = LanguageId{ QLocale::Japanese };
+	const auto english = LanguageId{ QLocale::English };
+	const auto russian = LanguageId{ QLocale::Russian };
+	auto origin = Core::Settings();
+	origin.setTranslateTo(german);
+	origin.setSkipTranslationLanguages({ chinese });
+	Check(
+		report,
+		origin.readPref<QString>(targetKey, u"absent"_q) == u"absent"_q
+			&& origin.readPref<QString>(skipKey, u"absent"_q) == u"absent"_q,
+		u"language setters keep one storage format"_q);
+	origin.writePref<QString>(targetKey, u"ja_JP"_q);
+	origin.writePref<QString>(skipKey, u"en_US;ru_RU"_q);
+	Check(
+		report,
+		origin.readPref<QString>(targetKey) == u"ja_JP"_q
+			&& origin.readPref<QString>(skipKey) == u"en_US;ru_RU"_q,
+		u"legacy preferences fixture populated"_q);
+
+	for (const auto hasTail : { false, true }) {
+		auto reader = Core::Settings();
+		reader.addFromSerialized(
+			hasTail ? origin.serialize() : OldFormatBlob(origin),
+			kFirstQt6Release - 1);
+		const auto expectedTarget = hasTail ? german : japanese;
+		const auto expectedSkip = hasTail
+			? std::vector<LanguageId>{ chinese }
+			: std::vector<LanguageId>{ english, russian };
+		Check(
+			report,
+			reader.translateTo() == expectedTarget,
+			u"stable tail takes precedence over legacy target"_q);
+		const auto skip = reader.skipTranslationLanguages();
+		Check(report, skip.size() == expectedSkip.size(), u"skip list size"_q);
+		for (const auto &language : expectedSkip) {
+			Check(report, Contains(skip, language), u"stable skip language kept"_q);
+		}
+		Check(
+			report,
+			reader.readPref<QString>(targetKey, u"absent"_q) == u"absent"_q
+				&& reader.readPref<QString>(skipKey, u"absent"_q) == u"absent"_q,
+			u"legacy preferences removed after loading"_q);
+		const auto saved = reader.serialize();
+		auto again = Core::Settings();
+		again.addFromSerialized(saved, kFirstQt6Release);
+		Check(
+			report,
+			again.translateTo() == expectedTarget && again.serialize() == saved,
+			u"normalized language preferences stay byte-stable"_q);
+	}
+}
+
 void CheckUnsetTarget(LangIdsMigrationReport &report) {
 	auto origin = Core::Settings();
 	origin.setSkipTranslationLanguages({});
@@ -224,6 +281,7 @@ LangIdsMigrationReport RunLangIdsMigrationSelfTest() {
 	CheckSchemeForAppVersion(report);
 	CheckRecover(report);
 	CheckBlob(report);
+	CheckAyuPreferences(report);
 	CheckUnsetTarget(report);
 	report.passed = report.failures.isEmpty();
 	return report;

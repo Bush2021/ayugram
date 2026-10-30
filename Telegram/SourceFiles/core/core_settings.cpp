@@ -101,26 +101,10 @@ constexpr auto kLanguageCodesFormat = qint32(1);
 		kMaxIvZoom);
 }
 
-// QLocale::Language numeric values can change between Qt versions.
-// The legacy sequential stream must keep its enum field for compatibility,
-// so stable locale names are stored in generic preferences as well.
-// Those preferences are loaded before deserialization and override the enum.
 constexpr auto kTranslateToLanguageKey
 	= std::string_view("translate-to-language");
 constexpr auto kSkipTranslationLanguagesKey
 	= std::string_view("skip-translation-languages");
-
-[[nodiscard]] QByteArray SerializeLanguageIds(
-		const std::vector<LanguageId> &list) {
-	auto names = QStringList();
-	names.reserve(int(list.size()));
-	for (const auto &id : list) {
-		if (id) {
-			names.push_back(id.name());
-		}
-	}
-	return names.join(u";"_q).toUtf8();
-}
 
 [[nodiscard]] std::vector<LanguageId> DeserializeLanguageIds(
 		const QByteArray &data) {
@@ -1493,15 +1477,19 @@ void Settings::addFromSerialized(
 		}
 		_translateToRaw = recovered;
 	}
-	if (const auto stored = readPrefGeneric(kTranslateToLanguageKey)) {
-		if (!stored->isEmpty()) {
-			_translateToRaw = int(
-				LanguageId::FromName(QString::fromUtf8(*stored)).value);
+	if (languageCodesFormat != kLanguageCodesFormat) {
+		if (const auto stored = readPrefGeneric(kTranslateToLanguageKey)) {
+			if (!stored->isEmpty()) {
+				_translateToRaw = int(
+					LanguageId::FromName(QString::fromUtf8(*stored)).value);
+			}
+		}
+		if (const auto stored = readPrefGeneric(kSkipTranslationLanguagesKey)) {
+			_skipTranslationLanguages = DeserializeLanguageIds(*stored);
 		}
 	}
-	if (const auto stored = readPrefGeneric(kSkipTranslationLanguagesKey)) {
-		_skipTranslationLanguages = DeserializeLanguageIds(*stored);
-	}
+	clearPref(kTranslateToLanguageKey);
+	clearPref(kSkipTranslationLanguagesKey);
 	_windowTitleContent = WindowTitleContent{
 		.hideChatName = (hideChatName == 1),
 		.hideAccountName = (hideAccountName == 1),
@@ -2138,11 +2126,6 @@ rpl::producer<bool> Settings::translateChatEnabledValue() const {
 
 void Settings::setTranslateTo(LanguageId id) {
 	_translateToRaw = int(id.value);
-	if (id) {
-		writePrefGeneric(kTranslateToLanguageKey, id.name().toUtf8());
-	} else {
-		clearPref(kTranslateToLanguageKey);
-	}
 }
 
 LanguageId Settings::translateTo() const {
@@ -2163,9 +2146,6 @@ rpl::producer<LanguageId> Settings::translateToValue() const {
 void Settings::setSkipTranslationLanguages(
 		std::vector<LanguageId> languages) {
 	_skipTranslationLanguages = std::move(languages);
-	writePrefGeneric(
-		kSkipTranslationLanguagesKey,
-		SerializeLanguageIds(_skipTranslationLanguages.current()));
 }
 
 auto Settings::skipTranslationLanguages() const -> std::vector<LanguageId> {
