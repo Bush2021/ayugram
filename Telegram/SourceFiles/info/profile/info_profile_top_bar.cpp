@@ -4016,6 +4016,10 @@ void TopBar::setupStatusWithRating() {
 	}
 }
 
+rpl::producer<std::optional<QColor>> TopBar::edgeColor() const {
+	return _edgeColor.value();
+}
+
 const style::FlatLabel &TopBar::statusStyle() const {
 	return _peer->isMegagroup()
 		? st::infoProfileMegagroupCover.status

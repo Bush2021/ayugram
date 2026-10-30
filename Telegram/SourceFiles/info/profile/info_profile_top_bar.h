@@ -148,6 +148,8 @@ public:
 		not_null<Window::SessionController*> controller,
 		Wrap wrap);
 
+	rpl::producer<std::optional<QColor>> edgeColor() const;
+
 	rpl::producer<int> desiredHeightValue() const override;
 
 protected:
