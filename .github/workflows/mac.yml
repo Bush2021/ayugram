@@ -12,7 +12,7 @@ jobs:
 
   macos:
     name: macOS
-    runs-on: macos-26
+    runs-on: xcode-27
 
     strategy:
       matrix:
