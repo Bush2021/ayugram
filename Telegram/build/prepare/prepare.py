@@ -590,7 +590,7 @@ mac:
         git+https://chromium.googlesource.com/external/gyp@master six
 """, 'ThirdParty')
 
-rustToolchain = '1.96.1'
+rustToolchain = '1.99.1'
 stage('rust', """
 win:
     powershell -Command "iwr -OutFile ./rustup-init.exe https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
