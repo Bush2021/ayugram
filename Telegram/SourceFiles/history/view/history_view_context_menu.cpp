@@ -1869,6 +1869,14 @@ void FillContextMenuItems(
 		}, &st::menuIconTranslate);
 	}
 
+	if (request.overSelection) {
+		AyuUi::AddCreateFilterAction(
+			result,
+			list->controller(),
+			item,
+			list->getSelectedText().rich.text);
+	}
+
 	AddTopMessageActions(result, request, list);
 	if (lnkPhoto && request.selectedItems.empty()) {
 		AddPhotoActions(result, lnkPhoto, item, list);
