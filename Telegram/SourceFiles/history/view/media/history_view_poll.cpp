@@ -3125,6 +3125,7 @@ void Poll::Options::updateAnswers() {
 		});
 		return;
 	}
+	const auto has = _owner->hasHeavyPart();
 	_answers = ranges::views::all(options) | ranges::views::transform([&](
 			const QByteArray &option) {
 		auto result = Answer();
@@ -3162,6 +3163,10 @@ void Poll::Options::updateAnswers() {
 	});
 
 	resetAnswersAnimation();
+
+	if (has && !_owner->hasHeavyPart()) {
+		_owner->_parent->checkHeavyPart();
+	}
 }
 
 ClickHandlerPtr Poll::Options::createAnswerClickHandler(
@@ -3429,6 +3434,7 @@ void Poll::Options::updateAnswerVotes() {
 			gsl::make_span(PercentsStorage).subspan(0, count));
 	}
 
+	const auto has = _owner->hasHeavyPart();
 	for (auto &answer : _answers) {
 		const auto i = ranges::find(
 			_owner->_poll->answers,
@@ -3442,6 +3448,9 @@ void Poll::Options::updateAnswerVotes() {
 			PercentsStorage[index],
 			maxVotes,
 			showPercent);
+	}
+	if (has && !_owner->hasHeavyPart()) {
+		_owner->_parent->checkHeavyPart();
 	}
 }
 

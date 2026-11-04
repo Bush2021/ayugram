@@ -1064,32 +1064,6 @@ void SendLocation(SendAction action, float64 lat, float64 lon) {
 				MTPint()))); // accuracy_radius
 }
 
-void SendVenue(SendAction action, Data::InputVenue venue) {
-	if (action.history->peer->isSecretChat()) {
-		SendToSecretChat(action, secret_decryptedMessageMediaVenue(
-			secret_double(venue.lat),
-			secret_double(venue.lon),
-			secret_string(venue.title),
-			secret_string(venue.address),
-			secret_string(venue.provider),
-			secret_string(venue.id)));
-		return;
-	}
-	SendSimpleMedia(
-		action,
-		MTP_inputMediaVenue(
-			MTP_inputGeoPoint(
-				MTP_flags(0),
-				MTP_double(venue.lat),
-				MTP_double(venue.lon),
-				MTPint()), // accuracy_radius
-			MTP_string(venue.title),
-			MTP_string(venue.address),
-			MTP_string(venue.provider),
-			MTP_string(venue.id),
-			MTP_string(venue.venueType)));
-}
-
 void FillMessagePostFlags(
 		const SendAction &action,
 		not_null<PeerData*> peer,
