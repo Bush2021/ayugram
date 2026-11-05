@@ -112,6 +112,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/audio/media_audio.h"
 #include "media/player/media_player_instance.h"
 #include "spellcheck/spellcheck_types.h"
+#include "tgw/tgw_log_box.h"
+#include "tgw/tgw_selection.h"
 #include "apiwrap.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -1842,7 +1844,7 @@ void FillContextMenuItems(
 	}
 	AddTodoListAction(result, request, list);
 
-	if (request.overSelection
+	if ((request.overSelection || (item && list->hasWidgetSelection(item)))
 		&& !list->hasCopyRestrictionForSelected()
 		&& !list->getSelectedText().empty()) {
 		const auto text = request.selectedItems.empty()
@@ -1961,6 +1963,7 @@ void FillContextMenuItems(
 				}, &st::menuIconTranslate);
 			}
 		}
+		Tgw::AddLogAction(result, view, list->controller()->uiShow());
 	}
 
 	AddCopyLinkAction(result, link);
@@ -2850,6 +2853,7 @@ void ShowWhoReactedMenu(
 				context,
 				st::whoReadMenu);
 			(*menu)->lifetime().add(base::take(lifetime));
+			Tgw::ListSelection::Watch(context, menu->get());
 		}
 		filler->populate(
 			menu->get(),

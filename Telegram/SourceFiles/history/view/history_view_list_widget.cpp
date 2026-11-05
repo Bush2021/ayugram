@@ -62,6 +62,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "media/player/media_player_instance.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
+#include "tgw/tgw_scroll.h"
+#include "tgw/tgw_selection.h"
+#include "tgw/tgw_touch.h"
 #include "ui/layers/generic_box.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/elastic_scroll.h"
@@ -559,6 +562,9 @@ void ListWidget::enumerateForumThreadBars(Method method) {
 	enumerateItems<EnumItemsDirection::BottomToTop>(barCallback);
 }
 
+template void ListWidget::enumerateDates(Tgw::ListTouch::Floating);
+template void ListWidget::enumerateForumThreadBars(Tgw::ListTouch::Floating);
+
 ListWidget::ListWidget(
 	QWidget *parent,
 	not_null<Main::Session*> session,
@@ -596,6 +602,8 @@ ListWidget::ListWidget(
 	[=](const HistoryItem *item) { return viewForItem(item); },
 	[=](const Element *view) { repaintItem(view); })
 , _touchSelectTimer([=] { onTouchSelect(); })
+, _widgetTouch(Tgw::ListTouch::Create(this))
+, _widgetSelection(Tgw::ListSelection::Create(this))
 , _touchScrollTimer([=] { onTouchScrollTimer(); })
 , _touchElastic(_delegate->listScrollArea(), [=](QPoint d, bool pressed) {
 	return _delegate->listScrollTo(_visibleTop - d.y(), !pressed);
@@ -623,11 +631,20 @@ ListWidget::ListWidget(
 	setAccessibleName(tr::lng_sr_message_list(tr::now));
 	if (const auto scroll = _delegate->listScrollArea()) {
 		scroll->lockWheelDirection();
-		scroll->setCrossAxisWheelProcess([=](
-				QPoint delta,
-				Qt::ScrollPhase phase) {
+		const auto crossAxis = [=](QPoint delta, Qt::ScrollPhase phase) {
 			return consumeScrollAction(delta, phase);
-		});
+		};
+		const auto wheelProcess = [=](not_null<QWheelEvent*> e) {
+			return processSendingLandingWheel(e);
+		};
+		scroll->setCrossAxisWheelProcess(crossAxis);
+		scroll->setCustomWheelProcess(wheelProcess);
+		Tgw::ListScroll::WatchInput(
+			scroll,
+			crl::guard(this, [=] { Tgw::ListScroll::Input(this); }),
+			crossAxis,
+			true,
+			wheelProcess);
 	}
 	if (_readMetricsTracker) {
 		Core::App().inAppKeyPressed(
@@ -754,11 +771,15 @@ ListWidget::ListWidget(
 	}
 
 	_session->data().itemVisibilityQueries(
-	) | rpl::on_next([=](
+	) | rpl::filter([=](
+			const Data::Session::ItemVisibilityQuery &query) {
+		return !query.view || isVisible();
+	}) | rpl::on_next([=](
 			const Data::Session::ItemVisibilityQuery &query) {
 		if (const auto view = viewForItem(query.item)) {
 			const auto top = itemTop(view);
-			if (top >= 0
+			if ((!query.view || (query.view == view))
+				&& top >= 0
 				&& top + view->height() > _visibleTop
 				&& top < _visibleBottom) {
 				*query.isVisible = true;
@@ -933,6 +954,7 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	}
 
 	saveScrollState();
+	const auto saved = Tgw::ListScroll::CaptureSaved(this);
 
 	const auto wasKnownTillEnd = _itemsKnownTillEnd;
 	const auto scrolledTillEnd = _itemsKnownTillEnd
@@ -1042,6 +1064,7 @@ void ListWidget::refreshRows(const Data::MessagesSlice &old) {
 	}
 	const auto markLastAsRead = (scrolledTillEnd && markingMessagesRead());
 	checkUnreadBarCreation(markLastAsRead);
+	Tgw::ListScroll::Keep(this, saved);
 	restoreScrollState();
 	if (_sendingLanding.active) {
 		auto &landing = _sendingLanding;
@@ -1241,6 +1264,7 @@ void ListWidget::scrollTo(
 		Data::MessagePosition attachPosition,
 		int delta,
 		AnimatedScroll type,
+		Fn<std::optional<int>()> placement,
 		crl::time duration) {
 	_scrollToAnimation.stop();
 	_scrollToBottomAnimation = false;
@@ -1251,10 +1275,18 @@ void ListWidget::scrollTo(
 	const auto transition = (type == AnimatedScroll::Full)
 		? anim::sineInOut
 		: anim::easeOutCubic;
+	const auto consumed = [=] {
+		return Tgw::ListScroll::Consumed(this);
+	};
+	const auto inputs = [=] {
+		return Tgw::ListScroll::Inputs(this);
+	};
 	if (delta > 0 && scrollTop == height() - (_visibleBottom - _visibleTop)) {
 		// Animated scroll to bottom.
 		_scrollToBottomAnimation = true;
-		_scrollToAnimation.start(
+		_scrollToFlight.start(-delta, 0, consumed, consumed(), inputs, nullptr);
+		_scrollToFlight.animate(
+			&_scrollToAnimation,
 			[=] { scrollToAnimationCallback(FullMsgId(), 0); },
 			-delta,
 			0,
@@ -1264,15 +1296,27 @@ void ListWidget::scrollTo(
 	}
 	const auto index = findNearestItem(attachPosition);
 	Assert(index >= 0 && index < int(_items.size()));
-	const auto attachTo = _items[index];
-	const auto attachToId = attachTo->data()->fullId();
+	const auto attachToId = _items[index]->data()->fullId();
 	const auto initial = scrollTop - delta;
+	const auto count = consumed();
 	_delegate->listScrollTo(initial);
 
+	const auto attachTo = viewForItem(attachToId);
+	if (!attachTo) {
+		return;
+	}
 	const auto attachToTop = itemTop(attachTo);
 	const auto relativeStart = initial - attachToTop;
 	const auto relativeFinish = scrollTop - attachToTop;
-	_scrollToAnimation.start(
+	_scrollToFlight.start(
+		relativeStart,
+		relativeFinish,
+		consumed,
+		count,
+		inputs,
+		std::move(placement));
+	_scrollToFlight.animate(
+		&_scrollToAnimation,
 		[=] { scrollToAnimationCallback(attachToId, relativeFinish); },
 		relativeStart,
 		relativeFinish,
@@ -1318,19 +1362,24 @@ void ListWidget::scrollToCurrentVoiceMessage(
 		*scrollTop,
 		to->data()->position(),
 		*scrollTop - _visibleTop,
-		AnimatedScroll::Part);
+		AnimatedScroll::Part,
+		Tgw::ListScroll::Placement(this, to->data()->position()));
 }
 
 void ListWidget::scrollToAnimationCallback(
 		FullMsgId attachToId,
 		int relativeTo) {
+	const auto apply = [=](int top) {
+		_delegate->listScrollTo(top);
+	};
 	if (!attachToId) {
 		// Animated scroll to bottom.
-		const auto current = int(base::SafeRound(
-			_scrollToAnimation.value(0)));
-		_delegate->listScrollTo(height()
-			- (_visibleBottom - _visibleTop)
-			+ current);
+		_scrollToFlight.frame(
+			height() - (_visibleBottom - _visibleTop),
+			_scrollToAnimation.value(0),
+			_visibleTop,
+			!_scrollToAnimation.animating(),
+			apply);
 		return;
 	}
 	const auto attachTo = session().data().message(attachToId);
@@ -1338,9 +1387,12 @@ void ListWidget::scrollToAnimationCallback(
 	if (!attachToView) {
 		_scrollToAnimation.stop();
 	} else {
-		const auto current = int(base::SafeRound(_scrollToAnimation.value(
-			relativeTo)));
-		_delegate->listScrollTo(itemTop(attachToView) + current);
+		_scrollToFlight.frame(
+			itemTop(attachToView),
+			_scrollToAnimation.value(relativeTo),
+			_visibleTop,
+			!_scrollToAnimation.animating(),
+			apply);
 	}
 }
 
@@ -1491,7 +1543,11 @@ bool ListWidget::showAtPositionNow(
 		: (_bar.element && !_bar.hidden && _bar.focus)
 		? _bar.element->data()->position()
 		: Data::MaxMessagePosition;
-	computeScrollTo(*scrollTop, attachTo, params.animated);
+	computeScrollTo(
+		*scrollTop,
+		attachTo,
+		params.animated,
+		Tgw::ListScroll::Placement(this, position));
 	if (done) {
 		const auto found = !position.fullId.peer
 			|| !IsServerMsgId(position.fullId.msg)
@@ -1505,6 +1561,7 @@ void ListWidget::computeScrollTo(
 		int to,
 		Data::MessagePosition position,
 		anim::type animated,
+		Fn<std::optional<int>()> placement,
 		crl::time duration) {
 	const auto currentScrollHeight = (_visibleBottom - _visibleTop);
 	const auto currentScrollTop = _visibleTop;
@@ -1519,7 +1576,13 @@ void ListWidget::computeScrollTo(
 		: (std::abs(fullDelta) > limit)
 		? AnimatedScroll::Part
 		: AnimatedScroll::Full;
-	scrollTo(wanted, position, scrollDelta, type, duration);
+	scrollTo(
+		wanted,
+		position,
+		scrollDelta,
+		type,
+		std::move(placement),
+		duration);
 }
 
 void ListWidget::checkUnreadBarCreation(bool markLastAsRead) {
@@ -1870,6 +1933,7 @@ MessageIdsList ListWidget::collectSelectedIds() const {
 
 void ListWidget::pushSelectedItems() {
 	_delegate->listSelectionChanged(collectSelectedItems());
+	Tgw::RefreshNativeCopy();
 }
 
 void ListWidget::removeItemSelection(
@@ -2313,7 +2377,9 @@ void ListWidget::clearTextSelection() {
 		_selectedTextItem = nullptr;
 		_selectedTextSelection = MessageSelection();
 		_selectedText = TextForMimeData();
+		Tgw::RefreshNativeCopy();
 	}
+	_widgetSelection->clear();
 }
 
 void ListWidget::setTextSelection(
@@ -2333,6 +2399,7 @@ void ListWidget::setTextSelection(
 		? view->selectedText(selection)
 		: TextForMimeData();
 	repaintItem(view);
+	Tgw::RefreshNativeCopy();
 	if (!_wasSelectedText && !_selectedText.empty()) {
 		_wasSelectedText = true;
 		setFocus();
@@ -2388,16 +2455,9 @@ bool ListWidget::hasCopyMediaRestriction(not_null<HistoryItem*> item) const {
 }
 
 bool ListWidget::showCopyRestriction(HistoryItem *item) {
-	const auto type = _delegate->listCopyRestrictionType(item);
-	if (type == CopyRestrictionType::None) {
-		return false;
-	}
-	_delegate->listUiShow()->showToast((type == CopyRestrictionType::Channel)
-		? tr::lng_error_nocopy_channel(tr::now)
-		: (type == CopyRestrictionType::User)
-		? tr::lng_error_nocopy_user(tr::now)
-		: tr::lng_error_nocopy_group(tr::now));
-	return true;
+	return Tgw::ShowCopyRestriction(
+		_delegate->listCopyRestrictionType(item),
+		[=] { return _delegate->listUiShow(); });
 }
 
 bool ListWidget::showCopyMediaRestriction(not_null<HistoryItem*> item) {
@@ -2418,7 +2478,8 @@ bool ListWidget::hasCopyRestrictionForSelected() const {
 		return true;
 	}
 	if (_selected.empty()) {
-		if (_selectedTextItem && _selectedTextItem->forbidsForward()) {
+		if ((_selectedTextItem && _selectedTextItem->forbidsForward())
+			|| _widgetSelection->copyRestricted()) {
 			return true;
 		}
 	}
@@ -2434,7 +2495,8 @@ bool ListWidget::hasCopyRestrictionForSelected() const {
 
 bool ListWidget::showCopyRestrictionForSelected() {
 	if (_selected.empty()) {
-		if (_selectedTextItem && showCopyRestriction(_selectedTextItem)) {
+		if ((_selectedTextItem && showCopyRestriction(_selectedTextItem))
+			|| Tgw::ListSelection::ShowRestriction(this)) {
 			return true;
 		}
 	}
@@ -2958,8 +3020,10 @@ void ListWidget::resizeToWidth(int newWidth, int minHeight) {
 	if (width() != newWidth && _overlayHost) {
 		_overlayHost->hide();
 	}
+	const auto snapshot = Tgw::ListScroll::Capture(this);
 	_minHeight = minHeight;
 	RpWidget::resizeToWidth(newWidth);
+	Tgw::ListScroll::Keep(this, snapshot);
 	restoreScrollPosition();
 	if (_thanosController) {
 		_thanosController->pinScroll();
@@ -3120,6 +3184,7 @@ void ListWidget::scrollToBottomForSending() {
 			*top,
 			Data::MaxMessagePosition,
 			anim::type::normal,
+			nullptr,
 			st::itemRevealDuration);
 	}
 }
@@ -3941,8 +4006,10 @@ HistorySelectedTextParts ListWidget::getSelectedTextParts() const {
 	if (selected.empty()) {
 		if (const auto view = viewForItem(_selectedTextItem)) {
 			return { .texts = { view->selectedText(_selectedTextSelection) } };
+		} else if (_selectedTextItem) {
+			return { .texts = { _selectedText } };
 		}
-		return { .texts = { _selectedText } };
+		return { .texts = { _widgetSelection->text() } };
 	}
 
 	const auto richContext = (selected.size() > 1);
@@ -4295,20 +4362,22 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 	}
 
 	if (key == Qt::Key_Escape || key == Qt::Key_Back) {
-		if (hasSelectedText() || hasSelectedItems()) {
+		if (hasSelectedText()
+			|| hasSelectedItems()
+			|| _widgetSelection->has()) {
 			cancelSelection();
 		} else {
 			_delegate->listCancelRequest();
 		}
 	} else if (e == QKeySequence::Copy
-		&& (hasSelectedText() || hasSelectedItems())
+		&& canCopySelected()
 		&& !showCopyRestriction()
-		&& !hasCopyRestrictionForSelected()) {
+		&& (_widgetSelection->has() || !hasCopyRestrictionForSelected())) {
 		copySelectedText();
 	} else if (IsCopyWithImageTextShortcut(e, &session())
-		&& (hasSelectedText() || hasSelectedItems())
+		&& canCopySelected()
 		&& !showCopyRestriction()
-		&& !hasCopyRestrictionForSelected()) {
+		&& (_widgetSelection->has() || !hasCopyRestrictionForSelected())) {
 		copySelectedText(true);
 #ifdef Q_OS_MAC
 	} else if (key == Qt::Key_E
@@ -4448,7 +4517,15 @@ void ListWidget::validateTrippleClickStartTime() {
 }
 
 void ListWidget::contextMenuEvent(QContextMenuEvent *e) {
+	if (e->reason() == QContextMenuEvent::Mouse) {
+		mouseActionUpdate(e->globalPos());
+	}
+	if (_widgetTouch->mouseMenu(e)) {
+		e->accept();
+		return;
+	}
 	showContextMenu(e);
+	_widgetSelection->watch(_menu.get());
 }
 
 void ListWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
@@ -4669,6 +4746,7 @@ void ListWidget::reactionChosen(ChosenReaction reaction) {
 }
 
 void ListWidget::mousePressEvent(QMouseEvent *e) {
+	_widgetSelection->listPress(e->button(), bool(_menu));
 	if (_menu) {
 		e->accept();
 		return; // ignore mouse press, that was hiding context menu
@@ -4707,6 +4785,8 @@ void ListWidget::onTouchScrollTimer() {
 			_touchPos);
 		if (consumedHorizontal) {
 			_horizontalScrollLocked = true;
+		} else if (!_horizontalScrollLocked && delta.y()) {
+			Tgw::ListScroll::Input(this);
 		}
 		const auto weak = base::make_weak(this);
 		const auto hasScrolled = consumedHorizontal
@@ -4809,6 +4889,7 @@ void ListWidget::touchDeaccelerate(int32 elapsed) {
 }
 
 void ListWidget::touchEvent(QTouchEvent *e) {
+	const auto bridge = Tgw::TouchBridge();
 	if (e->type() == QEvent::TouchCancel) { // cancel
 		if (!_touchInProgress) return;
 		_touchInProgress = false;
@@ -4820,6 +4901,7 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 		touchResetSpeed();
 		_touchMaybeSelecting = false;
 		mouseActionCancel();
+		_widgetTouch->cancel();
 		_touchElastic.finish(true);
 		return;
 	}
@@ -4832,10 +4914,12 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 
 	switch (e->type()) {
 	case QEvent::TouchBegin: {
+		_widgetSelection->dismiss();
 		if (_menu) {
 			e->accept();
 			return; // ignore mouse press, that was hiding context menu
 		}
+		_widgetTouch->retire();
 		if (_touchInProgress) return;
 		if (e->touchPoints().isEmpty()) return;
 
@@ -4851,8 +4935,10 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 			_touchStart = _touchPos;
 		} else {
 			_touchScroll = false;
-			_touchMaybeSelecting = true;
-			_touchSelectTimer.callOnce(QApplication::startDragTime());
+			if (!_widgetTouch->begin(_touchPos)) {
+				_touchMaybeSelecting = true;
+				_touchSelectTimer.callOnce(QApplication::startDragTime());
+			}
 		}
 		_touchSelect = false;
 		_touchStart = _touchPrevPos = _touchPos;
@@ -4860,9 +4946,14 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 
 	case QEvent::TouchUpdate: {
 		if (!_touchInProgress) return;
-		if (_touchSelect) {
+		const auto widget = _widgetTouch->update(_touchPos);
+		if (widget == false) {
+			return;
+		} else if (_touchSelect) {
 			mouseActionUpdate(_touchPos);
-		} else if (!_touchScroll && (_touchPos - _touchStart).manhattanLength() >= QApplication::startDragDistance()) {
+		} else if (!_touchScroll
+			&& widget.value_or((_touchPos - _touchStart).manhattanLength()
+				>= QApplication::startDragDistance())) {
 			_touchSelectTimer.cancel();
 			_touchMaybeSelecting = false;
 			_touchScroll = true;
@@ -4891,6 +4982,8 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 		auto weak = base::make_weak(this);
 		const auto notMoved = (_touchPos - _touchStart).manhattanLength()
 			< QApplication::startDragDistance();
+		const auto widget = _widgetTouch->end(_touchPos);
+		_touchScroll = widget.value_or(_touchScroll);
 		if (_touchSelect) {
 			if (notMoved || _touchMaybeSelecting.current()) {
 				mouseActionFinish(_touchPos, Qt::RightButton);
@@ -4922,8 +5015,8 @@ void ListWidget::touchEvent(QTouchEvent *e) {
 				_touchWaitingAcceleration = false;
 				_touchPrevPosValid = false;
 			}
-		} else if (notMoved) { // One short tap is like left mouse click.
-			mouseActionStart(_touchPos, Qt::LeftButton);
+		} else if (notMoved && !widget) { // One short tap is like left mouse click.
+			mouseActionStart(_touchPos, Qt::LeftButton, true);
 			mouseActionFinish(_touchPos, Qt::LeftButton);
 		}
 		if (weak) {
@@ -4969,11 +5062,13 @@ void ListWidget::mouseReleaseEvent(QMouseEvent *e) {
 		return;
 	}
 	if (_middleClickAutoscroll.active()) {
+		_widgetTouch->mouseRelease(e->button());
 		e->accept();
 		return;
 	}
 	registerReadMetricsActivity();
 	mouseActionFinish(e->globalPos(), e->button());
+	_widgetTouch->mouseRelease(e->button());
 	if (!rect().contains(e->pos())) {
 		leaveEvent(e);
 	}
@@ -4997,9 +5092,13 @@ void ListWidget::touchScrollUpdated(const QPoint &screenPos) {
 			Qt::NoScrollPhase,
 			_touchPos)) {
 		_horizontalScrollLocked = true;
-	} else if (!_horizontalScrollLocked
-		&& !_touchElastic.drag(_touchPos - _touchPrevPos)) {
-		return;
+	} else if (!_horizontalScrollLocked) {
+		if ((_touchPos - _touchPrevPos).y()) {
+			Tgw::ListScroll::Input(this);
+		}
+		if (!_touchElastic.drag(_touchPos - _touchPrevPos)) {
+			return;
+		}
 	}
 	touchUpdateSpeed();
 }
@@ -5068,9 +5167,10 @@ void ListWidget::updateDragSelection() {
 }
 
 void ListWidget::onTouchSelect() {
+	const auto bridge = Tgw::TouchBridge();
 	_touchSelect = true;
 	_touchMaybeSelecting = true;
-	mouseActionStart(_touchPos, Qt::LeftButton);
+	mouseActionStart(_touchPos, Qt::LeftButton, true);
 }
 
 void ListWidget::updateDragSelection(
@@ -5219,13 +5319,16 @@ void ListWidget::clearDragSelection() {
 
 void ListWidget::mouseActionStart(
 		const QPoint &globalPosition,
-		Qt::MouseButton button) {
+		Qt::MouseButton button,
+		bool fromTouch) {
 	mouseActionUpdate(globalPosition);
 	if (button != Qt::LeftButton) {
+		_widgetTouch->mousePress(button);
 		return;
 	}
 
 	ClickHandler::pressed();
+	_widgetSelection->press();
 	if (_pressState != _overState) {
 		if (_pressState.itemId != _overState.itemId) {
 			repaintItem(_pressState.itemId);
@@ -5246,7 +5349,9 @@ void ListWidget::mouseActionStart(
 	if (pressed
 		&& (!_overElement
 			|| _overState.pointState == PointState::Outside
-			|| !_overElement->allowTextSelectionByHandler(pressed))) {
+			|| !_overElement->allowTextSelectionByHandler(
+				pressed,
+				fromTouch))) {
 		_mouseAction = MouseAction::PrepareDrag;
 	} else if (inSelectionMode().inSelectionMode) {
 		if (overSelectedItems()) {
@@ -5388,7 +5493,14 @@ void ListWidget::mouseActionFinish(
 			&& _overElement->toggleSelectionByHandlerClick(handler);
 	};
 
+	const auto wasPressed = bool(ClickHandler::getPressed());
 	auto activated = ClickHandler::unpressed();
+	_widgetSelection->release();
+	if (const auto view = Element::HoveredLink()) {
+		if (wasPressed && !activated && view == _overElement) {
+			view->updatePressed(_overState.point);
+		}
+	}
 	auto simpleSelectionChange = pressState.itemId
 		&& !_pressWasInactive
 		&& (button != Qt::RightButton)
@@ -5513,6 +5625,18 @@ void ListWidget::mouseActionUpdate() {
 	auto point = QPoint(
 		std::clamp(mousePosition.x(), 0, width()),
 		std::clamp(mousePosition.y(), _visibleTop, _visibleBottom));
+
+	// Voice message seek support.
+	if (_pressState.pointState != PointState::Outside
+		&& ClickHandler::getPressed()) {
+		if (const auto item = session().data().message(_pressState.itemId)) {
+			if (const auto view = viewForItem(item)) {
+				auto adjustedPoint = mapPointToItem(mousePosition, view);
+				view->updatePressed(adjustedPoint);
+			}
+		}
+	}
+	_widgetSelection->update();
 
 	const auto reactionState = _reactionsManager
 		? _reactionsManager->buttonTextState(point)
@@ -5774,15 +5898,8 @@ void ListWidget::mouseActionUpdate() {
 		}
 	}
 
-	// Voice message seek support.
-	if (_pressState.pointState != PointState::Outside
-		&& ClickHandler::getPressed()) {
-		if (const auto item = session().data().message(_pressState.itemId)) {
-			if (const auto view = viewForItem(item)) {
-				auto adjustedPoint = mapPointToItem(point, view);
-				view->updatePressed(adjustedPoint);
-			}
-		}
+	if (view && !ClickHandler::getPressed()) {
+		view->updatePressed(itemPoint);
 	}
 
 	if (_mouseAction == MouseAction::Selecting) {
@@ -5796,7 +5913,9 @@ void ListWidget::mouseActionUpdate() {
 }
 
 style::cursor ListWidget::computeMouseCursor() const {
-	if (ClickHandler::getPressed() || ClickHandler::getActive()) {
+	if (ClickHandler::getPressed()
+		|| (ClickHandler::getActive()
+			&& _mouseCursorState != CursorState::Default)) {
 		return style::cur_pointer;
 	} else if (!hasSelectedItems()
 		&& (_mouseCursorState == CursorState::Text)) {
@@ -6316,7 +6435,9 @@ void ListWidget::itemRemoved(not_null<const HistoryItem*> item) {
 	}
 
 	saveScrollState();
+	const auto saved = Tgw::ListScroll::CaptureSaved(this);
 	const auto guard = gsl::finally([&] {
+		Tgw::ListScroll::Keep(this, saved);
 		restoreScrollState();
 	});
 
