@@ -721,6 +721,7 @@ public:
 
 	void searchQueryChanged(QString query);
 	bool submitted();
+	[[nodiscard]] bool hasKeyboardSelection();
 
 	PeerListRowId updateFromParentDrag(QPoint globalPosition);
 	void dragLeft();
@@ -1231,6 +1232,7 @@ public:
 	void showFinished() override;
 
 	void appendQueryChangedCallback(Fn<void(QString)>);
+	void setSearchSubmittedHandler(Fn<bool(const QString &query)> handler);
 
 protected:
 	void prepare() override;
@@ -1274,6 +1276,7 @@ private:
 
 	const std::shared_ptr<Main::SessionShow> _show;
 	Fn<void(QString)> _customQueryChangedCallback;
+	Fn<bool(const QString &)> _searchSubmittedHandler;
 	std::unique_ptr<PeerListController> _controller;
 	Fn<void(PeerListBox*)> _init;
 	bool _scrollBottomFixed = false;

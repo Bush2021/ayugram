@@ -101,6 +101,7 @@ public:
 	void updateFilter(QString filter = QString());
 	[[nodiscard]] bool isFilterEmpty() const;
 	void selectActive();
+	[[nodiscard]] bool hasKeyboardActive() const;
 
 	rpl::producer<Ui::ScrollToRequest> scrollToRequests() const;
 	rpl::producer<> searchRequests() const;
@@ -189,6 +190,7 @@ private:
 	int _rowHeight = 0;
 	int _columnCount = 4;
 	int _active = -1;
+	bool _activeByKeyboard = false;
 	int _upon = -1;
 	int _visibleTop = 0;
 
@@ -327,7 +329,10 @@ void ShareBox::prepare() {
 	_select->setResizedCallback([=] { updateScrollSkips(); });
 	_select->setSubmittedCallback([=](Qt::KeyboardModifiers modifiers) {
 		if (modifiers.testFlag(Qt::ControlModifier)
-			|| modifiers.testFlag(Qt::MetaModifier)) {
+			|| modifiers.testFlag(Qt::MetaModifier)
+			|| (_hasSelected
+				&& _select->getQuery().isEmpty()
+				&& !_inner->hasKeyboardActive())) {
 			submit({});
 		} else {
 			_inner->selectActive();
@@ -986,6 +991,7 @@ int ShareBox::Inner::displayedChatsCount() const {
 }
 
 void ShareBox::Inner::activateSkipColumn(int direction) {
+	_activeByKeyboard = true;
 	if (_active < 0) {
 		if (direction > 0) {
 			setActive(0);
@@ -1386,12 +1392,17 @@ void ShareBox::Inner::updateUpon(const QPoint &pos) {
 void ShareBox::Inner::mousePressEvent(QMouseEvent *e) {
 	if (e->button() == Qt::LeftButton) {
 		updateUpon(e->pos());
+		_activeByKeyboard = false;
 		changeCheckState(getChatAtIndex(_upon));
 	}
 }
 
 void ShareBox::Inner::selectActive() {
 	changeCheckState(getChatAtIndex(_active > 0 ? _active : 0));
+}
+
+bool ShareBox::Inner::hasKeyboardActive() const {
+	return _activeByKeyboard && (_active >= 0);
 }
 
 void ShareBox::Inner::resizeEvent(QResizeEvent *e) {

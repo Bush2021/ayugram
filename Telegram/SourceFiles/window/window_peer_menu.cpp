@@ -3846,6 +3846,17 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 
 	Ui::SendPendingMoveResizeEvents(comment);
 
+	state->box->setSearchSubmittedHandler([=](const QString &query) {
+		if (!query.isEmpty()
+			|| !state->controller->hasSelected()
+			|| state->box->peerListContent()->hasKeyboardSelection()) {
+			return false;
+		} else if (const auto onstack = state->submit) {
+			onstack({});
+		}
+		return true;
+	});
+
 	state->box->focusRequests(
 	) | rpl::on_next([=] {
 		if (!comment->isHidden()) {

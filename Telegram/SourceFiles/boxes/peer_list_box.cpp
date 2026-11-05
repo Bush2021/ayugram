@@ -130,6 +130,10 @@ void PeerListBox::createMultiSelect() {
 		[this] { updateScrollSkips(); },
 		lifetime());
 	_select->entity()->setSubmittedCallback([=](Qt::KeyboardModifiers) {
+		if (_searchSubmittedHandler
+			&& _searchSubmittedHandler(_select->entity()->getQuery())) {
+			return;
+		}
 		content()->submitted();
 	});
 	_select->entity()->setQueryChangedCallback([=](const QString &query) {
@@ -156,6 +160,11 @@ void PeerListBox::createMultiSelect() {
 
 void PeerListBox::appendQueryChangedCallback(Fn<void(QString)> callback) {
 	_customQueryChangedCallback = std::move(callback);
+}
+
+void PeerListBox::setSearchSubmittedHandler(
+		Fn<bool(const QString &query)> handler) {
+	_searchSubmittedHandler = std::move(handler);
 }
 
 void PeerListBox::setAddedTopScrollSkip(int skip, bool aboveSearch) {
@@ -2592,6 +2601,10 @@ bool PeerListContent::submitted() {
 		return true;
 	}
 	return false;
+}
+
+bool PeerListContent::hasKeyboardSelection() {
+	return !_mouseSelection && (getRow(_selected.index) != nullptr);
 }
 
 PeerListRowId PeerListContent::updateFromParentDrag(QPoint globalPosition) {
