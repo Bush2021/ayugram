@@ -41,7 +41,7 @@ TTLButton::TTLButton(
 		const auto ttl = peer->messagesTTL();
 		_button.setText(peer->isSecretChat() // AyuGram: ayu/secret.
 			? AyuSecret::FormatTtlTiny(ttl)
-			: Ui::FormatTTLTiny(ttl));
+			: Ui::FormatTTLBadge(ttl));
 	}, _button.lifetime());
 }
 

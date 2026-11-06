@@ -1191,7 +1191,9 @@ void ChooseTopicSearchController::searchOnServer() {
 		}
 		delegate()->peerListSearchRefreshRows();
 	}).fail([=] {
+		_requestId = 0;
 		_allLoaded = true;
+		delegate()->peerListSearchRefreshRows();
 	}).send();
 }
 

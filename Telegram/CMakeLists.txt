@@ -2331,6 +2331,8 @@ PRIVATE
     test/test_hover.h
     test/test_ink.cpp
     test/test_ink.h
+    test/test_l10n_seams.cpp
+    test/test_l10n_seams.h
     test/test_lang_ids_migration.cpp
     test/test_lang_ids_migration.h
     test/test_lang_pack.cpp
@@ -2839,6 +2841,10 @@ else()
     PRIVATE
         tray_accounts_menu_dummy.cpp
     )
+endif()
+
+if (TDESKTOP_L10N_CAPTURE)
+    include(${TDESKTOP_L10N_CAPTURE}/capture.cmake)
 endif()
 
 if (NOT build_winstore)
