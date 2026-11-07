@@ -9621,6 +9621,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SecretChatFileRejected" = "A file did not match its key and was discarded.";
 "ayu_NewSecretChat" = "New Secret Chat";
 "ayu_SecretChatKey" = "Encryption Key";
+"ayu_CommonMessages" = "Messages in Common Groups";
+"ayu_CommonMessagesEmpty" = "No recent messages from this user in your common groups.";
 "ayu_SecretChatClearHint" = "This will also clear the history for {user}.";
 "ayu_SecretChatDeleteConfirm" = "Delete the secret chat with {user} and all messages for both of you?\n\nThis action cannot be undone.";
 "ayu_SecretChatReportSure" = "Are you sure you want to report spam from {user}?";

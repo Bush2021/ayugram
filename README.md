@@ -85,6 +85,12 @@ Missing messages in the range load automatically, including in topics and commen
 threads. At most 100 messages can be selected; if the range holds more, the
 selection stays as it was and a notice says so.
 
+### Messages in common groups
+
+Another user's profile shows Messages in Common Groups when you share a group with them.
+It lists their 20 most recent messages from each common group, newest first. Click one
+to jump to it in its chat. Channels are not searched.
+
 ### Mention by ID
 
 Typing @ and a user ID in the message field, such as @123456789, makes the mention

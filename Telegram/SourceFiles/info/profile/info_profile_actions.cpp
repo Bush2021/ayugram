@@ -122,6 +122,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/secret/data_secret_chat.h"
 #include "ayu/secret/ui/secret_key_box.h"
 #include "ayu/secret/ui/secret_ttl_box.h"
+#include "ayu/ui/boxes/common_messages_box.h"
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_ayu_styles.h"
@@ -3370,6 +3371,13 @@ void ActionsFiller::fillUserActions(not_null<UserData*> user) {
 	if (!user->isSelf()) {
 		addEditContactAction(user);
 		addDeleteContactAction(user);
+		const auto controller = _controller->parentController();
+		AddActionButton(
+			_wrap,
+			tr::ayu_CommonMessages(),
+			CommonGroupsCountValue(user) | rpl::map(rpl::mappers::_1 > 0),
+			[=] { AyuUi::ShowCommonMessagesBox(controller, user); },
+			&st::infoIconMediaGroup);
 	}
 	if (CanReportBot(user)) {
 		addBotCommandActions(user);
