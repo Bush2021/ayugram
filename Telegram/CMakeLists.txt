@@ -2755,6 +2755,8 @@ PRIVATE
     window/window_chat_preview.h
     window/window_chat_switch_process.cpp
     window/window_chat_switch_process.h
+    window/window_columns.cpp
+    window/window_columns.h
     window/window_connecting_widget.cpp
     window/window_connecting_widget.h
     window/window_controller.cpp
