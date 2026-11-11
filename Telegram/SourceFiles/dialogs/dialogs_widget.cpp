@@ -22,7 +22,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/dialogs_key.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_contact_status.h"
 #include "history/view/history_view_group_call_bar.h"
 #include "history/view/history_view_requests_bar.h"
@@ -63,7 +62,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "chat_helpers/message_field.h"
 #include "core/application.h"
-#include "core/ui_integration.h"
 #include "core/update_checker.h"
 #include "core/shortcuts.h"
 #include "window/window_columns.h"
@@ -80,7 +78,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "data/stickers/data_custom_emoji.h"
 #include "data/data_user.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
@@ -102,7 +99,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_dialogs_widget.h"
 #include "styles/style_info.h"
 #include "styles/style_window.h"
-#include "base/qt/qt_common_adapters.h"
 
 #include <QtCore/QMimeData>
 #include <QtGui/QTextBlock>
@@ -4019,7 +4015,8 @@ void Widget::dragEnterEvent(QDragEnterEvent *e) {
 	} else if (ComputeMimeDataState(data) != MimeDataState::None) {
 		e->setDropAction(Qt::CopyAction);
 		e->accept();
-	} else if (data->hasText()) {
+	} else if (data->hasText()
+		&& !data->hasFormat(u"application/x-telegram-dialog"_q)) {
 		e->setDropAction(Qt::CopyAction);
 		e->accept();
 	}
@@ -4089,6 +4086,7 @@ void Widget::dropEvent(QDropEvent *e) {
 			e->accept();
 			const auto data = e->mimeData();
 			if (!data->hasFormat(u"application/x-td-forward"_q)
+				&& !data->hasFormat(u"application/x-telegram-dialog"_q)
 				&& ComputeMimeDataState(data) == MimeDataState::None
 				&& data->hasText()) {
 				controller()->content()->textDrop(thread, data);
