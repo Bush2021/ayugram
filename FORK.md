@@ -1,6 +1,6 @@
 # Fork Management
 
-This is `Bush2021/ayugram`, a fork of `AyuGram/AyuGramDesktop`, which forks `telegramdesktop/tdesktop`. Read alongside `AGENTS.md`.
+This is `Bush2021/ayugram`, a fork of `AyuGram/AyuGramDesktop`, which forks `telegramdesktop/tdesktop`. Read alongside `AGENTS.md`. This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
 
 ## Remotes
 
