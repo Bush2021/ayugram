@@ -123,6 +123,8 @@ paths. Built-in automatic updates are disabled; download updates from this repos
   session accepts secret chats and calls, and the server region.
 - Compatibility fixes preserve AyuGram settings as upstream UI code changes,
   including the gift button toggle and filtering out sticker packs you have not added.
+- Reply to Forward is available for standard forwards. It is hidden in secret chats
+  and for messages that AyuGram forwards by copying or reuploading.
 - Add Filter works on selected message text and captions in the modern chat view.
 - The build tooltip includes the source commit hash to help identify development builds.
 
