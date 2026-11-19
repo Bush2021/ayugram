@@ -16,6 +16,10 @@ namespace HistoryView {
 class Element;
 } // namespace HistoryView
 
+namespace Images {
+struct CornersMaskRef;
+} // namespace Images
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -34,6 +38,7 @@ namespace Tgw {
 class Bridge;
 class RendererCore;
 struct MessageMemory;
+struct RendererCut;
 
 enum class HeightChange : uchar {
 	Own,
@@ -87,6 +92,7 @@ public:
 
 	[[nodiscard]] static bool IsQuitPrevent();
 	[[nodiscard]] static bool IsExitPrevent(Fn<void()> retry);
+	static void Finish();
 	static void StateChanged(
 		const base::flat_set<not_null<HistoryItem*>> &items);
 	[[nodiscard]] static auto WatchingOnScreen()
@@ -111,6 +117,7 @@ public:
 		Fn<void()> repaint,
 		Fn<void()> heavyChanged);
 	void setSize(int width, double maxHeight);
+	void setCut(Images::CornersMaskRef corners, bool autoHeight);
 	void setSafeArea(ContentSafeArea area);
 	void laidOut(int height);
 	void setTheme(std::shared_ptr<const twidget::WidgetTheme> theme);
@@ -141,7 +148,7 @@ private:
 	static void ThemeDone(const std::shared_ptr<Host> &host);
 	static void WalletAvailabilityChanged(not_null<Main::Session*> session);
 	[[nodiscard]] static Runtime *FindVictim();
-	static void TrimKeptPictures();
+	static void TrimKept();
 
 	[[nodiscard]] bool currentContent() const;
 	[[nodiscard]] bool crashedOut() const;
@@ -150,7 +157,8 @@ private:
 	[[nodiscard]] bool queryVisible() const;
 
 	[[nodiscard]] bool recordStop(not_null<RendererCore*> renderer);
-	void breakCrashRun();
+	[[nodiscard]] bool countCrash(bool fatal);
+	int breakCrashRun();
 	void start();
 	void release();
 	void resourcesReady(
@@ -163,17 +171,26 @@ private:
 		const twidget::WidgetData &data,
 		const QString &error,
 		uint64 storage);
-	void retire(State state);
+	void retire(State state, int brokenCrashes = 0);
+	[[nodiscard]] Fn<void(twidget::WidgetHost &host)> keepStill();
 	void stopForCrashes();
 	void fail(const QString &error);
 	void failResources();
 
 	void subscribeLive();
+	void subscribeStill();
 	void coreUpdated(
 		not_null<RendererCore*> renderer,
 		bool repaint,
-		bool finished);
-	void coreStopped(not_null<RendererCore*> renderer);
+		bool client);
+	void cursorChanged(not_null<RendererCore*> renderer);
+	void coreStopped(not_null<RendererCore*> renderer, bool client);
+	void stillUpdated(
+		not_null<RendererCore*> renderer,
+		bool stopped,
+		bool repaint,
+		bool client);
+	void stillKeptChanged(not_null<RendererCore*> renderer);
 	void linkRequested(
 		not_null<RendererCore*> renderer,
 		const std::string &url,
@@ -221,12 +238,14 @@ private:
 	std::shared_ptr<const twidget::WidgetTheme> _hostTheme;
 	std::unique_ptr<RendererCore> _live;
 	std::unique_ptr<RendererCore> _still;
+	std::unique_ptr<RendererCut> _cut;
 	std::vector<QString> _notes;
 	QString _stopReason;
 	QString _summary;
 	Fn<void(const QString &text)> _logDone;
 	QPointer<QWidget> _window;
 	rpl::lifetime _liveLifetime;
+	rpl::lifetime _stillLifetime;
 	rpl::lifetime _windowLifetime;
 	std::optional<int> _shownHeight;
 	const uint64 _contentSerial = 0;
@@ -240,6 +259,7 @@ private:
 	double _maxHeight = 0.;
 	int _generation = 0;
 	int _width = 0;
+	int _brokenCrashes = 0;
 	HeightLayout _layout;
 	ContentSafeArea _safeArea;
 	ContentSafeArea _hostSafeArea;
@@ -252,8 +272,8 @@ private:
 	bool _summaryLast = false;
 	bool _displayDeferred = false;
 	bool _displayPosted = false;
-	bool _sizing = false;
 	bool _clientPending = false;
+	bool _stillKept = false;
 
 };
 

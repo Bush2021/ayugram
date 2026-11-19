@@ -14,7 +14,11 @@
 # There is no packaged branch: no distribution ships this library.
 
 add_library(lib_widget_sandbox STATIC)
-init_target(lib_widget_sandbox "(external)")
+if (APPLE)
+    init_standalone_target(lib_widget_sandbox "(external)")
+else()
+    init_target(lib_widget_sandbox "(external)")
+endif()
 
 add_library(tdesktop::lib_widget_sandbox ALIAS lib_widget_sandbox)
 
@@ -44,6 +48,9 @@ PRIVATE
     include/twidget/js_thread.h
     include/twidget/json.h
     include/twidget/quickjs_context.h
+    include/twidget/remote_engine.h
+    include/twidget/remote_hosted.h
+    include/twidget/remote_stream.h
     include/twidget/renderer.h
     include/twidget/resources.h
     include/twidget/sandbox_engine.h
@@ -57,11 +64,23 @@ PRIVATE
     src/intl.cpp
     src/js_thread.cpp
     src/quickjs_context.cpp
+    src/remote_coding.cpp
+    src/remote_engine.cpp
+    src/remote_hosted.cpp
+    src/remote_internal.h
+    src/remote_stream.cpp
+    src/remote_stream_engine.cpp
+    src/remote_wire.h
     src/resources.cpp
     src/sandbox_engine.cpp
+    src/sandbox_engine_client.cpp
+    src/sandbox_engine_shared.cpp
     src/sdk_policy.cpp
+    src/steady_clock.h
     src/trusted_validator.cpp
     src/widget_host.cpp
+    src/widget_host_internal.h
+    src/widget_host_local.cpp
 )
 
 target_include_directories(lib_widget_sandbox

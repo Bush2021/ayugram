@@ -29,6 +29,11 @@ get_filename_component(src_loc SourceFiles REALPATH)
 get_filename_component(res_loc Resources REALPATH)
 
 include(cmake/telegram_options.cmake)
+if (APPLE
+    OR WIN32
+    OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(cmake/init_standalone_target.cmake)
+endif()
 include(cmake/lib_ffmpeg.cmake)
 include(cmake/lib_stripe.cmake)
 include(cmake/lib_tgcalls.cmake)
@@ -2058,6 +2063,11 @@ PRIVATE
     platform/linux/tray_linux.h
     platform/linux/update_install_linux.cpp
     platform/linux/update_install_linux.h
+    platform/linux/widget_descriptors_linux.cpp
+    platform/linux/widget_descriptors_linux.h
+    platform/linux/widget_helper_linux.cpp
+    platform/linux/widget_helper_linux.h
+    platform/linux/widget_lockdown_linux.h
     platform/mac/file_utilities_mac.mm
     platform/mac/file_utilities_mac.h
     platform/mac/global_menu_mac.h
@@ -2092,6 +2102,9 @@ PRIVATE
     platform/mac/wallet_protection_mac.h
     platform/mac/wallet_protection_mac.mm
     platform/mac/webauthn_mac.mm
+    platform/mac/widget_helper_mac.h
+    platform/mac/widget_helper_mac.mm
+    platform/mac/widget_helper_store_mac.mm
     platform/mac/window_title_mac.mm
     platform/mac/touchbar/items/mac_formatter_item.h
     platform/mac/touchbar/items/mac_formatter_item.mm
@@ -2111,6 +2124,12 @@ PRIVATE
     platform/mac/touchbar/mac_touchbar_manager.mm
     platform/mac/touchbar/mac_touchbar_media_view.h
     platform/mac/touchbar/mac_touchbar_media_view.mm
+    platform/posix/widget_channel_posix.cpp
+    platform/posix/widget_channel_posix.h
+    platform/posix/widget_reaping_posix.cpp
+    platform/posix/widget_reaping_posix.h
+    platform/posix/widget_stderr_posix.cpp
+    platform/posix/widget_stderr_posix.h
     platform/win/file_utilities_win.cpp
     platform/win/file_utilities_win.h
     platform/win/launcher_win.cpp
@@ -2133,6 +2152,13 @@ PRIVATE
     platform/win/wallet_protection_win.cpp
     platform/win/wallet_protection_win.h
     platform/win/webauthn_win.cpp
+    platform/win/widget_channel_win.cpp
+    platform/win/widget_channel_win.h
+    platform/win/widget_helper_image_win.cpp
+    platform/win/widget_helper_image_win.h
+    platform/win/widget_helper_win.cpp
+    platform/win/widget_sandbox_win.cpp
+    platform/win/widget_sandbox_win.h
     platform/win/windows_app_user_model_id.cpp
     platform/win/windows_app_user_model_id.h
     platform/win/windows_dlls.cpp
@@ -2157,6 +2183,7 @@ PRIVATE
     platform/platform_translate_provider.h
     platform/platform_tray.h
     platform/platform_webauthn.h
+    platform/platform_widget_helper.h
     platform/platform_window_title.h
     profile/profile_block_widget.cpp
     profile/profile_block_widget.h
@@ -2483,12 +2510,19 @@ PRIVATE
     test/test_widget_conformance_stop.h
     test/test_widget_fixture.cpp
     test/test_widget_fixture.h
+    test/test_widget_helper_probe.cpp
+    test/test_widget_helper_probe.h
+    test/test_widget_helper_probe_lockdown.h
     test/test_widget_host.cpp
     test/test_widget_host.h
     test/test_widget_ops.cpp
     test/test_widget_ops.h
+    test/test_widget_ops_check.cpp
+    test/test_widget_ops_hosted.cpp
+    test/test_widget_ops_internal.h
     test/test_widget_paint_policy.cpp
     test/test_widget_paint_policy.h
+    test/test_widget_renderer_forward.h
     test/test_widget_stress.cpp
     test/test_widget_stress.h
     test/test_widget_stress_internal.h
@@ -2509,18 +2543,34 @@ PRIVATE
     tgw/tgw_emoji.h
     tgw/tgw_emoji_images.cpp
     tgw/tgw_emoji_images.h
+    tgw/tgw_hosted_wire.h
     tgw/tgw_intl.cpp
     tgw/tgw_intl.h
+    tgw/tgw_kept_budget.cpp
+    tgw/tgw_kept_budget.h
     tgw/tgw_log_box.cpp
     tgw/tgw_log_box.h
     tgw/tgw_media.cpp
     tgw/tgw_media.h
     tgw/tgw_painter.cpp
     tgw/tgw_painter.h
+    tgw/tgw_painter_clips.cpp
+    tgw/tgw_painter_clips.h
     tgw/tgw_painter_filters.cpp
     tgw/tgw_painter_filters.h
+    tgw/tgw_remote.cpp
+    tgw/tgw_remote.h
+    tgw/tgw_render_thread.cpp
+    tgw/tgw_render_thread.h
     tgw/tgw_renderer.cpp
     tgw/tgw_renderer.h
+    tgw/tgw_renderer_input.cpp
+    tgw/tgw_renderer_input.h
+    tgw/tgw_renderer_platform.cpp
+    tgw/tgw_renderer_platform.h
+    tgw/tgw_renderer_rules.h
+    tgw/tgw_renderer_work.cpp
+    tgw/tgw_renderer_work.h
     tgw/tgw_resources.cpp
     tgw/tgw_resources.h
     tgw/tgw_runtime.cpp
@@ -2544,6 +2594,8 @@ PRIVATE
     tgw/tgw_touch_lists.cpp
     tgw/tgw_wallet.cpp
     tgw/tgw_wallet.h
+    tgw/tgw_widget_meter.cpp
+    tgw/tgw_widget_meter.h
     ui/boxes/edit_invite_link_session.cpp
     ui/boxes/edit_invite_link_session.h
     ui/boxes/emoji_stake_box.cpp
@@ -2908,6 +2960,12 @@ if (NOT build_winstore)
     )
 endif()
 
+if (NOT build_macstore)
+    remove_target_sources(Telegram ${src_loc}
+        platform/mac/widget_helper_store_mac.mm
+    )
+endif()
+
 if (DESKTOP_APP_USE_PACKAGED)
     remove_target_sources(Telegram ${src_loc}
         platform/mac/mac_iconv_helper.c
@@ -3155,9 +3213,20 @@ set_target_properties(Telegram PROPERTIES
     XCODE_ATTRIBUTE_COPY_PHASE_STRIP NO
     XCODE_ATTRIBUTE_ALWAYS_SEARCH_USER_PATHS NO
     XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY libc++
-    XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS --deep
     XCODE_ATTRIBUTE_CLANG_DEBUG_INFORMATION_LEVEL $<IF:$<CONFIG:Debug>,default,line-tables-only>
 )
+if (APPLE AND CMAKE_GENERATOR STREQUAL Xcode)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_custom_command(TARGET Telegram POST_BUILD
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/build/sign_mac.py
+            --xcode
+            --runtime
+            --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/${bundle_entitlements}
+            $<TARGET_BUNDLE_DIR:Telegram>
+        VERBATIM
+    )
+endif()
+
 set(entitlement_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Telegram.entitlements"
     "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Telegram Lite.entitlements"
@@ -3288,6 +3357,12 @@ if (WIN32 AND DESKTOP_APP_WIN7_PROBE)
 endif()
 
 target_prepare_qrc(Telegram)
+
+if (APPLE
+    OR WIN32
+    OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(cmake/telegram_widget_helper.cmake)
+endif()
 
 if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_winstore)
     add_executable(Updater WIN32)
