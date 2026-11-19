@@ -677,6 +677,10 @@ bool UserData::isPremium() const {
 	return flags() & UserDataFlag::Premium;
 }
 
+bool UserData::isBotInlineGeo() const {
+	return flags() & UserDataFlag::BotInlineGeo;
+}
+
 bool UserData::isBot() const {
 	return botInfo != nullptr;
 }
@@ -849,6 +853,18 @@ UserData::ContactStatus UserData::contactStatus() const {
 
 bool UserData::isContact() const {
 	return (contactStatus() == ContactStatus::Contact);
+}
+
+bool UserData::isCloseFriend() const {
+	return (flags() & UserDataFlag::CloseFriend);
+}
+
+void UserData::setIsCloseFriend(bool is) {
+	if (is) {
+		addFlags(UserDataFlag::CloseFriend);
+	} else {
+		removeFlags(UserDataFlag::CloseFriend);
+	}
 }
 
 UserData::CallsStatus UserData::callsStatus() const {

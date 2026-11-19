@@ -17,7 +17,6 @@ jobs:
     strategy:
       matrix:
         arch: [x64]
-        qt: [""]
         generator: ["Ninja Multi-Config"]
 
     env:
@@ -30,6 +29,20 @@ jobs:
         shell: cmd
 
     steps:
+      - name: Clean up preinstalled software.
+        shell: pwsh
+        run: |
+          $before = (Get-PSDrive C).Free / 1GB
+          Get-Service docker -ErrorAction SilentlyContinue | Stop-Service -ErrorAction SilentlyContinue
+          wsl --shutdown 2> $null
+          Remove-Item "C:\Android\android-sdk", "C:\Program Files\dotnet", "C:\Miniconda", "C:\msys64", "$env:USERPROFILE\.cargo", "$env:USERPROFILE\.rustup", "$env:LOCALAPPDATA\Docker", "C:\ProgramData\DockerDesktop", "C:\Program Files\PostgreSQL", "C:\PostgreSQL", "C:\Program Files\MongoDB", "C:\Program Files\MySQL" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "C:\ghcup", "C:\cabal", "C:\Program Files\LLVM", "C:\vcpkg", "C:\tools\kotlinc", "C:\tools\php", "C:\tools\Apache24", "C:\tools\nginx-*", "C:\selenium", "C:\SeleniumWebDrivers", "C:\Program Files\R", "C:\Program Files (x86)\R", "C:\rtools*", "C:\Program Files\Google\Chrome*", "C:\Program Files (x86)\Google\Chrome*", "C:\Program Files\Mozilla Firefox*", "C:\ProgramData\Package Cache" -Recurse -Force -ErrorAction SilentlyContinue
+          # The _Instances registry is how vswhere finds Visual Studio.
+          Get-ChildItem "C:\ProgramData\Microsoft\VisualStudio\Packages" -Exclude _Instances -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item C:\hostedtoolcache\windows\Go*, C:\hostedtoolcache\windows\Ruby*, C:\hostedtoolcache\windows\PyPy*, C:\hostedtoolcache\windows\Java_*, C:\hostedtoolcache\windows\NuGet* -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host ('{0:N1} GB -> {1:N1} GB free' -f $before, ((Get-PSDrive C).Free / 1GB))
+          exit 0
+
       - name: Prepare directories.
         run: |
           mkdir %GITHUB_WORKSPACE%\TBuild\Libraries
@@ -117,16 +130,17 @@ jobs:
           path: |
             ${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-${{ matrix.arch }}-workspace-${{ matrix.qt || 'qt' }}-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-workspace-${{ matrix.qt || 'qt' }}-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-workspace-qt-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-workspace-qt-
 
       - name: Libraries.
         env:
           GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\18\Enterprise\'
           GYP_MSVS_VERSION: 2026
         run: |
+          set CARGO_INCREMENTAL=0
           cd %TBUILD%
-          %REPO_NAME%\Telegram\build\prepare\win.bat silent skip-debug ${{ matrix.qt }}
+          %REPO_NAME%\Telegram\build\prepare\win.bat silent skip-debug
 
       - name: Read configuration matrix.
         shell: bash
@@ -141,10 +155,6 @@ jobs:
             esac
             echo "Architecture from matrix: $ARCH"
             ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.arch }}"
-          fi
-
-          if [ -n "${{ matrix.qt }}" ]; then
-            ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.qt }}"
           fi
 
           GENERATOR=""
@@ -216,7 +226,6 @@ jobs:
           call configure.bat ^
           %TDESKTOP_BUILD_GENERATOR% ^
           %TDESKTOP_BUILD_ARCH% ^
-          ${{ matrix.qt }} ^
           -D TDESKTOP_API_ID=2040 ^
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^

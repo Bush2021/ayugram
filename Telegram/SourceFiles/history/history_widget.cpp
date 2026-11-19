@@ -326,19 +326,19 @@ HistoryWidget::HistoryWidget(
 	st::historyDiscardRichDraftButton))
 , _unblock(
 	this,
-	tr::lng_unblock_button(tr::now).toUpper(),
+	tr::lng_unblock_button(tr::now, tr::upper),
 	st::historyUnblock)
 , _botStart(
 	this,
-	tr::lng_bot_start(tr::now).toUpper(),
+	tr::lng_bot_start(tr::now, tr::upper),
 	st::historyComposeButton)
 , _joinChannel(
 	this,
-	tr::lng_profile_join_channel(tr::now).toUpper(),
+	tr::lng_profile_join_channel(tr::now, tr::upper),
 	st::historyComposeButton)
 , _muteUnmute(
 	this,
-	tr::lng_channel_mute(tr::now).toUpper(),
+	tr::lng_channel_mute(tr::now, tr::upper),
 	st::historyComposeButton)
 , _discuss(this,
 	tr::ayu_ChannelBottomButtonDiscuss(tr::now).toUpper(),
@@ -557,14 +557,14 @@ HistoryWidget::HistoryWidget(
 		updateExpandButtonVisibility();
 		updateSendButtonType();
 	}, lifetime());
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	// Removed an ability to insert text from the menu bar
 	// when the field is hidden.
 	_field->shownValue(
 	) | rpl::on_next([=](bool shown) {
 		_field->setEnabled(shown);
 	}, _field->lifetime());
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 	controller->widget()->shownValue(
 	) | rpl::skip(1) | rpl::on_next([=] {
 		windowIsVisibleChanged();
@@ -1410,11 +1410,11 @@ Dialogs::EntryState HistoryWidget::computeDialogsEntryState() const {
 
 void HistoryWidget::refreshJoinChannelText() {
 	if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
-		_joinChannel->setText((channel->isBroadcast()
+		_joinChannel->setText(Ui::Text::Upper(channel->isBroadcast()
 			? tr::lng_profile_join_channel(tr::now)
 			: (channel->requestToJoin() && !channel->amCreator())
 			? tr::lng_profile_apply_to_join_group(tr::now)
-			: tr::lng_profile_join_group(tr::now)).toUpper());
+			: tr::lng_profile_join_group(tr::now)));
 	}
 }
 
@@ -3652,11 +3652,11 @@ void HistoryWidget::showHistory(
 	initFieldAutocomplete();
 
 	if (_peer) {
-		_unblock->setText(((_peer->isUser()
+		_unblock->setText(Ui::Text::Upper((_peer->isUser()
 			&& _peer->asUser()->isBot()
 			&& !_peer->asUser()->isSupport())
 				? tr::lng_restart_button(tr::now)
-				: tr::lng_unblock_button(tr::now)).toUpper());
+				: tr::lng_unblock_button(tr::now)));
 	}
 
 	_nonEmptySelection = false;
@@ -4180,9 +4180,9 @@ void HistoryWidget::updateNotifyControls() {
 		return;
 	}
 
-	_muteUnmute->setText((_history->muted()
+	_muteUnmute->setText(Ui::Text::Upper(_history->muted()
 		? tr::lng_channel_unmute(tr::now)
-		: tr::lng_channel_mute(tr::now)).toUpper());
+		: tr::lng_channel_mute(tr::now)));
 	if (!session().data().notifySettings().silentPostsUnknown(_peer)) {
 		if (_silent) {
 			_silent->setChecked(
@@ -6083,6 +6083,7 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		action);
 	_voiceRecordBar->clearListenState();
 }
@@ -7085,7 +7086,7 @@ bool HistoryWidget::eventFilter(QObject *obj, QEvent *e) {
 		const auto k = static_cast<QKeyEvent*>(e);
 		if ((k->modifiers() & kCommonModifiers) == Qt::ControlModifier) {
 			if (k->key() == Qt::Key_Up) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 				// Cmd + Up is used instead of Home.
 				if (fieldHasSendText()
 					&& !base::options::value<bool>(
@@ -7095,7 +7096,7 @@ bool HistoryWidget::eventFilter(QObject *obj, QEvent *e) {
 #endif
 				return replyToPreviousMessage();
 			} else if (k->key() == Qt::Key_Down) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 				// Cmd + Down is used instead of End.
 				if (fieldHasSendText()
 					&& !base::options::value<bool>(
@@ -11032,9 +11033,11 @@ void HistoryWidget::editMessage(
 	}
 
 	const auto editData = PrepareEditText(item);
+	const auto length = uint16(editData.text.size());
+	const auto position = EditFieldSelection(editData, { length, length }).from;
 	const auto cursor = MessageCursor {
-		int(editData.text.size()),
-		int(editData.text.size()),
+		position,
+		position,
 		Ui::kQFixedMax
 	};
 	const auto previewDraft = Data::WebPageDraft::FromItem(item);
@@ -11056,7 +11059,7 @@ void HistoryWidget::editMessage(
 	updateReplyToName();
 	updateControlsGeometry();
 	updateField();
-	SelectTextInFieldWithMargins(_field, selection);
+	SelectTextInFieldWithMargins(_field, EditFieldSelection(editData, selection));
 
 	saveDraftWithTextNow();
 	setInnerFocus();

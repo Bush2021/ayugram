@@ -30,7 +30,7 @@ public:
 
 protected:
 
-	int _size;
+	int _size = 0;
 
 };
 

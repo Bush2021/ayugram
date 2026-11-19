@@ -148,6 +148,9 @@ public:
 		_confirmedCallback = std::move(callback);
 	}
 	void setCancelledCallback(Fn<void()> callback) {
+		if (!callback) {
+			_cancelled2Callback = nullptr;
+		}
 		_cancelledCallback = std::move(callback);
 	}
 	void setStashCallbacks(Fn<bool()> check, SendFilesStash stash) {

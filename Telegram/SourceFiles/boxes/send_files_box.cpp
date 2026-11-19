@@ -955,9 +955,11 @@ void SendFilesBox::prepare() {
 			&& _cancelledCallback) {
 			_cancelledCallback();
 		}
-		auto text = _caption->getTextWithAppliedMarkdown();
-		if (!_confirmed && _cancelled2Callback && !text.empty()) {
-			_cancelled2Callback(std::move(text));
+		if (!_confirmed && !_stashed && !_textTaken && _cancelled2Callback) {
+			const auto text = _caption->getTextWithAppliedMarkdown();
+			if (!text.empty()) {
+				_cancelled2Callback(text);
+			}
 		}
 	}, lifetime());
 

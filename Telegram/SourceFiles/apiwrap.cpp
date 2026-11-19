@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
 #include "api/api_blocked_peers.h"
+#include "api/api_bot_info.h"
 #include "api/api_chat_invite.h"
 #include "api/api_chat_links.h"
 #include "api/api_chat_participants.h"
@@ -20,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_media.h"
 #include "api/api_peer_colors.h"
 #include "api/api_peer_photo.h"
+#include "api/api_stories.h"
 #include "api/api_polls.h"
 #include "api/api_sending.h"
 #include "api/api_text_entities.h"
@@ -273,6 +275,7 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _readMetrics(std::make_unique<Api::ReadMetrics>(this))
 , _confirmPhone(std::make_unique<Api::ConfirmPhone>(this))
 , _peerPhoto(std::make_unique<Api::PeerPhoto>(this))
+, _stories(std::make_unique<Api::Stories>(this))
 , _polls(std::make_unique<Api::Polls>(this))
 , _todoLists(std::make_unique<Api::TodoLists>(this))
 , _richTasks(std::make_unique<Api::RichTasks>(this))
@@ -286,7 +289,9 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _usernames(std::make_unique<Api::Usernames>(this))
 , _websites(std::make_unique<Api::Websites>(this))
 , _peerColors(std::make_unique<Api::PeerColors>(this))
-, _shareThemes(std::make_unique<Api::ShareThemes>(this)) {
+, _shareThemes(std::make_unique<Api::ShareThemes>(this))
+, _botInfoLocalizations(
+	std::make_unique<Api::BotInfoLocalizations>()) {
 	crl::on_main(session, [=] {
 		// You can't use _session->lifetime() in the constructor,
 		// only queued, because it is not constructed yet.
@@ -4444,6 +4449,7 @@ void ApiWrap::sendVoiceMessage(
 		VoiceWaveform waveform,
 		crl::time duration,
 		bool video,
+		std::shared_ptr<Media::Encode::VideoSource> videoSource,
 		const SendAction &action) {
 	auto scheduledAction = action;
 	applyGhostScheduling(scheduledAction, QString(), 17);
@@ -4456,6 +4462,7 @@ void ApiWrap::sendVoiceMessage(
 			.duration = duration,
 			.waveform = waveform,
 			.video = video,
+			.videoSource = std::move(videoSource),
 			.to = to,
 			.caption = caption,
 		}));
@@ -5175,6 +5182,7 @@ void ApiWrap::sendMessage(
 				sendMessageFail(error, peer, randomId, newId);
 				if (!action.options.scheduled
 					&& !action.options.shortcutId) {
+					Core::App().materializeLocalDrafts();
 					const auto failed = _session->data().message(newId);
 					const auto local = history->localDraft(
 						draftTopicRootId,
@@ -5185,7 +5193,8 @@ void ApiWrap::sendMessage(
 					if (failed
 						&& Data::DraftIsNull(local)
 						&& Data::DraftIsNull(cloud)) {
-						const auto text = failed->originalText();
+						const auto text = PreventInlineBotQuery(
+							failed->originalText());
 						auto draft = Data::Draft();
 						draft.textWithTags = {
 							text.text,
@@ -5673,7 +5682,7 @@ void ApiWrap::sendMultiPaidMedia(
 	const auto groupId = album->groupId;
 	auto &options = album->options;
 	const auto randomId = album->items.front().randomId;
-	auto medias = album->items | ranges::view::transform([](
+	auto medias = album->items | ranges::views::transform([](
 			const SendingAlbum::Item &part) {
 		Assert(part.media.has_value());
 		return MTPInputMedia(part.media->data().vmedia());
@@ -6109,6 +6118,10 @@ Api::PeerPhoto &ApiWrap::peerPhoto() {
 	return *_peerPhoto;
 }
 
+Api::Stories &ApiWrap::stories() {
+	return *_stories;
+}
+
 Api::Polls &ApiWrap::polls() {
 	return *_polls;
 }
@@ -6163,4 +6176,8 @@ Api::PeerColors &ApiWrap::peerColors() {
 
 Api::ShareThemes &ApiWrap::shareThemes() {
 	return *_shareThemes;
+}
+
+Api::BotInfoLocalizations &ApiWrap::botInfoLocalizations() {
+	return *_botInfoLocalizations;
 }
