@@ -5,6 +5,7 @@
 # https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 include(cmake/generate_widget_helper_identity.cmake)
+include(cmake/lib_widget_helper_rust.cmake)
 
 if (build_macstore)
     set(widget_helper_identifier ${bundle_identifier}.WidgetHelper)
@@ -21,6 +22,7 @@ PRIVATE
     _other/widget_helper.h
     _other/widget_helper_linux.cpp
     _other/widget_helper_mac.cpp
+    _other/widget_helper_rust.cpp
     _other/widget_helper_service_mac.cpp
     _other/widget_helper_thread_mac.cpp
     _other/widget_helper_thread_mac.h
@@ -59,37 +61,10 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 
 target_link_libraries(TelegramWidgetHelper
 PRIVATE
-    tdesktop::lib_widget_sandbox
+    tdesktop::lib_widget_sandbox_platform
+    tdesktop::lib_widget_helper_rust
     desktop-app::external_gsl
 )
-
-set(widget_helper_renders OFF)
-if (APPLE)
-    set(widget_helper_renders ON)
-endif()
-
-if (widget_helper_renders)
-    nice_target_sources(TelegramWidgetHelper ${src_loc}
-    PRIVATE
-        _other/widget_helper_renderer.cpp
-        test/test_widget_helper_tap.cpp
-        test/test_widget_helper_tap.h
-        test/test_widget_renderer_forward.h
-        tgw/tgw_cursor.cpp
-        tgw/tgw_cursor.h
-        tgw/tgw_hosted_glue.cpp
-        tgw/tgw_hosted_glue.h
-        tgw/tgw_hosted_wire.h
-        tgw/tgw_renderer_rules.h
-    )
-    target_link_libraries(TelegramWidgetHelper PRIVATE tdesktop::lib_widget_renderer)
-    target_compile_definitions(Telegram PRIVATE TDESKTOP_WIDGET_HELPER_RENDERS)
-else()
-    nice_target_sources(TelegramWidgetHelper ${src_loc}
-    PRIVATE
-        _other/widget_helper_serve.cpp
-    )
-endif()
 
 if (WIN32)
     if (build_winarm)
@@ -115,14 +90,40 @@ if (WIN32)
     PRIVATE
         # GUI image with main(): a console one would start a conhost.exe the job forbids.
         /ENTRY:mainCRTStartup
-        # Not a KnownDLL, which the LPAC primary cannot open: WarmUp() binds it while impersonating.
+        # Not KnownDLLs on every Windows, which the LPAC primary cannot open: WarmUp() binds them while impersonating.
         /DELAYLOAD:bcrypt.dll
         $<$<CONFIG:Debug>:/DELAYLOAD:ws2_32.dll>
     )
+    if (NOT build_winarm)
+        # advapi32 can forward SystemFunction036 to cryptbase.dll, no KnownDLL: a delay-load hook answers it instead.
+        target_link_options(TelegramWidgetHelper PRIVATE /DELAYLOAD:advapi32.dll)
+    else()
+        target_link_options(TelegramWidgetHelper PRIVATE /DELAYLOAD:bcryptprimitives.dll)
+    endif()
+    if (DESKTOP_APP_WIN7_BASELINE)
+        target_link_options(TelegramWidgetHelper PRIVATE /SUBSYSTEM:WINDOWS,6.01)
+    endif()
+    if (MSVC)
+        foreach (target TelegramWidgetHelper lib_widget_sandbox_platform)
+            target_compile_definitions(${target}
+            PRIVATE
+                _MSVC_STL_HARDENING=1
+                _MSVC_STL_DESTRUCTOR_TOMBSTONES=1
+            )
+            target_compile_options(${target} PRIVATE /guard:cf)
+        endforeach()
+        target_link_options(TelegramWidgetHelper PRIVATE /GUARD:CF)
+        # The ARM64 linker refuses /CETCOMPAT with LNK1246.
+        if (CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "^(X86|x64)$")
+            target_link_options(TelegramWidgetHelper PRIVATE /CETCOMPAT)
+        endif()
+    endif()
     add_dependencies(Telegram TelegramWidgetHelper)
 
     generate_widget_helper_identity(Telegram TelegramWidgetHelper authenticode)
 elseif (APPLE)
+    include(cmake/widget_helper_hardening.cmake)
+
     set_target_properties(TelegramWidgetHelper PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${output_folder}
         XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
@@ -137,10 +138,12 @@ elseif (APPLE)
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${widget_helper_identifier}
             LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/TelegramWidgetHelper.plist;${widget_helper_entitlements}"
         )
-        set(widget_helper_sign_options --entitlements ${widget_helper_entitlements})
         set(widget_helper_signed $<TARGET_BUNDLE_DIR:TelegramWidgetHelper>)
     else()
-        set(widget_helper_sign_options)
+        set(widget_helper_entitlements ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/TelegramWidgetHelperDirect.entitlements)
+        set_target_properties(TelegramWidgetHelper PROPERTIES
+            LINK_DEPENDS ${widget_helper_entitlements}
+        )
         set(widget_helper_signed $<TARGET_FILE:TelegramWidgetHelper>)
     endif()
 
@@ -155,7 +158,7 @@ elseif (APPLE)
         COMMAND "$<$<NOT:$<CONFIG:Debug>>:${CMAKE_STRIP};$<TARGET_FILE:TelegramWidgetHelper>>"
         COMMAND codesign --force --sign - --options runtime
             --identifier ${widget_helper_identifier}
-            ${widget_helper_sign_options}
+            --entitlements ${widget_helper_entitlements}
             ${widget_helper_signed}
         COMMAND_EXPAND_LISTS
         VERBATIM
@@ -176,9 +179,6 @@ elseif (APPLE)
                 "${widget_helper_built}/_CodeSignature/CodeResources" "${widget_helper_service}/_CodeSignature/"
             VERBATIM
         )
-        generate_widget_helper_identity(Telegram TelegramWidgetHelper cdhash
-            IDENTIFIER ${widget_helper_identifier}
-            ENTITLEMENTS ${widget_helper_entitlements})
     else()
         add_custom_target(TelegramWidgetHelper_bundle
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Telegram>/../Helpers"
@@ -186,8 +186,10 @@ elseif (APPLE)
                 "$<TARGET_FILE:TelegramWidgetHelper>" "$<TARGET_FILE_DIR:Telegram>/../Helpers/"
             VERBATIM
         )
-        generate_widget_helper_identity(Telegram TelegramWidgetHelper cdhash IDENTIFIER ${widget_helper_identifier})
     endif()
+    generate_widget_helper_identity(Telegram TelegramWidgetHelper cdhash
+        IDENTIFIER ${widget_helper_identifier}
+        ENTITLEMENTS ${widget_helper_entitlements})
     add_dependencies(TelegramWidgetHelper_bundle TelegramWidgetHelper)
     add_dependencies(Telegram TelegramWidgetHelper_bundle)
 else()
@@ -199,8 +201,8 @@ else()
         if (NOT DESKTOP_APP_SPECIAL_TARGET)
             file(RELATIVE_PATH widget_helper_folder
                 "${CMAKE_INSTALL_FULL_BINDIR}"
-                "${CMAKE_INSTALL_FULL_LIBEXECDIR}/telegram-desktop")
-            set(widget_helper_destination "${CMAKE_INSTALL_LIBEXECDIR}/telegram-desktop")
+                "${CMAKE_INSTALL_FULL_LIBEXECDIR}/TelegramDesktop")
+            set(widget_helper_destination "${CMAKE_INSTALL_LIBEXECDIR}/TelegramDesktop")
             set(widget_helper_pinned OFF)
         endif()
         install(TARGETS TelegramWidgetHelper RUNTIME DESTINATION "${widget_helper_destination}")
@@ -229,5 +231,26 @@ else()
             TDESKTOP_WIDGET_HELPER_PINNED)
         generate_widget_helper_identity(Telegram TelegramWidgetHelper sha256)
     endif()
+    foreach (target TelegramWidgetHelper lib_widget_sandbox_platform)
+        target_compile_definitions(${target} PRIVATE _GLIBCXX_ASSERTIONS)
+        target_compile_options_if_exists(${target}
+        PRIVATE
+            -fstack-protector-strong
+            -fstack-clash-protection
+            -fcf-protection
+            -ftrivial-auto-var-init=zero
+        )
+        # Fortify needs optimization, glibc warns without it; through -Wp, our level wins over a distribution's.
+        target_compile_options(${target}
+        PRIVATE
+            $<$<NOT:$<CONFIG:Debug>>:-Wp,-U_FORTIFY_SOURCE>
+            $<$<NOT:$<CONFIG:Debug>>:-Wp,-D_FORTIFY_SOURCE=3>
+        )
+    endforeach()
+    target_link_options(TelegramWidgetHelper
+    PRIVATE
+        LINKER:-z,relro
+        LINKER:-z,now
+    )
     add_dependencies(Telegram TelegramWidgetHelper)
 endif()

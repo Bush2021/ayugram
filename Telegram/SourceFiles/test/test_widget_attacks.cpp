@@ -20,10 +20,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "test/test_widget_ops.h"
 #include "test/test_widgets.h"
 #include "tgw/tgw_hosted_wire.h"
-#include "tgw/tgw_remote.h"
+#include "tgw/tgw_renderer.h"
 #include "tgw/tgw_renderer_input.h"
 #include "tgw/tgw_runtime.h"
-#include "twidget/json.h"
 #include "twidget/widget_host.h"
 #include "ui/style/style_core_scale.h"
 #include "ui/widgets/elastic_scroll.h"
@@ -45,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -81,14 +81,25 @@ constexpr auto kTallBand = 48;
 // head, which holds the state and diagnostic kinds.
 constexpr auto kMaxLogChars = 32768;
 
+// |died| and |deathReason| are what the file's row reports, and its
+// totals' dead list entry (DeadFiles()) follows them: for a file whose tap
+// selected hosted works (WidgetTapHosted()), the shared reading of the
+// final charges (ReadHostedDeath()), its reason measured (|deathMeasured|)
+// only from the record of the work a fresh or final summary of the log was
+// sampled from (|sampled|), else "charged, reason unmeasured"; a file whose
+// tap selected no hosted work (refused, skipped or finished before any
+// renderer of it was selected) is alive, its reason empty and unmeasured.
 struct Verdict {
 	QString notRun;
 	// A fixture check's reason for a file that ran but was then refused.
 	QString refusal;
+	QString deathReason;
 	QStringList incomplete;
+	std::optional<WidgetHostedRun> sampled;
 	bool ran = false;
 	bool loaded = false;
 	bool died = false;
+	bool deathMeasured = false;
 	bool notLoaded = false;
 	bool complete = false;
 	bool clean = false;
@@ -96,7 +107,15 @@ struct Verdict {
 
 // One selected corpus file. Its fixture record names the message by id
 // only, and its tap by the session-qualified key it was armed with, kept
-// for every disarm.
+// for every disarm. Its display log's "Died: " line after the first sandbox
+// header gives |diedLine|, whether there is one, written in the row's `log`
+// fields with |logHeader|; |diedText| is the "Died: " line the summary the
+// log took starts with, verbatim, paired with |summaryWork|, the work that
+// summary was sampled from, and |summaryOwn|, whether it was the fresh or
+// final summary of the host the log was requested for
+// (WidgetLogSummaryOwn()), the only one a hosted reading takes a cause
+// from; |logDeath| is the hosted reading of that sample at the log stage,
+// when the tap had selected hosted works by then.
 struct AttackFile {
 	QString name;
 	QByteArray html;
@@ -115,8 +134,9 @@ struct AttackFile {
 	QString stateAfterWatch;
 	QString clickOutcome;
 	QString clickDetails;
-	QString diedReason;
+	QString diedText;
 	QString rowPath;
+	WidgetHostedDeath logDeath;
 	crl::time watchStarted = 0;
 	crl::time loadWaitMs = 0;
 	crl::time watchMs = 0;
@@ -125,10 +145,12 @@ struct AttackFile {
 	qint64 endMs = 0;
 	qint64 pressMs = 0;
 	uint64 playedWork = 0;
+	uint64 summaryWork = 0;
 	bool live = false;
 	bool clickAttempted = false;
 	bool logHeader = false;
 	bool diedLine = false;
+	bool summaryOwn = false;
 	bool barrierClosed = false;
 	bool itemGone = false;
 	bool rowEmitted = false;
@@ -144,6 +166,14 @@ struct NonWidget {
 	int lines = 0;
 	bool file = false;
 	bool known = false;
+};
+
+// What the audit's emitters wrote of a state that captures them
+// (AuditState::capture), in order: each row's marker and fields, and each
+// check they decided.
+struct AuditCapture {
+	std::vector<std::pair<QString, QJsonObject>> rows;
+	std::vector<WidgetOpsSelfCheckRow> checks;
 };
 
 // The one State of the audit. The window, the chat, the list, the
@@ -164,6 +194,10 @@ struct AuditState {
 
 	QString abort;
 	bool totalsEmitted = false;
+
+	// Only the verdict self-check's controls of the emitters (Emitted())
+	// set it: what they write goes there, and nothing of it to the log.
+	AuditCapture *capture = nullptr;
 };
 
 [[nodiscard]] QString Prefixed(const QString &text) {
@@ -217,6 +251,35 @@ void Row(const QString &marker, const QJsonObject &fields) {
 		+ u": "_q
 		+ QString::fromUtf8(
 			QJsonDocument(fields).toJson(QJsonDocument::Compact)));
+}
+
+// An emitter's Row(), into |state|'s capture when it has one.
+void WriteRow(
+		const AuditState &state,
+		const QString &marker,
+		const QJsonObject &fields) {
+	if (state.capture) {
+		state.capture->rows.emplace_back(marker, fields);
+	} else {
+		Row(marker, fields);
+	}
+}
+
+// An emitter's Check(), into |state|'s capture when it has one.
+void Decide(
+		const AuditState &state,
+		bool passed,
+		const QString &name,
+		const QString &details) {
+	if (state.capture) {
+		state.capture->checks.push_back({
+			.name = name,
+			.details = details,
+			.passed = passed,
+		});
+	} else {
+		Check(passed, name, details);
+	}
 }
 
 // ---------------------------------------------------------------------
@@ -483,15 +546,16 @@ void CheckInjected(AuditState &state, AttackFile &file) {
 	const auto runtime = OwnRuntime(state, file);
 	const auto current = runtime ? runtime->state() : RuntimeState::Idle;
 	message.wait.details = u"state=%1 ackQueries=%2 ackResults=%3 "
-		u"rendered=%4 frozen=%5 built=%6"_q.arg(
+		u"rendered=%4 frozen=%5 desktopCharges=%6 built=%7"_q.arg(
 			runtime ? RuntimeStateName(current) : u"no-runtime"_q,
 			NumberText(reading.ackQueries),
 			NumberText(reading.ackResults),
 			NumberText(reading.renderedHosts),
 			NumberText(reading.fatalFrozen),
+			NumberText(reading.desktopCharges),
 			NumberText(reading.wrappersBuilt));
 	return Loaded(reading)
-		|| (reading.fatalFrozen > 0)
+		|| WidgetTapCharged(reading)
 		|| !WidgetFixtureItem(*state.fixture, message.id)
 		|| (current == RuntimeState::Stopped)
 		|| (current == RuntimeState::Failed)
@@ -508,7 +572,7 @@ void RecordLoad(AuditState &state, AttackFile &file) {
 		: u"no-runtime"_q;
 	file.loadOutcome = Loaded(reading)
 		? u"loaded"_q
-		: (reading.fatalFrozen > 0)
+		: WidgetTapCharged(reading)
 		? u"died"_q
 		: !runtime
 		? u"no-runtime"_q
@@ -532,7 +596,7 @@ void RecordLoad(AuditState &state, AttackFile &file) {
 	if (runtime && (current == RuntimeState::Live)) {
 		return false;
 	}
-	return (ReadWidgetOps(*file.message->tap).fatalFrozen > 0)
+	return WidgetTapCharged(ReadWidgetOps(*file.message->tap))
 		|| (current == RuntimeState::Stopped)
 		|| (current == RuntimeState::Failed);
 }
@@ -635,31 +699,25 @@ void ClickAndWatch(AuditState &state, AttackFile &file) {
 // alone, while it stays the newest, and each for the press the click
 // played: the primary press the chat dispatched to the core it clicked
 // while the click's own mouse-down was being delivered
-// (PlayMarkedClick()). A local renderer's trusted click and the trusted
-// click of the release of that press's own down, as its work's forwarding
-// handed it to the host before the core was detached; with the Debug
-// helper's tap a hosted host's mirrored trusted click and the click
-// decision the helper's renderer reported for the up of that press, sent
-// with the pointer serial of that dispatch; without it (a Release harness)
-// that decision alone. An answered down or up is delivery, never a click,
-// and a trusted click the played press did not make never completes it.
+// (PlayMarkedClick()). With the Debug helper's tap the hosted host's
+// mirrored trusted click and the click decision the helper's renderer
+// reported for the up of that press, sent with the pointer serial of that
+// dispatch; without it (a Release harness) that decision alone. An
+// answered down or up is delivery, never a click, and a trusted click the
+// played press did not make never completes it.
 enum class ClickReading {
-	Renderer,
 	HelperMirror,
 	Decision,
 };
 
 [[nodiscard]] ClickReading ClickReadingHere() {
-	return !Tgw::WidgetsHosted()
-		? ClickReading::Renderer
-		: WidgetHelperMirrors()
+	return WidgetHelperMirrors()
 		? ClickReading::HelperMirror
 		: ClickReading::Decision;
 }
 
 [[nodiscard]] QString ClickSource(ClickReading reading) {
 	switch (reading) {
-	case ClickReading::Renderer: return u"renderer"_q;
 	case ClickReading::HelperMirror: return u"helper-mirror"_q;
 	case ClickReading::Decision: return u"click-decision"_q;
 	}
@@ -672,29 +730,25 @@ enum class ClickReading {
 
 // The click's outcome from the watch's reading as |reading| reads it:
 // "observed" from a trusted click of the marked generation together with
-// the played press's own click (locally the trusted click its release
-// answered as it reached the host, hosted with the Debug tap its
-// decision), "decided" from that decision alone; the press's own click
-// counts only for the press the click played to |played|, the work of the
-// core it clicked, never for 0. Anything else, an answered down or up, a
-// late step of an earlier press or another generation, a press dispatched
-// before the mark, after a mouse-down no core took, or to another core, a
-// trusted click another press made, a click after a newer generation was
-// selected and a local click that reached no host (its up queued across
-// the core's retirement) included, is "not-observed".
+// the played press's own click (with the Debug tap its decision),
+// "decided" from that decision alone; the press's own click counts only
+// for the press the click played to |played|, the work of the core it
+// clicked, never for 0. Anything else, an answered down or up, a late step
+// of an earlier press or another generation, a press dispatched before the
+// mark, after a mouse-down no core took, or to another core, a trusted
+// click another press made and a click after a newer generation was
+// selected included, is "not-observed".
 [[nodiscard]] QString ClickOutcome(
 		const WidgetOpsReading &watched,
 		ClickReading reading,
 		uint64 played) {
 	const auto trusted = (watched.trustedClicks > 0);
-	const auto local = (reading == ClickReading::Renderer);
 	const auto identified = played
 		&& (watched.markedWork == played)
 		&& watched.markedSerial
-		&& (local || watched.markedPress);
+		&& watched.markedPress;
 	const auto own = identified && (watched.clicksCompleted > 0);
 	switch (reading) {
-	case ClickReading::Renderer:
 	case ClickReading::HelperMirror:
 		return (trusted && own) ? u"observed"_q : u"not-observed"_q;
 	case ClickReading::Decision:
@@ -716,11 +770,25 @@ void RecordWatch(AuditState &state, AttackFile &file) {
 	HideFixtureLayers(*state.fixture, *file.message, u"after the watch"_q);
 }
 
-// The one field of the runtime log the row needs: the "Died: " line that
+// The one field of the runtime log the row needs, the "Died: " line, read
+// twice. The display log's own line (Runtime::logText()), the one
 // Summarize() puts right after the first sandbox header, before any text a
-// widget controls (its errors and console may hold line breaks).
+// widget controls (its errors and console may hold line breaks), gives the
+// row's `log.sandboxHeader` and `log.diedLine` alone.
+// For a hosted reading, from the summary the log took itself
+// (WidgetRuntimeLog::summary), whose first line Summarize() writes,
+// verbatim and paired with the work that summary was sampled from
+// (summaryWork, read with the text), the only work it can describe, and
+// with whether that summary was the requested host's own: no text the
+// display log puts before its sandbox header, a renderer's multiline stop
+// reason among them, can stand in for that line or hide it.
 void ParseLog(AttackFile &file) {
-	const auto lines = file.message->log.text.split(QChar('\n'));
+	const auto &log = file.message->log;
+	const auto first = log.summary.section(QChar('\n'), 0, 0);
+	file.diedText = first.startsWith(u"Died: "_q) ? first : QString();
+	file.summaryWork = log.summaryWork;
+	file.summaryOwn = WidgetLogSummaryOwn(log);
+	const auto lines = log.text.split(QChar('\n'));
 	for (auto i = 0; i + 1 < int(lines.size()); ++i) {
 		const auto &line = lines[i];
 		const auto header = line.endsWith(QChar(':'))
@@ -731,14 +799,33 @@ void ParseLog(AttackFile &file) {
 		}
 		const auto &next = lines[i + 1];
 		file.diedLine = next.startsWith(u"Died: "_q);
-		if (file.diedLine) {
-			const auto reason = next.mid(6).trimmed();
-			if (reason != u"terminated"_q) {
-				file.diedReason = reason;
-			}
-		}
 		file.logHeader = true;
 		return;
+	}
+}
+
+// ReadHostedDeath() of |reading| for the sample the log paired
+// (ParseLog()), only while that sample was the summary of the host the log
+// was requested for (`summaryOwn`), as the conformance runner reads its
+// own: a stale or absent one, possibly an older host's line and work left
+// in the runtime when the request timed out, keeps them raw in the file but
+// names no work whose record may give a cause, neither now nor through
+// |earlier|, a reading kept for a record evicted since.
+[[nodiscard]] WidgetHostedDeath ReadSampledDeath(
+		const AttackFile &file,
+		const WidgetOpsReading &reading,
+		const WidgetHostedDeath *earlier) {
+	return file.summaryOwn
+		? ReadHostedDeath(reading, file.summaryWork, file.diedText, earlier)
+		: ReadHostedDeath(reading, 0, QString(), earlier);
+}
+
+// The hosted reading of the log's sample with the tap's |reading| then,
+// once that tap selected hosted works, whose measured reason, of an own
+// sample alone, stays with the sampled work once its record is evicted.
+void ReadLogDeath(AttackFile &file, const WidgetOpsReading &reading) {
+	if (WidgetTapHosted(reading)) {
+		file.logDeath = ReadSampledDeath(file, reading, nullptr);
 	}
 }
 
@@ -746,10 +833,14 @@ void RecordLog(AuditState &state, AttackFile &file) {
 	auto &message = *file.message;
 	FinishRuntimeLog(*state.fixture, message);
 	ParseLog(file);
+	ReadLogDeath(file, ReadWidgetOps(*message.tap));
 	const auto &log = message.log;
 	Row(u"ATTACK_LOG"_q, {
 		{ u"file"_q, file.name },
 		{ u"source"_q, log.source },
+		{ u"summaryWork"_q, QString::number(file.summaryWork) },
+		{ u"summaryOwn"_q, file.summaryOwn },
+		{ u"diedText"_q, file.diedText },
 		{ u"pending"_q, log.pending },
 		{ u"waitedMs"_q, qint64(crl::now() - message.wait.started) },
 		{ u"chars"_q, log.chars },
@@ -786,6 +877,24 @@ void RecordLog(AuditState &state, AttackFile &file) {
 	return u"no renderer was built for it: "_q + progress;
 }
 
+// The death of |file| from its reading: once its tap selected hosted
+// works, ReadSampledDeath() for the sample its log paired (ParseLog()),
+// none for a skipped log stage, the log stage's own reading standing for
+// a record evicted since, never a raw line by itself; a file whose tap
+// selected no hosted work keeps the alive, unmeasured, reasonless verdict
+// Judge() starts from.
+void JudgeDeath(Verdict &verdict, const AttackFile &file) {
+	const auto &reading = file.reading;
+	if (!WidgetTapHosted(reading)) {
+		return;
+	}
+	const auto death = ReadSampledDeath(file, reading, &file.logDeath);
+	verdict.died = death.died;
+	verdict.deathMeasured = death.measured;
+	verdict.deathReason = WidgetHostedDeathText(death);
+	verdict.sampled = death.sampled;
+}
+
 // Independent statuses from the final reading: a death with a leak is in
 // both lists, and only the copied scanner decides the leak count. A
 // renderer violation is no leak, but a file with one is never clean.
@@ -794,7 +903,7 @@ void RecordLog(AuditState &state, AttackFile &file) {
 	auto result = Verdict();
 	result.ran = (reading.wrappersBuilt > 0);
 	result.loaded = Loaded(reading);
-	result.died = (reading.fatalFrozen > 0) || !file.diedReason.isEmpty();
+	JudgeDeath(result, file);
 	result.notLoaded = result.ran && !result.loaded;
 	if (!result.ran) {
 		result.notRun = NotRunReason(state, file);
@@ -840,6 +949,8 @@ void RecordLog(AuditState &state, AttackFile &file) {
 		u"ran=%1"_q.arg(FlagText(verdict.ran)),
 		u"loaded=%1"_q.arg(FlagText(verdict.loaded)),
 		u"died=%1"_q.arg(FlagText(verdict.died)),
+		u"deathReason=[%1]"_q.arg(verdict.deathReason),
+		u"deathMeasured=%1"_q.arg(FlagText(verdict.deathMeasured)),
 		u"complete=%1"_q.arg(FlagText(verdict.complete)),
 		u"clean=%1"_q.arg(FlagText(verdict.clean)),
 		u"notRun=[%1]"_q.arg(verdict.notRun),
@@ -847,6 +958,19 @@ void RecordLog(AuditState &state, AttackFile &file) {
 		u"incomplete=[%1]"_q.arg(verdict.incomplete.join(u","_q)),
 	};
 	return fields.join(QChar(' '));
+}
+
+// The totals' dead list: each file whose row's verdict died, with that
+// verdict's reason, so the list and its row never disagree.
+[[nodiscard]] QStringList DeadFiles(const AuditState &state) {
+	auto result = QStringList();
+	for (const auto &file : state.files) {
+		if (!file.verdict.died) {
+			continue;
+		}
+		result.push_back(file.name + u": "_q + file.verdict.deathReason);
+	}
+	return result;
 }
 
 // A final row of a file whose one renderer loaded, sent one clean batch and
@@ -883,10 +1007,7 @@ void RecordLog(AuditState &state, AttackFile &file) {
 // the click hit (another core's work, or no bound press, is none); with
 // the tap a decision needs the mirror's trusted click and that click the
 // decision (an earlier press's mirrored click is no decision of the marked
-// one). A local renderer's trusted click alone is none either, a reading
-// with no played work none whatever it counted: only the trusted click the
-// played press's own release answered, beside the generation's count,
-// completes it, and only for the core the click hit.
+// one).
 void CheckClickOutcomes(const QString &prefix) {
 	constexpr auto kPlayed = uint64(7);
 	auto down = WidgetOpsReading();
@@ -906,14 +1027,6 @@ void CheckClickOutcomes(const QString &prefix) {
 	mirrored.trustedClicks = 1;
 	auto both = decided;
 	both.trustedClicks = 1;
-	auto localTrusted = mirrored;
-	localTrusted.markedPress = 0;
-	auto localOwn = both;
-	localOwn.markedPress = 0;
-	auto localUncounted = localOwn;
-	localUncounted.trustedClicks = 0;
-	auto localUnbound = unbound;
-	localUnbound.trustedClicks = 1;
 	using Reading = ClickReading;
 	const auto release = [&](const WidgetOpsReading &reading) {
 		return ClickOutcome(reading, Reading::Decision, kPlayed);
@@ -936,16 +1049,6 @@ void CheckClickOutcomes(const QString &prefix) {
 		Reading::HelperMirror,
 		kPlayed);
 	const auto debugBoth = ClickOutcome(both, Reading::HelperMirror, kPlayed);
-	const auto local = [&](const WidgetOpsReading &reading, uint64 played) {
-		return ClickOutcome(reading, Reading::Renderer, played);
-	};
-	const auto localUnplayed = local(localTrusted, 0);
-	const auto localTrustedOnly = local(localTrusted, kPlayed);
-	const auto localOwnUnplayed = local(localOwn, 0);
-	const auto localOwnOther = local(localOwn, kPlayed + 1);
-	const auto localOwnUncounted = local(localUncounted, kPlayed);
-	const auto localUnboundClick = local(localUnbound, kPlayed);
-	const auto localClick = local(localOwn, kPlayed);
 	Check(
 		(releaseDown == u"not-observed"_q)
 			&& (releaseReplaced == u"not-observed"_q)
@@ -955,21 +1058,11 @@ void CheckClickOutcomes(const QString &prefix) {
 			&& (releaseOther == u"not-observed"_q)
 			&& (debugDecided == u"not-observed"_q)
 			&& (debugMirrored == u"not-observed"_q)
-			&& (debugBoth == u"observed"_q)
-			&& (localUnplayed == u"not-observed"_q)
-			&& (localTrustedOnly == u"not-observed"_q)
-			&& (localOwnUnplayed == u"not-observed"_q)
-			&& (localOwnOther == u"not-observed"_q)
-			&& (localOwnUncounted == u"not-observed"_q)
-			&& (localUnboundClick == u"not-observed"_q)
-			&& (localClick == u"observed"_q),
+			&& (debugBoth == u"observed"_q),
 		prefix + u"a hosted click is the click decision of the press played "
 			u"to the clicked core (with the Debug helper's tap and the "
 			u"mirror's trusted click), never an answered down or up or an "
-			u"unbound or other core's press; a local one the trusted click "
-			u"its work matched to the played press's own release, with the "
-			u"generation's trusted click, never a trusted click alone, an "
-			u"unbound press, another core's or one with no played work"_q,
+			u"unbound or other core's press"_q,
 		u"releaseDown=%1 releaseReplaced=%2 releaseNone=%3 releaseClick=%4 "
 			u"releaseUnbound=%5 releaseOther=%6 debugDecided=%7 "
 			u"debugMirrored=%8 debugBoth=%9"_q.arg(
@@ -981,35 +1074,20 @@ void CheckClickOutcomes(const QString &prefix) {
 				releaseOther,
 				debugDecided,
 				debugMirrored,
-				debugBoth)
-			+ u" localUnplayed=%1 localTrustedOnly=%2 localOwnUnplayed=%3 "
-			u"localOwnOther=%4 localOwnUncounted=%5 localUnbound=%6 "
-			u"localClick=%7"_q.arg(
-				localUnplayed,
-				localTrustedOnly,
-				localOwnUnplayed,
-				localOwnOther,
-				localOwnUncounted,
-				localUnboundClick,
-				localClick));
+				debugBoth));
 }
 
 // Work ids no RendererCore is given and the ops self-check does not use,
-// the older and newer generations' of the hosted and of the local taps,
-// then each tap's three later generations' (a click completed before its
-// core retired, a press whose up was queued across that retirement, a
-// press whose up came between its core's detach and its host's
-// retirement), and the session of the messages the verdict check drives.
+// the older and newer generations' of the hosted tap, then its three later
+// generations' (a click completed before its core retired, a press whose
+// up was queued across that retirement, a press whose up came between its
+// core's detach and its host's retirement), and the session of the
+// message the verdict check drives.
 constexpr auto kVerdictOlderWork = std::numeric_limits<uint64>::max() - 5;
 constexpr auto kVerdictNewerWork = kVerdictOlderWork + 1;
-constexpr auto kVerdictLocalOlderWork = kVerdictOlderWork - 2;
-constexpr auto kVerdictLocalNewerWork = kVerdictOlderWork - 1;
 constexpr auto kVerdictKeptWork = kVerdictOlderWork - 12;
 constexpr auto kVerdictRetiredWork = kVerdictOlderWork - 13;
-constexpr auto kVerdictLocalKeptWork = kVerdictOlderWork - 14;
-constexpr auto kVerdictLocalRetiredWork = kVerdictOlderWork - 15;
 constexpr auto kVerdictGapWork = kVerdictOlderWork - 16;
-constexpr auto kVerdictLocalGapWork = kVerdictOlderWork - 17;
 constexpr auto kVerdictTapSession = uint64(3);
 
 // The trusted click a renderer sends its host.
@@ -1017,34 +1095,18 @@ constexpr auto kVerdictClick = R"json({"type":"event",)json"
 	R"json("ev":{"type":"click","targetId":2,"detail":1},)json"
 	R"json("trusted":true})json";
 
-// A local product renderer standing in for the verdict check's: it sends
-// its host only what the check gives it.
-class VerdictRenderer final : public twidget::Renderer {
-public:
-	void load() override;
-	void send(const std::string &json) override;
-	void setTheme(const std::string &theme) override;
-	void setWidth(double width) override;
-	void destroy() override;
-
-};
-
-// How the verdict check plays a press of a work through one placement's
-// product seams: its down taken (hosted its Sent and Down, locally
-// WidgetLocalPressDown()), then its up, with or without the click its
-// renderer decided (hosted its Up and Click, then its host's mirrored
-// trusted click, which only a Debug tap reads; locally
-// WidgetLocalPressReleased() answered with the trusted click, which the
-// work's forwarding hands its host through the wrapper, then
-// WidgetLocalPressForwarded()), a third generation selected for the
-// message, a later generation selected and built for a work, the detach
-// of a work's core (RendererCore::detach(): WidgetCoreDetached(), then
-// its link closed), after which a reply its route had already taken still
-// reports the up and the click its renderer decided, its host, still
-// live, mirroring that click (hosted) and its forwarding reaching no
-// wrapper (locally), and the retirement of that work's host
-// (WidgetHostRetired(), hosted alone), after which such a reply reports
-// with no mirrored trusted click, while the host keeps the wrapper.
+// How the verdict check plays a press of a work through the product's
+// seams: its down taken (its Sent and Down), then its up, with or without
+// the click its renderer decided (its Up and Click, then its host's
+// mirrored trusted click, which only a Debug tap reads), a third
+// generation selected for the message, a later generation selected and
+// built for a work, the detach of a work's core (RendererCore::detach():
+// WidgetCoreDetached(), then its link closed), after which a reply its
+// route had already taken still reports the up and the click its renderer
+// decided, its host, still live, mirroring that click, and the retirement
+// of that work's host (WidgetHostRetired()), after which such a reply
+// reports with no mirrored trusted click, while the host keeps the
+// wrapper.
 struct VerdictPlayer {
 	Fn<void(uint64 work, uint64 press, uint64 serial)> down;
 	Fn<void(uint64 work, uint64 press, bool clicked)> up;
@@ -1059,8 +1121,8 @@ struct VerdictPlayer {
 	uint64 gap = 0;
 };
 
-// The readings the verdict check's interactions leave on one placement's
-// tap, and whether its hosts or wrappers were built.
+// The readings the verdict check's interactions leave on its tap, and
+// whether its hosts were built.
 struct VerdictRun {
 	WidgetOpsReading late;
 	WidgetOpsReading replaced;
@@ -1079,28 +1141,6 @@ struct VerdictRun {
 	bool built = false;
 };
 
-// A local generation's wrapper, built by the wrapping factory, which is
-// released then as a host releases it, and the renderer it wraps.
-struct VerdictLocal {
-	std::unique_ptr<twidget::Renderer> wrapper;
-	VerdictRenderer *product = nullptr;
-};
-
-void VerdictRenderer::load() {
-}
-
-void VerdictRenderer::send(const std::string &) {
-}
-
-void VerdictRenderer::setTheme(const std::string &) {
-}
-
-void VerdictRenderer::setWidth(double) {
-}
-
-void VerdictRenderer::destroy() {
-}
-
 // A hosted host with no channel, never started: the tap's observers are
 // installed on it and nothing else calls them.
 [[nodiscard]] std::shared_ptr<twidget::WidgetHost> VerdictHost() {
@@ -1110,27 +1150,6 @@ void VerdictRenderer::destroy() {
 		320.,
 		twidget::WidgetHostOptions(),
 		std::shared_ptr<twidget::SandboxHostedChannel>());
-}
-
-// The next generation of |id| for the local |work|; no product when the
-// tap did not wrap it.
-[[nodiscard]] VerdictLocal VerdictLocalGeneration(
-		GlobalMsgId id,
-		uint64 work) {
-	auto result = VerdictLocal();
-	auto factory = TapWidgetRenderer(id, work, [&](
-			std::shared_ptr<twidget::SandboxResources>,
-			const std::string &,
-			double) {
-		auto renderer = std::make_unique<VerdictRenderer>();
-		result.product = renderer.get();
-		return std::unique_ptr<twidget::Renderer>(std::move(renderer));
-	});
-	result.wrapper = factory(nullptr, "light", 320.);
-	if (result.wrapper.get() == result.product) {
-		result.product = nullptr;
-	}
-	return result;
 }
 
 // |work|'s primary press |press| through the product's press seam, |steps|
@@ -1353,77 +1372,6 @@ struct VerdictHosted {
 	return result;
 }
 
-// The cases on local generations through TapWidgetRenderer(), each wrapper
-// built and its factory released first and kept to the end, as a host
-// sample keeps a retired host, and the product's WidgetPressDispatched(),
-// WidgetLocalPressDown(), WidgetLocalPressReleased(),
-// WidgetLocalPressForwarded() and WidgetCoreDetached().
-[[nodiscard]] VerdictRun PlayLocalVerdicts() {
-	const auto id = GlobalMsgId{
-		FullMsgId(PeerId(), MsgId(-2)),
-		kVerdictTapSession,
-	};
-	const auto tap = ArmWidgetOpsTap(id);
-	auto generations = std::map<uint64, VerdictLocal>();
-	const auto add = [&](uint64 work) {
-		const auto &added = generations.emplace(
-			work,
-			VerdictLocalGeneration(id, work)).first->second;
-		return (added.product != nullptr);
-	};
-	const auto productOf = [&](uint64 work) {
-		const auto i = generations.find(work);
-		return (i != end(generations)) ? i->second.product : nullptr;
-	};
-	auto click = std::vector<twidget::Json>();
-	if (auto parsed = twidget::Json::parse(kVerdictClick)) {
-		click.push_back(std::move(*parsed));
-	}
-	auto result = VerdictRun();
-	result.built = add(kVerdictLocalOlderWork)
-		&& add(kVerdictLocalNewerWork)
-		&& !click.empty();
-	auto closed = QSet<uint64>();
-	auto third = twidget::RendererFactory();
-	PlayVerdicts(result, *tap, {
-		.down = [](uint64 work, uint64, uint64 serial) {
-			WidgetLocalPressDown(work, serial);
-		},
-		.up = [&](uint64 work, uint64, bool clicked) {
-			WidgetLocalPressReleased(
-				work,
-				clicked ? click : std::vector<twidget::Json>());
-			const auto product = productOf(work);
-			if (clicked
-				&& !closed.contains(work)
-				&& product
-				&& product->onMessage) {
-				product->onMessage(kVerdictClick);
-			}
-			WidgetLocalPressForwarded(work);
-		},
-		.supersede = [&] {
-			third = TapWidgetRenderer(id, twidget::RendererFactory());
-		},
-		.next = add,
-		.detach = [&](uint64 work) {
-			closed.insert(work);
-			WidgetCoreDetached(work);
-		},
-		.retire = [](uint64) {
-		},
-		.older = kVerdictLocalOlderWork,
-		.newer = kVerdictLocalNewerWork,
-		.kept = kVerdictLocalKeptWork,
-		.retired = kVerdictLocalRetiredWork,
-		.gap = kVerdictLocalGapWork,
-	});
-	third = nullptr;
-	generations.clear();
-	DisarmWidgetOpsTap(id);
-	return result;
-}
-
 // |reading|'s click outcome as |reader| reads it for a press played to
 // |played|, and the row verdict of a clean final row with that outcome.
 [[nodiscard]] std::pair<QString, Verdict> JudgedClick(
@@ -1466,18 +1414,16 @@ void CheckVerdictReader(
 		{ u"retired"_q, run.retired, run.retiredWork },
 		{ u"gap"_q, run.gap, run.gapWork },
 	};
-	const auto hosted = (reader != ClickReading::Renderer);
-	const auto gapTrusted = hosted ? trusted : 0;
 	const auto bound = [&](const WidgetOpsReading &reading) {
 		return (reading.markedWork == run.gapWork)
 			&& (reading.markedSerial == 11)
-			&& (!hosted || (reading.markedPress == 11))
+			&& (reading.markedPress == 11)
 			&& (reading.downsConfirmed == 1)
 			&& !reading.upsConfirmed
 			&& !reading.clicksCompleted
 			&& reading.markDetached
 			&& (reading.pressStepsElsewhere == 2)
-			&& (reading.trustedClicks == gapTrusted);
+			&& (reading.trustedClicks == trusted);
 	};
 	const auto gapText = [](const WidgetOpsReading &reading) {
 		return u"%1/%2/%3 down=%4 up=%5 click=%6 detached=%7 "
@@ -1556,9 +1502,7 @@ void CheckVerdictReader(
 // consumer (the click decision) and the Debug one (the mirror and the
 // decision) on hosted generations, whose mirrored trusted clicks only a
 // Debug tap reads, so the Debug reader certifies nothing in a Release
-// build; and the local consumer (the trusted click of the played press's
-// own release as it reached the host, with the generation's) on local
-// ones.
+// build.
 void CheckMarkedClicks(const AuditState &state, const QString &prefix) {
 	const auto mirrors = WidgetHelperMirrors();
 	const auto hosted = PlayHostedVerdicts();
@@ -1578,14 +1522,821 @@ void CheckMarkedClicks(const AuditState &state, const QString &prefix) {
 		kVerdictNewerWork,
 		mirrors ? u"observed"_q : u"not-observed"_q,
 		mirrors ? 1 : 0);
-	CheckVerdictReader(
+}
+
+// The death verdicts' texts: the end of the widget helper, which every
+// host it served reports alike, spared or charged, and the line of a
+// summary that carries it, StalledReason(), an ordinary death's label,
+// one of Telegram's own refusals and a forged line a renderer's multiline
+// stop reason could put before the sandbox header; and their works, below
+// the verdict check's own.
+constexpr auto kDeathHelperEnded = "the widget engine process ended";
+constexpr auto kDeathHelperLine = "Died: the widget engine process ended";
+constexpr auto kDeathStalled = "The widget stopped responding";
+constexpr auto kDeathLabel = "Widget stopped";
+constexpr auto kDeathRefusal
+	= "The widget renderer skipped a frame asked to paint";
+constexpr auto kDeathForged = "Died: a forged line in the stop reason";
+constexpr auto kDeathWork = kVerdictOlderWork - 100;
+
+[[nodiscard]] GlobalMsgId DeathVerdictId(int index) {
+	return { FullMsgId(PeerId(), MsgId(-index)), kVerdictTapSession };
+}
+
+[[nodiscard]] Tgw::HostedDecision DeathDecision(
+		Tgw::HostedOutcome outcome,
+		const char *reason,
+		Tgw::HostedOutcome transport) {
+	return {
+		.reason = QString::fromLatin1(reason),
+		.outcome = outcome,
+		.transport = transport,
+	};
+}
+
+// Plays |play| as a construction whose host rendered and then reported
+// |died| (none for null) as its death, raw, as a host of an ended helper
+// does: selected and installed.
+[[nodiscard]] bool InstallDeath(WidgetHostedPlay &play, const char *died) {
+	const auto built = play.selected() && play.install();
+	return built && play.change(died, true);
+}
+
+// A runtime log whose summary, sampled from |work| and read as |state|
+// says, starts with |line| (a healthy one for null), and whose display log
+// puts |stopped|, a fatal stop's reason, before its sandbox header; no
+// summary and no header for a 0 |work|.
+[[nodiscard]] WidgetRuntimeLog DeathLog(
+		uint64 work,
+		const char *line,
+		const QString &stopped = QString(),
+		WidgetLogSummary state = WidgetLogSummary::Fresh) {
+	auto result = WidgetRuntimeLog();
+	result.summary = work
+		? ((line ? (QString::fromLatin1(line) + QChar('\n')) : QString())
+			+ u"Loaded: yes"_q)
+		: QString();
+	result.summaryState = work ? state : WidgetLogSummary::Absent;
+	result.summaryWork = work;
+	result.text = u"State: Live, generation 1, on screen.\n"_q
+		+ (stopped.isEmpty()
+			? QString()
+			: (u"Stopped (fatal): "_q + stopped + QChar('\n')))
+		+ u"Crashes in a row: 0 of 2.\n"_q
+		+ (work
+			? (u"Current sandbox:\n"_q + result.summary + QChar('\n'))
+			: u"No sandbox diagnostics yet.\n"_q)
+		+ u"Notes:"_q;
+	return result;
+}
+
+// The clean control row's file named |name|, its runtime log |log| parsed
+// by ParseLog() and read by the log stage on |tap| now.
+[[nodiscard]] AttackFile DeathFile(
+		const char *name,
+		const WidgetOpsTap &tap,
+		const WidgetRuntimeLog &log) {
+	auto result = VerdictControlFile();
+	result.name = QString::fromLatin1(name);
+	result.message->log = log;
+	ParseLog(result);
+	ReadLogDeath(result, ReadWidgetOps(tap));
+	return result;
+}
+
+// Finalize()'s reading of the file after its removal, then its row's
+// verdict.
+void SettleDeath(
+		const AuditState &state,
+		AttackFile &file,
+		const WidgetOpsTap &tap) {
+	file.reading = ReadWidgetOps(tap);
+	file.barrierClosed = WidgetTapFinished(file.reading);
+	file.verdict = Judge(state, file);
+}
+
+// Whether |file|'s verdict died with |reason| (alive for an empty one),
+// measured or not.
+[[nodiscard]] bool DeathReads(
+		const AttackFile &file,
+		const QString &reason,
+		bool measured) {
+	const auto &verdict = file.verdict;
+	return (verdict.died == !reason.isEmpty())
+		&& (verdict.deathReason == reason)
+		&& (verdict.deathMeasured == measured);
+}
+
+[[nodiscard]] QString DeathRecordText(
+		const std::optional<WidgetHostedRun> &run) {
+	return run ? WidgetHostedRunText(*run) : u"none"_q;
+}
+
+[[nodiscard]] QString DeathFileText(const AttackFile &file) {
+	return u"%1: %2 diedText=[%3] summaryWork=%4 own=%5 sampled=[%6] "
+		"tap=[%7]"_q.arg(
+			file.name,
+			VerdictText(file.verdict),
+			file.diedText,
+			QString::number(file.summaryWork),
+			FlagText(file.summaryOwn),
+			DeathRecordText(file.verdict.sampled),
+			WidgetTapCounts(file.reading));
+}
+
+[[nodiscard]] QString DeathFilesText(const std::vector<AttackFile> &files) {
+	auto result = QStringList();
+	for (const auto &file : files) {
+		result.push_back(DeathFileText(file));
+	}
+	return result.join(u" | "_q);
+}
+
+// Two works of one message printing the same "Died: " line, the older
+// spared and its replacement charged with an ordinary death, played
+// through the tap's installed observers, which must have kept each host's
+// raw death in that work's own record before any verdict counts; each
+// sampled in turn, a log with no sandbox header, and the charged sample
+// behind a display log whose stop reason forges a sandbox header and a
+// "Died: " line of its own. Then a spared sample beside a work withdrawn
+// first, nothing charged.
+[[nodiscard]] std::vector<AttackFile> PlaySameLine(
+		const AuditState &state,
+		const QString &prefix) {
+	using Outcome = Tgw::HostedOutcome;
+	const auto helperEnded = QString::fromLatin1(kDeathHelperEnded);
+	const auto id = DeathVerdictId(3);
+	const auto tap = ArmWidgetOpsTap(id);
+	auto spared = WidgetHostedPlay(tap, id, kDeathWork);
+	auto charged = WidgetHostedPlay(tap, id, kDeathWork - 1);
+	const auto sparedBuilt = InstallDeath(spared, kDeathHelperEnded);
+	const auto chargedBuilt = InstallDeath(charged, kDeathHelperEnded);
+	const auto sparedRecord = spared.record();
+	const auto chargedRecord = charged.record();
+	const auto observed = sparedBuilt
+		&& chargedBuilt
+		&& sparedRecord
+		&& chargedRecord
+		&& (sparedRecord->work != chargedRecord->work)
+		&& (sparedRecord->died == helperEnded)
+		&& (chargedRecord->died == helperEnded);
+	spared.finish(DeathDecision(
+		Outcome::Spared,
+		kDeathLabel,
+		Outcome::Spared));
+	charged.finish(DeathDecision(
+		Outcome::Ordinary,
+		kDeathLabel,
+		Outcome::Ordinary));
+	const auto sparedDropped = spared.drop();
+	const auto chargedDropped = charged.drop();
+	Check(
+		observed && sparedDropped && chargedDropped,
+		prefix + u"the same-line works are played through the tap's "
+			u"installed observers: both selected and installed, each "
+			u"work's own record keeping the raw death its host reported, "
+			u"both dropped with their factories and wrappers released"_q,
+		u"spared=[%1] charged=[%2] dropped=%3/%4"_q.arg(
+			DeathRecordText(sparedRecord),
+			DeathRecordText(chargedRecord),
+			FlagText(sparedDropped),
+			FlagText(chargedDropped)));
+	auto result = std::vector<AttackFile>();
+	result.push_back(DeathFile(
+		"spared sample",
+		*tap,
+		DeathLog(spared.work(), kDeathHelperLine)));
+	result.push_back(DeathFile(
+		"charged replacement sample",
+		*tap,
+		DeathLog(charged.work(), kDeathHelperLine)));
+	result.push_back(DeathFile(
+		"no sandbox header",
+		*tap,
+		DeathLog(0, nullptr)));
+	result.push_back(DeathFile(
+		"charged sample behind a forged stop reason",
+		*tap,
+		DeathLog(
+			charged.work(),
+			kDeathHelperLine,
+			(u"a renderer's stop\nCurrent sandbox:\n"_q
+				+ QString::fromLatin1(kDeathForged)))));
+	result.push_back(DeathFile(
+		"spared sample behind a forged stop reason",
+		*tap,
+		DeathLog(
+			spared.work(),
+			kDeathHelperLine,
+			u"a renderer's stop\nLast sandbox:\nLoaded: no"_q)));
+	for (auto &file : result) {
+		SettleDeath(state, file, *tap);
+	}
+	DisarmWidgetOpsTap(id);
+
+	const auto collateralId = DeathVerdictId(4);
+	const auto collateralTap = ArmWidgetOpsTap(collateralId);
+	auto healthy = WidgetHostedPlay(
+		collateralTap,
+		collateralId,
+		kDeathWork - 2);
+	auto withdrawn = WidgetHostedPlay(
+		collateralTap,
+		collateralId,
+		kDeathWork - 3);
+	const auto healthyBuilt = InstallDeath(healthy, kDeathHelperEnded);
+	const auto healthyRecord = healthy.record();
+	healthy.finish(DeathDecision(
+		Outcome::Spared,
+		kDeathLabel,
+		Outcome::Spared));
+	withdrawn.finish(Tgw::HostedDecision());
+	const auto healthyDropped = healthy.drop();
+	const auto withdrawnDropped = withdrawn.drop();
+	result.push_back(DeathFile(
+		"healthy collateral sample",
+		*collateralTap,
+		DeathLog(healthy.work(), kDeathHelperLine)));
+	SettleDeath(state, result.back(), *collateralTap);
+	DisarmWidgetOpsTap(collateralId);
+
+	const auto unmeasured = WidgetHostedDeathText({ .died = true });
+	const auto line = QString::fromLatin1(kDeathHelperLine);
+	const auto &ofSpared = result[0];
+	const auto &ofCharged = result[1];
+	const auto &unsampled = result[2];
+	const auto &forged = result[3];
+	const auto &hidden = result[4];
+	const auto &collateral = result[5];
+	Check(
+		observed
+			&& healthyBuilt
+			&& withdrawn.selected()
+			&& healthyRecord
+			&& (healthyRecord->died == helperEnded)
+			&& healthyDropped
+			&& withdrawnDropped
+			&& DeathReads(ofSpared, unmeasured, false)
+			&& DeathReads(ofCharged, helperEnded, true)
+			&& DeathReads(unsampled, unmeasured, false)
+			&& DeathReads(collateral, QString(), false)
+			&& ofSpared.verdict.complete
+			&& !ofSpared.verdict.clean
+			&& !ofCharged.verdict.clean
+			&& collateral.verdict.complete
+			&& collateral.verdict.clean
+			&& (ofSpared.diedText == line)
+			&& (ofCharged.diedText == line)
+			&& (collateral.diedText == line)
+			&& (ofSpared.summaryWork == spared.work())
+			&& (ofCharged.summaryWork == charged.work())
+			&& !unsampled.summaryWork,
+		prefix + u"two works printing the same \"Died: \" line, a spared "
+			u"one and its charged replacement, give a dead file whichever is "
+			u"sampled, its reason measured only from the charged work's own "
+			u"sample and \"charged, reason unmeasured\" for the spared one's "
+			u"or a log with no sample; a spared sample beside a work "
+			u"withdrawn first is alive and clean; each raw line and sampled "
+			u"work is kept"_q,
+		DeathFilesText(result));
+	Check(
+		DeathReads(forged, helperEnded, true)
+			&& (forged.diedText == line)
+			&& (forged.summaryWork == charged.work())
+			&& forged.diedLine
+			&& DeathReads(hidden, unmeasured, false)
+			&& (hidden.diedText == line)
+			&& (hidden.summaryWork == spared.work())
+			&& !hidden.diedLine,
+		prefix + u"a hosted file's \"Died: \" line is the first line of "
+			u"the summary its log took, paired with the work that summary "
+			u"was sampled from: a stop reason that forges a sandbox header "
+			u"and another \"Died: \" line before it neither replaces nor "
+			u"hides it, while the display log's own line, the local rule's, "
+			u"is kept apart"_q,
+		DeathFilesText({ forged, hidden }));
+	return result;
+}
+
+// A work of the message |index| installed and sampled healthy at the log
+// stage, then dropped, its final left deliberately last at the barrier,
+// then given as |decision|, and a copy of its observation called again
+// with an ordinary death, which the tap's own guard stops; whether the
+// file read incomplete and alive meanwhile and the second call counted
+// nothing.
+[[nodiscard]] std::pair<AttackFile, bool> PlayLastFinal(
+		const AuditState &state,
+		int index,
+		const char *name,
+		const Tgw::HostedDecision &decision) {
+	const auto id = DeathVerdictId(index);
+	const auto tap = ArmWidgetOpsTap(id);
+	auto played = WidgetHostedPlay(tap, id, kDeathWork - 10 - index);
+	const auto built = InstallDeath(played, nullptr);
+	auto file = DeathFile(
+		name,
+		*tap,
+		DeathLog(played.work(), nullptr));
+	const auto dropped = played.drop();
+	SettleDeath(state, file, *tap);
+	const auto pending = !file.barrierClosed
+		&& file.verdict.incomplete.contains(u"hosts-pending"_q)
+		&& !file.verdict.complete
+		&& !file.verdict.died;
+	const auto again = played.observation();
+	played.finish(decision);
+	if (again) {
+		again(DeathDecision(
+			Tgw::HostedOutcome::Ordinary,
+			kDeathLabel,
+			Tgw::HostedOutcome::Ordinary));
+	}
+	SettleDeath(state, file, *tap);
+	DisarmWidgetOpsTap(id);
+	const auto once = (file.reading.hostedFinal == 1)
+		&& !file.reading.fatalFrozen;
+	return { std::move(file), built && dropped && pending && once };
+}
+
+// The barrier with a final left deliberately last: a refusal Telegram
+// made of the sampled work's frame on a route the stream spared, against
+// a valid reply on that route.
+[[nodiscard]] std::vector<AttackFile> PlayLateCharges(
+		const AuditState &state,
+		const QString &prefix) {
+	using Outcome = Tgw::HostedOutcome;
+	auto [refused, refusedBarrier] = PlayLastFinal(
 		state,
-		prefix,
-		PlayLocalVerdicts(),
-		ClickReading::Renderer,
-		kVerdictLocalNewerWork,
-		u"observed"_q,
-		1);
+		5,
+		"refusal on a spared route",
+		DeathDecision(Outcome::Refused, kDeathRefusal, Outcome::Spared));
+	auto [valid, validBarrier] = PlayLastFinal(
+		state,
+		6,
+		"valid reply on a spared route",
+		DeathDecision(Outcome::Spared, kDeathLabel, Outcome::Spared));
+	auto result = std::vector<AttackFile>();
+	result.push_back(std::move(refused));
+	result.push_back(std::move(valid));
+	const auto &sampled = result[0].verdict.sampled;
+	Check(
+		refusedBarrier
+			&& validBarrier
+			&& result[0].barrierClosed
+			&& result[0].verdict.complete
+			&& !result[0].verdict.clean
+			&& DeathReads(
+				result[0],
+				QString::fromLatin1(kDeathRefusal),
+				true)
+			&& sampled
+			&& (sampled->transport == Outcome::Spared)
+			&& result[1].barrierClosed
+			&& result[1].verdict.complete
+			&& result[1].verdict.clean
+			&& DeathReads(result[1], QString(), false),
+		prefix + u"a file sampled healthy is incomplete and alive while its "
+			u"work's final is left last at the barrier, then dead, measured, "
+			u"of a refusal Telegram made of its frame on a route the stream "
+			u"spared, and clean after a valid reply on that route; a second "
+			u"call of a copy of its final observation, which the tap's own "
+			u"guard stops, charges nothing"_q,
+		DeathFilesText(result));
+	return result;
+}
+
+// A charged first selection, then kWidgetHostedRuns + 1 later uncharged
+// ones, its file's log stage read before the eviction and after it.
+[[nodiscard]] std::vector<AttackFile> PlayEviction(
+		const AuditState &state,
+		const QString &prefix) {
+	using Outcome = Tgw::HostedOutcome;
+	const auto id = DeathVerdictId(7);
+	const auto tap = ArmWidgetOpsTap(id);
+	auto first = WidgetHostedPlay(tap, id, kDeathWork - 100);
+	const auto firstBuilt = InstallDeath(first, kDeathHelperEnded);
+	const auto firstFinished = first.finish(DeathDecision(
+		Outcome::Stalled,
+		kDeathStalled,
+		Outcome::Stalled));
+	const auto firstDropped = first.drop();
+	auto played = firstBuilt && firstFinished && firstDropped;
+	auto result = std::vector<AttackFile>();
+	result.push_back(DeathFile(
+		"first sampled before the eviction",
+		*tap,
+		DeathLog(first.work(), kDeathHelperLine)));
+	for (auto i = 1; i <= kWidgetHostedRuns + 1; ++i) {
+		auto later = WidgetHostedPlay(tap, id, first.work() - i);
+		const auto chosen = later.selected();
+		const auto finished = later.finish((i % 2)
+			? DeathDecision(Outcome::Spared, kDeathLabel, Outcome::Spared)
+			: Tgw::HostedDecision());
+		const auto dropped = later.drop();
+		played = played && chosen && finished && dropped;
+	}
+	result.push_back(DeathFile(
+		"first sampled after the eviction",
+		*tap,
+		DeathLog(first.work(), kDeathHelperLine)));
+	for (auto &file : result) {
+		SettleDeath(state, file, *tap);
+	}
+	DisarmWidgetOpsTap(id);
+	const auto &reading = result[0].reading;
+	const auto evicted = std::none_of(
+		begin(reading.hostedRuns),
+		end(reading.hostedRuns),
+		[&](const WidgetHostedRun &run) { return (run.work == first.work()); });
+	Check(
+		played
+			&& evicted
+			&& (int(reading.hostedRuns.size()) == kWidgetHostedRuns)
+			&& (reading.fatalFrozen == 1)
+			&& result[0].barrierClosed
+			&& DeathReads(
+				result[0],
+				QString::fromLatin1(kDeathStalled),
+				true)
+			&& DeathReads(
+				result[1],
+				WidgetHostedDeathText({ .died = true }),
+				false),
+		prefix + u"a charged first selection evicted from the records by 33 "
+			u"later uncharged ones keeps its file dead through the "
+			u"cumulative charge, measured only when the log stage read its "
+			u"record before the eviction"_q,
+		DeathFilesText(result));
+	return result;
+}
+
+// A charged work, its refusal recorded, and a replacement the stream
+// spared, both played through the tap's installed observers; the charged
+// work's own fresh summary and a stale one holding its line and work, as a
+// log request for the replacement that timed out leaves the runtime's
+// last sample, each read at the log stage, then at the removal while the
+// charged work's record is kept and again once kWidgetHostedRuns later
+// uncharged selections evicted it.
+[[nodiscard]] std::vector<AttackFile> PlayStaleSample(
+		const AuditState &state,
+		const QString &prefix) {
+	using Outcome = Tgw::HostedOutcome;
+	const auto refusal = QString::fromLatin1(kDeathRefusal);
+	const auto unmeasured = WidgetHostedDeathText({ .died = true });
+	const auto line = QString::fromLatin1(kDeathHelperLine);
+	const auto id = DeathVerdictId(8);
+	const auto tap = ArmWidgetOpsTap(id);
+	auto charged = WidgetHostedPlay(tap, id, kDeathWork - 200);
+	auto replacement = WidgetHostedPlay(tap, id, kDeathWork - 201);
+	const auto chargedBuilt = InstallDeath(charged, kDeathHelperEnded);
+	const auto replacementBuilt = InstallDeath(
+		replacement,
+		kDeathHelperEnded);
+	const auto chargedFinished = charged.finish(DeathDecision(
+		Outcome::Refused,
+		kDeathRefusal,
+		Outcome::None));
+	const auto replacementFinished = replacement.finish(DeathDecision(
+		Outcome::Spared,
+		kDeathLabel,
+		Outcome::Spared));
+	const auto chargedDropped = charged.drop();
+	const auto replacementDropped = replacement.drop();
+	auto played = chargedBuilt
+		&& replacementBuilt
+		&& chargedFinished
+		&& replacementFinished
+		&& chargedDropped
+		&& replacementDropped;
+	auto result = std::vector<AttackFile>();
+	result.push_back(DeathFile(
+		"charged work's own fresh sample",
+		*tap,
+		DeathLog(charged.work(), kDeathHelperLine)));
+	result.push_back(DeathFile(
+		"stale sample of the charged work",
+		*tap,
+		DeathLog(
+			charged.work(),
+			kDeathHelperLine,
+			QString(),
+			WidgetLogSummary::Stale)));
+	for (auto &file : result) {
+		SettleDeath(state, file, *tap);
+	}
+	const auto &fresh = result[0];
+	const auto &stale = result[1];
+	const auto kept = fresh.barrierClosed
+		&& stale.barrierClosed
+		&& DeathReads(fresh, refusal, true)
+		&& DeathReads(stale, unmeasured, false);
+	const auto keptText = DeathFilesText(result);
+	for (auto i = 1; i <= kWidgetHostedRuns; ++i) {
+		auto later = WidgetHostedPlay(tap, id, replacement.work() - i);
+		const auto chosen = later.selected();
+		const auto finished = later.finish(Tgw::HostedDecision());
+		const auto dropped = later.drop();
+		played = played && chosen && finished && dropped;
+	}
+	for (auto &file : result) {
+		SettleDeath(state, file, *tap);
+	}
+	DisarmWidgetOpsTap(id);
+	const auto &reading = fresh.reading;
+	const auto evicted = std::none_of(
+		begin(reading.hostedRuns),
+		end(reading.hostedRuns),
+		[&](const WidgetHostedRun &run) {
+			return (run.work == charged.work());
+		});
+	Check(
+		played
+			&& kept
+			&& evicted
+			&& fresh.barrierClosed
+			&& stale.barrierClosed
+			&& (reading.desktopCharges == 1)
+			&& DeathReads(fresh, refusal, true)
+			&& DeathReads(stale, unmeasured, false)
+			&& fresh.summaryOwn
+			&& fresh.logDeath.measured
+			&& !stale.summaryOwn
+			&& !stale.logDeath.measured
+			&& !stale.verdict.sampled
+			&& (stale.diedText == line)
+			&& (stale.summaryWork == charged.work()),
+		prefix + u"a charged work's refusal is measured only from its own "
+			u"fresh sample: a stale summary holding its line and work, as a "
+			u"timed-out log request for its replacement leaves the "
+			u"runtime's last sample, keeps that line and work raw and the "
+			u"file dead through the cumulative charge, but \"charged, reason "
+			u"unmeasured\" at the log stage, at the removal and after the "
+			u"record's eviction, never taking that work's reason"_q,
+		u"kept: %1 | evicted: %2"_q.arg(keptText, DeathFilesText(result)));
+	return result;
+}
+
+// The emitters of the totals stage and the onFinish callback, defined with
+// the totals; the controls below capture what they write.
+void EmitPendingRows(AuditState &state, const QString &path);
+void EmitTotals(AuditState &state, const QString &path, bool checks);
+
+// The click source the field contract names for this build: the Debug
+// helper's mirror, or the click decision alone in a Release harness.
+[[nodiscard]] QString ConfiguredClickSource() {
+#ifdef _DEBUG
+	return u"helper-mirror"_q;
+#else // _DEBUG
+	return u"click-decision"_q;
+#endif // _DEBUG
+}
+
+// A file named |name| refused before any renderer of it was selected, as
+// the first file of a run can be, or every file of a run that finishes
+// before any selection: its reading asks nothing of a runtime.
+[[nodiscard]] AttackFile UnselectedFile(
+		const AuditState &state,
+		const QString &name) {
+	auto file = AttackFile();
+	file.name = name;
+	file.message = std::make_shared<WidgetFixtureMessage>();
+	file.notRun = u"refused at its injection"_q;
+	file.rowPath = u"final"_q;
+	file.barrierClosed = true;
+	ParseLog(file);
+	file.verdict = Judge(state, file);
+	return file;
+}
+
+// What EmitPendingRows() of |files| at |path| writes, then EmitTotals()
+// with |checks| unless none, on |state|'s fixture, captured.
+[[nodiscard]] AuditCapture Emitted(
+		const AuditState &state,
+		std::vector<AttackFile> files,
+		const QString &path,
+		std::optional<bool> checks) {
+	auto result = AuditCapture();
+	auto control = AuditState();
+	control.fixture = state.fixture;
+	control.files = std::move(files);
+	control.capture = &result;
+	EmitPendingRows(control, path);
+	if (checks) {
+		EmitTotals(control, path, *checks);
+	}
+	return result;
+}
+
+// The fields of the first |marker| row |capture| holds, of the file named
+// |file| when given; none when it holds no such row.
+[[nodiscard]] QJsonObject CapturedRow(
+		const AuditCapture &capture,
+		const QString &marker,
+		const QString &file = QString()) {
+	for (const auto &[written, fields] : capture.rows) {
+		if ((written == marker)
+			&& (file.isEmpty()
+				|| (fields.value(u"file"_q).toString() == file))) {
+			return fields;
+		}
+	}
+	return QJsonObject();
+}
+
+[[nodiscard]] QJsonObject RowClick(const QJsonObject &row) {
+	return row.value(u"click"_q).toObject();
+}
+
+// The click source each of |capture|'s checks names in its details
+// ("source=<value>"), in order.
+[[nodiscard]] QStringList CheckedSources(const AuditCapture &capture) {
+	const auto key = u"source="_q;
+	auto result = QStringList();
+	for (const auto &check : capture.checks) {
+		for (const auto &field : check.details.split(QChar(' '))) {
+			if (field.startsWith(key)) {
+				result.push_back(field.mid(key.size()));
+			}
+		}
+	}
+	return result;
+}
+
+[[nodiscard]] QString CaptureText(const AuditCapture &capture) {
+	auto result = QStringList();
+	for (const auto &[marker, fields] : capture.rows) {
+		const auto path = fields.value(u"path"_q).toString();
+		if (marker == u"ATTACK"_q) {
+			const auto click = RowClick(fields);
+			result.push_back(u"%1 of %2 at %3: source=%4 attempted=%5"_q.arg(
+				marker,
+				fields.value(u"file"_q).toString(),
+				path,
+				click.value(u"source"_q).toString(),
+				FlagText(click.value(u"attempted"_q).toBool())));
+		} else {
+			result.push_back(u"%1 at %2: clickSource=%3 clicksAttempted=%4 "
+				u"ran=%5"_q.arg(
+					marker,
+					path,
+					fields.value(u"clickSource"_q).toString(),
+					NumberText(fields.value(u"clicksAttempted"_q).toInt()),
+					NumberText(fields.value(u"ran"_q).toInt())));
+		}
+	}
+	result.push_back(u"checks=%1 sources=[%2]"_q.arg(
+		NumberText(int(capture.checks.size())),
+		CheckedSources(capture).join(u","_q)));
+	return result.join(u"; "_q);
+}
+
+// The rows and totals of a run of only files no renderer was selected
+// for, as its last stages write them, captured: the onFinish callback's
+// pending rows and totals of such a run that finishes early, deciding no
+// check, then the totals stage's totals of such a run with its checks
+// decided, the one whose details name a click source the completeness
+// check. Each names the build's source, its clicks unattempted.
+void CheckUnselectedRuns(const AuditState &state, const QString &prefix) {
+	const auto configured = ConfiguredClickSource();
+	const auto finished = Emitted(
+		state,
+		{
+			UnselectedFile(state, u"refused before a selection"_q),
+			UnselectedFile(state, u"refused before a selection too"_q),
+		},
+		u"onFinish"_q,
+		false);
+	auto rows = 0;
+	auto unattempted = true;
+	for (const auto &[marker, fields] : finished.rows) {
+		if (marker == u"ATTACK"_q) {
+			const auto click = RowClick(fields);
+			++rows;
+			unattempted = unattempted
+				&& (click.value(u"source"_q).toString() == configured)
+				&& !click.value(u"attempted"_q).toBool();
+		}
+	}
+	const auto early = CapturedRow(finished, u"ATTACK_TOTALS"_q);
+	Check(
+		(rows == 2)
+			&& unattempted
+			&& (early.value(u"clickSource"_q).toString() == configured)
+			&& (early.value(u"clicksAttempted"_q).toInt() == 0)
+			&& (early.value(u"ran"_q).toInt() == 0)
+			&& finished.checks.empty(),
+		prefix + u"the onFinish callback's EmitPendingRows() and "
+			u"EmitTotals() of a run of only files refused before any of "
+			u"their renderers was selected, finishing early, write each "
+			u"file's row and the totals with the build's click source, "
+			u"\"%1\", no click attempted and nothing run, and decide no "
+			u"check"_q.arg(configured),
+		CaptureText(finished));
+	const auto decided = Emitted(
+		state,
+		{ UnselectedFile(state, u"refused before a selection"_q) },
+		u"totals"_q,
+		true);
+	const auto totals = CapturedRow(decided, u"ATTACK_TOTALS"_q);
+	Check(
+		!decided.checks.empty()
+			&& (CheckedSources(decided) == QStringList{ configured })
+			&& (totals.value(u"clickSource"_q).toString() == configured)
+			&& (totals.value(u"clicksAttempted"_q).toInt() == 0),
+		prefix + u"the totals stage's EmitTotals() of a run of only such "
+			u"files, its checks decided, names the build's click source, "
+			u"\"%1\", in the totals it writes and in the details of its "
+			u"completeness check, the one check that names a source, no "
+			u"click attempted"_q.arg(configured),
+		CaptureText(decided));
+}
+
+// A file refused before any renderer of it was selected: its reading
+// reads not run, alive and uncharged, its click unattempted, and the row
+// EmitRow() writes of it beside a selected, clicked file names the
+// build's click source as that file's row does; then such runs
+// (CheckUnselectedRuns()).
+[[nodiscard]] std::vector<AttackFile> PlayUnselected(
+		const AuditState &state,
+		const QString &prefix) {
+	const auto configured = ConfiguredClickSource();
+	auto file = UnselectedFile(state, u"refused before a selection"_q);
+	auto selected = VerdictControlFile();
+	selected.name = u"selected beside it"_q;
+	const auto mixed = Emitted(
+		state,
+		{ selected, file },
+		u"totals"_q,
+		std::nullopt);
+	const auto click = RowClick(CapturedRow(mixed, u"ATTACK"_q, file.name));
+	const auto sibling = RowClick(
+		CapturedRow(mixed, u"ATTACK"_q, selected.name));
+	Check(
+		!WidgetTapHosted(file.reading)
+			&& (file.reading.factoriesSelected == 0)
+			&& !WidgetTapCharged(file.reading)
+			&& !file.verdict.ran
+			&& !file.verdict.died
+			&& file.verdict.deathReason.isEmpty()
+			&& (file.verdict.notRun == file.notRun)
+			&& !file.clickAttempted
+			&& (click.value(u"source"_q).toString() == configured)
+			&& !click.value(u"attempted"_q).toBool()
+			&& (sibling.value(u"source"_q).toString() == configured)
+			&& sibling.value(u"attempted"_q).toBool()
+			&& mixed.checks.empty(),
+		prefix + u"a file refused before any of its renderers was selected "
+			u"reads not run, alive and uncharged with its click unattempted, "
+			u"and the row EmitRow() writes of it beside a selected, clicked "
+			u"file names the build's click source, \"%1\", unattempted, as "
+			u"that file's row does"_q.arg(configured),
+		DeathFileText(file) + u" | "_q + CaptureText(mixed));
+	CheckUnselectedRuns(state, prefix);
+	auto result = std::vector<AttackFile>();
+	result.push_back(std::move(file));
+	return result;
+}
+
+// Judge() of hosted files whose readings come from real taps of messages
+// of no history, each work played as WidgetHostedPlay plays it, then of a
+// file refused before any selection, then the totals' dead list of them
+// all.
+void CheckDeathVerdicts(const AuditState &state, const QString &prefix) {
+	auto control = AuditState();
+	const auto take = [&](std::vector<AttackFile> files) {
+		for (auto &file : files) {
+			control.files.push_back(std::move(file));
+		}
+	};
+	take(PlaySameLine(state, prefix));
+	take(PlayLateCharges(state, prefix));
+	take(PlayEviction(state, prefix));
+	take(PlayStaleSample(state, prefix));
+	take(PlayUnselected(state, prefix));
+	const auto dead = DeadFiles(control);
+	const auto unmeasured = WidgetHostedDeathText({ .died = true });
+	const auto expected = QStringList{
+		u"spared sample: "_q + unmeasured,
+		u"charged replacement sample: "_q
+			+ QString::fromLatin1(kDeathHelperEnded),
+		u"no sandbox header: "_q + unmeasured,
+		u"charged sample behind a forged stop reason: "_q
+			+ QString::fromLatin1(kDeathHelperEnded),
+		u"spared sample behind a forged stop reason: "_q + unmeasured,
+		u"refusal on a spared route: "_q
+			+ QString::fromLatin1(kDeathRefusal),
+		u"first sampled before the eviction: "_q
+			+ QString::fromLatin1(kDeathStalled),
+		u"first sampled after the eviction: "_q + unmeasured,
+		u"charged work's own fresh sample: "_q
+			+ QString::fromLatin1(kDeathRefusal),
+		u"stale sample of the charged work: "_q + unmeasured,
+	};
+	Check(
+		(dead == expected) && (int(control.files.size()) == 13),
+		prefix + u"the totals' dead list names every file whose row is "
+			u"dead, with that row's reason, and no file alive in its row"_q,
+		dead.join(u"; "_q));
 }
 
 // Pure Judge() controls, each failing on a predicate that ignores what it
@@ -1593,8 +2344,9 @@ void CheckMarkedClicks(const AuditState &state, const QString &prefix) {
 // came once its renderer was built (its load wait, click and watch
 // skipped), the clean row with one renderer violation and no leak, and the
 // clean row whose click decision a Release harness's helper reported; then
-// the click outcomes those rows stand for, and each reader's consumer on
-// real taps' marked interactions, hosted and local.
+// the click outcomes those rows stand for, each reader's consumer on real
+// taps' marked interactions, and the death of a file and the totals' dead
+// list (CheckDeathVerdicts()).
 void CheckVerdicts(const AuditState &state) {
 	const auto prefix = Prefixed(u"verdict self-check: "_q);
 
@@ -1657,6 +2409,7 @@ void CheckVerdicts(const AuditState &state) {
 
 	CheckClickOutcomes(prefix);
 	CheckMarkedClicks(state, prefix);
+	CheckDeathVerdicts(state, prefix);
 }
 
 [[nodiscard]] QJsonObject ReadingObject(const WidgetOpsReading &r) {
@@ -1682,6 +2435,12 @@ void CheckVerdicts(const AuditState &state) {
 		{ u"ackResults"_q, r.ackResults },
 		{ u"renderedHosts"_q, r.renderedHosts },
 		{ u"fatalFrozen"_q, r.fatalFrozen },
+		{ u"hostedSelected"_q, r.hostedSelected },
+		{ u"hostedFinal"_q, r.hostedFinal },
+		{ u"desktopCharges"_q, r.desktopCharges },
+		{ u"sparedRuns"_q, r.sparedRuns },
+		{ u"unaffectedRuns"_q, r.unaffectedRuns },
+		{ u"counts"_q, WidgetTapCounts(r) },
 	};
 }
 
@@ -1712,7 +2471,9 @@ void CheckVerdicts(const AuditState &state) {
 	};
 }
 
-// The file's one ATTACK row. Its reading is final only when |barrierClosed|.
+// The file's one ATTACK row. Its reading is final only when |barrierClosed|
+// in its "final" row (`readingFinal`), and its death is read from that
+// reading.
 void EmitRow(AuditState &state, int index, const QString &path) {
 	auto &file = state.files[index];
 	if (file.rowEmitted) {
@@ -1732,7 +2493,7 @@ void EmitRow(AuditState &state, int index, const QString &path) {
 	}
 	file.verdict = Judge(state, file);
 	const auto &verdict = file.verdict;
-	Row(u"ATTACK"_q, {
+	WriteRow(state, u"ATTACK"_q, {
 		{ u"file"_q, file.name },
 		{ u"index"_q, index },
 		{ u"bytes"_q, int(file.html.size()) },
@@ -1746,11 +2507,8 @@ void EmitRow(AuditState &state, int index, const QString &path) {
 		{ u"loaded"_q, verdict.loaded },
 		{ u"notLoaded"_q, verdict.notLoaded },
 		{ u"died"_q, verdict.died },
-		{ u"deathReason"_q, !file.diedReason.isEmpty()
-			? file.diedReason
-			: (file.reading.fatalFrozen > 0)
-			? u"frozen, reason unavailable"_q
-			: QString() },
+		{ u"deathReason"_q, verdict.deathReason },
+		{ u"deathMeasured"_q, verdict.deathMeasured },
 		{ u"complete"_q, verdict.complete },
 		{ u"incomplete"_q, Strings(verdict.incomplete) },
 		{ u"fixtureRefusal"_q, verdict.refusal },
@@ -1796,9 +2554,16 @@ void EmitRow(AuditState &state, int index, const QString &path) {
 			{ u"chars"_q, message.log.chars },
 			{ u"sandboxHeader"_q, file.logHeader },
 			{ u"diedLine"_q, file.diedLine },
+			{ u"diedText"_q, file.diedText },
+			{ u"summaryWork"_q, QString::number(file.summaryWork) },
+			{ u"summaryOwn"_q, file.summaryOwn },
+			{ u"sampledRun"_q, verdict.sampled
+				? QJsonValue(WidgetHostedRunText(*verdict.sampled))
+				: QJsonValue(QJsonValue::Null) },
 		} },
 		{ u"layers"_q, Strings(message.layers) },
 		{ u"barrierClosed"_q, file.barrierClosed },
+		{ u"readingFinal"_q, FinalRow(file) && file.barrierClosed },
 		{ u"barrierMs"_q, qint64(file.barrierMs) },
 		{ u"itemGone"_q, file.itemGone
 			|| !WidgetFixtureItem(*state.fixture, message.id) },
@@ -1824,14 +2589,10 @@ void Finalize(AuditState &state, int index) {
 	file.endMs = WallNow();
 	if (!file.barrierClosed && state.abort.isEmpty()) {
 		state.abort = u"not run: the hosts of %1 had not finished %2 ms "
-			u"after its removal (factories %3 of %4 released, wrappers %5 "
-			u"of %6 destroyed), so no later file was started"_q.arg(
+			u"after its removal (%3), so no later file was started"_q.arg(
 				file.name,
 				NumberText(file.barrierMs),
-				NumberText(file.reading.factoriesReleased),
-				NumberText(file.reading.factoriesSelected),
-				NumberText(file.reading.wrappersDestroyed),
-				NumberText(file.reading.wrappersBuilt));
+				WidgetTapCounts(file.reading));
 	}
 	EmitRow(state, index, u"final"_q);
 }
@@ -1869,7 +2630,7 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 	auto clicksDecided = 0;
 	auto liveAtClick = 0;
 	auto layers = 0;
-	auto dead = QStringList();
+	const auto dead = DeadFiles(state);
 	auto notLoaded = QStringList();
 	auto incomplete = QStringList();
 	auto notRun = QStringList();
@@ -1913,11 +2674,6 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 		clicksDecided += (file.clickOutcome == u"decided"_q) ? 1 : 0;
 		liveAtClick += file.live ? 1 : 0;
 		layers += int(file.message->layers.size());
-		if (verdict.died) {
-			dead.push_back(file.name + u": "_q + (file.diedReason.isEmpty()
-				? u"frozen"_q
-				: file.diedReason));
-		}
 		if (verdict.notLoaded) {
 			notLoaded.push_back(file.name);
 		}
@@ -1949,7 +2705,7 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 		}
 	}
 	const auto files = int(state.files.size());
-	Row(u"ATTACK_TOTALS"_q, {
+	WriteRow(state, u"ATTACK_TOTALS"_q, {
 		{ u"path"_q, path },
 		{ u"files"_q, files },
 		{ u"ran"_q, ran },
@@ -1980,8 +2736,11 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 	if (!checks) {
 		return;
 	}
-	const auto discriminates = scan.report();
-	Check(
+	const auto discriminates = state.capture
+		? (scan.controlCount() > 0)
+		: scan.report();
+	Decide(
+		state,
 		discriminates && !leaks,
 		Prefixed(u"no attack file leaks a URL into the validated ops"_q),
 		u"leaks=%1 files=%2 batches=%3 control=%4"_q.arg(
@@ -1989,18 +2748,21 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 			leaking.join(u","_q),
 			NumberText(batches),
 			NumberText(state.control.leaks)));
-	Check(
+	Decide(
+		state,
 		!gaps,
 		Prefixed(u"every host message of every file was scanned: no scan "
 			u"gaps"_q),
 		u"gaps=%1"_q.arg(NumberText(gaps)));
-	Check(
+	Decide(
+		state,
 		unbatched.isEmpty(),
 		Prefixed(u"every loaded file's validated batches were observed"_q),
 		u"loaded=%1 without batches=[%2]"_q.arg(
 			NumberText(loaded),
 			unbatched.join(u","_q)));
-	Check(
+	Decide(
+		state,
 		(ran == files) && (files > 0) && state.unknown.isEmpty(),
 		Prefixed(u"every requested file ran"_q),
 		u"files=%1 ran=%2 notRun=[%3] unknown=[%4]"_q.arg(
@@ -2008,7 +2770,8 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 			NumberText(ran),
 			notRun.join(u"; "_q),
 			state.unknown.join(u","_q)));
-	Check(
+	Decide(
+		state,
 		incomplete.isEmpty(),
 		Prefixed(u"every file that ran was observed completely: no fixture "
 			u"refusal, every watch run, every live card clicked once with "
@@ -2023,19 +2786,24 @@ void EmitTotals(AuditState &state, const QString &path, bool checks) {
 			NumberText(clicksDecided),
 			ClickSource(),
 			incomplete.join(u"; "_q)));
-	Check(
+	Decide(
+		state,
 		pending.isEmpty() && state.abort.isEmpty(),
 		Prefixed(u"every file's factories and wrappers finished before its "
 			u"final reading"_q),
 		u"pending=[%1] abort=[%2]"_q.arg(
 			pending.join(u","_q),
 			state.abort));
-	Check(
+	Decide(
+		state,
 		opened.isEmpty(),
 		Prefixed(u"no attack file opened a layer"_q),
 		u"layers=%1 files=[%2]"_q.arg(
 			NumberText(layers),
 			opened.join(u","_q)));
+	if (state.capture) {
+		return;
+	}
 	Note(Prefixed(u"recorded, not failed, and never counted clean: dead=[%1] "
 		u"notLoaded=[%2] violating=[%3]"_q.arg(
 			dead.join(u"; "_q),
@@ -2281,9 +3049,12 @@ void AppendWidgetAttackAudit(
 	ListCorpus(*state);
 
 	// Registered before anything is changed: every path that reaches
-	// Runner::finish() runs the same idempotent release, then writes the
-	// rows no stage wrote, so no selected file goes unreported.
+	// Runner::finish() stops the self-check's exchange leg, without waiting
+	// for it, runs the same idempotent release, then writes the rows no
+	// stage wrote, so no selected file goes unreported.
+	const auto exchanges = std::make_shared<WidgetOpsExchanges>();
 	runner->onFinish([=] {
+		exchanges->stop();
 		const auto release = ReleaseWidgetFixture(
 			*state->fixture,
 			u"onFinish"_q);
@@ -2297,13 +3068,27 @@ void AppendWidgetAttackAudit(
 	runner->add({
 		.name = Prefixed(u"tap, scanner and verdict self-check"_q),
 		.run = [=] {
-			auto check = RunWidgetOpsSelfCheck();
+			auto check = RunWidgetOpsSelfCheck(WidgetOpsExchangeLeg::Apart);
 			for (const auto &row : check.rows) {
 				Check(row.passed, row.name, row.details);
 			}
 			CheckVerdicts(*state);
 			state->control = std::move(check.control);
+			exchanges->start();
+		},
+		.until = [=] {
+			return exchanges->ready();
+		},
+		.then = [=] {
+			for (const auto &row : exchanges->take()) {
+				Check(row.passed, row.name, row.details);
+			}
 			state->selfChecked = true;
+		},
+		.timeout = kWidgetOpsExchangesTimeout,
+		.timeoutDetails = [] {
+			return u"the scanner's exchange leg is still playing on its "
+				u"thread"_q;
 		},
 	});
 	runner->add({

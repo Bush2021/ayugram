@@ -25,6 +25,7 @@ class Session;
 } // namespace Main
 
 namespace twidget {
+class SandboxHostedChannel;
 class SandboxResources;
 struct WalletCall;
 struct WidgetData;
@@ -37,8 +38,13 @@ namespace Tgw {
 
 class Bridge;
 class RendererCore;
+struct HostedDecision;
+struct HostedRun;
+struct HostedWithdrawal;
 struct MessageMemory;
 struct RendererCut;
+
+inline constexpr auto kMaxLogLine = 240;
 
 enum class HeightChange : uchar {
 	Own,
@@ -131,6 +137,29 @@ public:
 private:
 	struct Host;
 
+	enum class Demand : uchar {
+		None,
+		Paint,
+		GatedPaint,
+	};
+
+	enum class Discard : uchar {
+		Storage,
+		Sibling,
+		Own,
+		Stale,
+		Capacity,
+	};
+
+	struct Request {
+		std::shared_ptr<HostedRun> run;
+		Demand paint = Demand::None;
+		bool recovery = false;
+		bool started = false;
+		bool left = false;
+		bool owned = false;
+	};
+
 	[[nodiscard]] static std::shared_ptr<MessageMemory> RememberMessage(
 		not_null<HistoryItem*> item,
 		const QByteArray &html);
@@ -149,30 +178,47 @@ private:
 	static void WalletAvailabilityChanged(not_null<Main::Session*> session);
 	[[nodiscard]] static Runtime *FindVictim();
 	static void TrimKept();
+	static void FinishRun(
+		std::shared_ptr<HostedRun> run,
+		HostedDecision decision);
+	static void RunGone(
+		const std::shared_ptr<HostedRun> &run,
+		const HostedWithdrawal &withdrawal);
+	[[nodiscard]] static bool ChargeRun(HostedRun &run, MessageMemory &memory);
 
 	[[nodiscard]] bool currentContent() const;
 	[[nodiscard]] bool crashedOut() const;
 	[[nodiscard]] bool startable() const;
-	[[nodiscard]] bool wantsStart() const;
+	[[nodiscard]] bool demanded() const;
+	[[nodiscard]] bool wantsStart();
+	[[nodiscard]] bool runsDeciding(const HostedRun *self = nullptr) const;
 	[[nodiscard]] bool queryVisible() const;
 
-	[[nodiscard]] bool recordStop(not_null<RendererCore*> renderer);
-	[[nodiscard]] bool countCrash(bool fatal);
+	void recordStop(not_null<RendererCore*> renderer);
 	int breakCrashRun();
 	void start();
 	void release();
+	void cancelStart();
+	void gatePaint();
+	void releaseAttempt(Discard discard, const QString &note);
+	void applyFinal(const HostedRun &run);
+	void stopForRun(const HostedDecision &decision);
+	[[nodiscard]] bool livesWork(uint64 work) const;
+	void restartSpared(uint64 work);
 	void resourcesReady(
 		int generation,
 		std::shared_ptr<twidget::SandboxResources> resources);
 	void construct(std::shared_ptr<twidget::SandboxResources> resources);
+	[[nodiscard]] std::shared_ptr<HostedRun> createRun();
 	void constructed(
 		int generation,
 		std::shared_ptr<twidget::WidgetHost> host,
 		const twidget::WidgetData &data,
 		const QString &error,
-		uint64 storage);
-	void retire(State state, int brokenCrashes = 0);
-	[[nodiscard]] Fn<void(twidget::WidgetHost &host)> keepStill();
+		uint64 storage,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel);
+	void retire(State state, bool keepOwnDeath = false);
+	[[nodiscard]] Fn<void(twidget::WidgetHost &host)> keepStill(bool ended);
 	void stopForCrashes();
 	void fail(const QString &error);
 	void failResources();
@@ -257,16 +303,15 @@ private:
 	uint64 _summaryRequest = 0;
 	uint64 _logHost = 0;
 	double _maxHeight = 0.;
+	Request _request;
 	int _generation = 0;
 	int _width = 0;
-	int _brokenCrashes = 0;
 	HeightLayout _layout;
 	ContentSafeArea _safeArea;
 	ContentSafeArea _hostSafeArea;
 	State _state = State::Idle;
 	bool _visible = false;
 	bool _hostVisible = false;
-	bool _painted = false;
 	bool _windowKnown = false;
 	bool _stopFatal = false;
 	bool _summaryLast = false;
@@ -280,6 +325,9 @@ private:
 [[nodiscard]] double CssFromLogical(int logical);
 [[nodiscard]] int LogicalHeight(double css);
 [[nodiscard]] int LogicalWidth(double css);
+
+[[nodiscard]] QString ClipLogLine(QString text, int length = kMaxLogLine);
+[[nodiscard]] QString ClipLogLine(const std::string &text);
 
 [[nodiscard]] Runtime *FindRuntime(
 	not_null<const HistoryView::Element*> view);

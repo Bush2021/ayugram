@@ -12,13 +12,14 @@ chat shown in its own `HistoryInner` of the legacy `HistoryWidget`, local
 outgoing widget messages with tapped validated ops, card readings, the
 runtime log, loopback network controls, the primary window's one-column
 placement and one idempotent release. [Remote engines](#remote-engines)
-says where the engines of its widgets run: by default in a sandboxed
+says where its widgets run: in a sandboxed
 widget helper, packaged builds included, which on macOS, on Linux x86_64
-and aarch64 and on Windows 10 1809 or later, the Windows Store build too,
-is the separate Qt-free `TelegramWidgetHelper` (in the Mac App Store
-build, from macOS 12, an App-Sandboxed XPC service), on Windows a
-restricted `modules\<arch>\TelegramWidgetHelper.exe`. Where no such
-helper exists no widget engine runs: every widget stops with `no
+and aarch64 and on Windows 7 SP1 or later (the Windows Store build from
+Windows 10 1809) is the separate Qt-free `TelegramWidgetHelper` (in the
+Mac App Store build, from macOS 12, an App-Sandboxed XPC service), on Windows a
+restricted `modules\<arch>\TelegramWidgetHelper.exe` in the sandbox tier
+of its Windows version. Where no such
+helper is available no widget engine runs: every widget stops with `no
 sandboxed widget helper is available here: <reason>`.
 
 Callers: `Test::AppendWidgetAttackAudit` in `test_widget_attacks.cpp`
@@ -142,17 +143,26 @@ screen choice and stay-on-top hint.
   by the caller's `purpose` ("the click show refused: ...").
 - **Desktop stop.** `WidgetDesktopStop(fixture, id, core, fatalFrozen)`
   only reads a stop the desktop decided itself, such as a paint bound's
-  refusal of the widget's frames, found in `RendererWork::raster()` on the
-  core's work turn. The stop reaches the chat later, in the posted answer
-  `RendererCore::apply()` takes: only then do the core's `stopped()`,
-  `stopReason()` and `stopFatal()` read it and the runtime retire, so the
-  reading stays empty until that answer arrives. A host's `frozen` is
-  latched by `RendererCore::hostFrozen()` as soon as the host link's post
-  of it to the main thread runs (`HostLink::postMessage()` also posts
-  `RendererWork::freeze()` to the widget render thread), but its stop, too,
-  is published only by the posted answer. Such a stop reaches no host death:
-  the host watch's `dead` stays null, or reads `terminated` once the
-  retired host is destroyed ([test_widget_host](test_widget_host.md)).
+  refusal of the widget's frames: the Qt backend refuses a helper picture
+  the core's `RendererWork` paints on the widget render thread, and that
+  worker stops the core and closes its route there
+  (`RendererWork::refuse()`). The stop reaches the chat later, in the
+  answer the worker posts and `RendererCore::apply()` takes: only then do
+  the core's `stopped()`, `stopReason()` and `stopFatal()` read it and the
+  runtime retire, so the reading stays empty until that answer arrives. A
+  hosted host's death goes the other way: its `onDeath` callback calls
+  `HostLink::postDeath()`, which, for a death the stream did not spare,
+  records the run's decision and calls `HostLink::postFrozen()`: that posts
+  `RendererCore::hostFrozen()` to the main thread, which latches the
+  freeze as soon as it runs, and `RendererWork::freeze()` to the widget
+  render thread; that stop, too, is published only by the posted answer.
+  A spared death posts only `RendererCore::hostFrozen()`, and no stop
+  ([Remote engines](#remote-engines), *Deaths*).
+  A desktop stop is no host death: the host watch's `dead` stays null,
+  reads `terminated` once the retired host is destroyed, or holds another
+  death of that host, such as `the widget engine process ended` when the
+  desktop refused the traffic of a route its helper's end had spared
+  ([test_widget_host](test_widget_host.md)).
   The identity is the caller's: `core` is `WidgetHostSample::core` of the
   run's one watched attachment, compared by address with the list's own
   runtime's `Runtime::core()`, which is the retired core itself (the
@@ -161,10 +171,17 @@ screen choice and stay-on-top hint.
   picture while an older still is shown: `Runtime::retire()` then
   discards the stopped core, `Runtime::core()` stays the older still,
   another address, and the reading is empty, as for any other core.
-  `fatalFrozen` is the run's tap count
-  ([test_widget_ops](test_widget_ops.md)): a host's counted-cap stop sends
-  a fatal `frozen` and carries its reason in the host's own death. The
-  reading changes nothing, keeps nothing and never takes another view's
+  `fatalFrozen` is the run's tap count of its hosted works' final ordinary
+  or stalled charges
+  ([test_widget_ops](test_widget_ops.md#hosted-deaths-and-final-charges)),
+  never of a death a host reported by itself, and the reading is
+  empty once it is above 0: a host's counted-cap stop carries its reason
+  in the host's own death, so a stop that death made is never read as the
+  desktop's. A refusal the desktop made of a hosted widget's traffic is a
+  final charge of its work too, counted apart (`desktopCharges`), which
+  this reading does not consult; the conformance runner takes a hosted
+  widget's cause from its sampled work's own record, never from this
+  reading. The reading changes nothing, keeps nothing and never takes another view's
   runtime. Its consumers are the stress-kit runner, which latches its first
   answer with that reading's time, and the conformance runner, which reads
   it once in its log stage.
@@ -301,8 +318,10 @@ stay with each caller (their policies close this section).
 ## Remote engines
 
 On macOS (in the Mac App Store build from macOS 12), on Linux x86_64 and
-aarch64 and on Windows 10 1809 or later (the Windows Store build too),
-packaged builds included on all three, every widget engine of the client
+aarch64 and on Windows 7 SP1 or later (each Windows version in its own
+sandbox tier, **The Windows sandbox tiers** below; the Windows Store build
+from Windows 10 1809, in the full tier alone, **The Windows Store build**
+below), packaged builds included on all three, every widget of the client
 runs in one shared widget helper process that has locked itself down,
 instead of the client's own threads, in Debug and Release builds alike
 and with no switch. That helper is the separate Qt-free executable
@@ -310,23 +329,28 @@ and with no switch. That helper is the separate Qt-free executable
 `TelegramWidgetHelper.exe`, which the Windows Store build carries in its
 package (**The Windows Store build** below); the Mac App Store build
 packages it as an App-Sandboxed XPC service (**The Mac App Store
-service** below). On macOS, both packages alike, that helper runs the
-whole widget: its engine, its trusted validator and its TwidgetCore
-renderer, while the client keeps the checked Qt work and the pictures
-(**Hosted widgets on macOS** below); on Windows and Linux it runs the
-engines alone, as before.
-Everywhere else no widget engine runs: every widget stops with `no
-sandboxed widget helper is available here: <reason>` (**Store, packaged
-and other platforms** below), and only the Debug switch `in-process` runs
-the engines in the client there. The
+service** below). On macOS, both packages alike, on Linux, in the
+`TelegramHelpers` and the libexec layouts alike, and on Windows, the
+Windows Store build too, that helper runs the whole widget: its engine,
+its trusted validator and its renderer, while the client keeps the
+checked Qt work and the pictures (**Hosted widgets on macOS, Linux and
+Windows** below). Telegram links no widget engine, validator, renderer or
+litehtml on any platform: Nova, the validator, the renderer and its
+litehtml are twidget's Rust serving, the helper's one Rust library
+(**The shared helper** and **The Windows helper** below). Everywhere else, and in every
+build configured with `DESKTOP_APP_DISABLE_PRIVATE_QT_API`, no widget
+engine runs: every widget stops with `no sandboxed widget helper is
+available here: <reason>` (**Platform default** and **Store, packaged and
+other platforms** below). The
 packs, the fixture and the seams they use need no change for it.
 
 - **Platform default.** It is `Platform::WidgetHelper::Enabled()`: true on
   macOS, builds with packaged libraries (`DESKTOP_APP_USE_PACKAGED`)
   included and the Mac App Store build (`OS_MAC_STORE`) from macOS 12, on
-  Windows 10 1809 or later, the Windows Store build (`OS_WIN_STORE`)
-  included, and on Linux x86_64 and aarch64, so a launch with no switch
-  runs every engine in the sandboxed helper. Everywhere else it is
+  Windows 7 SP1 or later, Windows 7 with update KB2533623, in the Windows
+  Store build (`OS_WIN_STORE`) from Windows 10 1809, and on Linux x86_64
+  and aarch64, so a launch with no switch
+  runs every widget in the sandboxed helper. Everywhere else it is
   false, and a launch with no switch stops every widget with `no
   sandboxed widget helper is available here: <reason>`, the reason of
   `Platform::WidgetHelper::UnsupportedReason()`, which is empty exactly
@@ -334,14 +358,32 @@ packs, the fixture and the seams they use need no change for it.
   refuses before any spawn or connection: `the widget helper needs macOS
   12 or later in the Store build` in the Mac App Store build before macOS
   12 (`@available(macOS 12.0, *)` in `widget_helper_mac.mm`), `the widget
-  helper needs Windows 10 1809 or later` on Windows before 10 1809, `the
+  helper needs Windows 7 SP1 or later` on Windows before 7 SP1 or when the
+  Windows version cannot be read, `the widget helper needs update
+  KB2533623 on Windows 7` on a Windows 7 whose kernel32 lacks
+  `SetDefaultDllDirectories`, `the widget helper needs Windows 10 1809 or
+  later` in the Windows Store build before Windows 10 1809 or when the
+  Windows version cannot be read, `the
   widget helper is not available on this architecture` on other Linux
   architectures and `the widget helper is not available on this
-  platform` on the non-Linux all-other platforms.
+  platform` on the non-Linux all-other platforms. A build configured with
+  `DESKTOP_APP_DISABLE_PRIVATE_QT_API` stops every widget the same way on
+  every platform, with the reason `this build cannot bound the clips of
+  widget pictures without Qt's private API` (`tgw_remote.cpp`): its painter
+  charges nothing for the copies that nested clips make
+  (`tgw/tgw_painter_clips.cpp`), so its client never starts the helper,
+  which such a build still builds, and reads no Debug switch.
   On Windows it is true exactly when `UnsupportedReason()`, defined in the
   client's `platform/win/widget_helper_win.cpp`, returns no reason,
-  whatever the architecture and in the Store build alike: it checks only
-  the 1809 floor.
+  whatever the architecture. It returns
+  `SandboxUnsupportedReason()` of the shared `widget_sandbox_win.cpp`,
+  which checks only that the version reading maps to a sandbox tier and,
+  on the Windows 7 tier, that kernel32 exports `SetDefaultDllDirectories`
+  (the update the helper's `Adopt()` refuses without), so such a system
+  stops at that place instead of failing every start (**The Windows
+  sandbox tiers** below). In the Store build only Windows 10 1809 and
+  later map to a tier, the full one, so it keeps the floor and the reason
+  it had before the tiers (**The Windows Store build** below).
   On Linux it is true on x86_64 and aarch64 in every build, Debug and
   Release, with or without the harness, and has no packaged exclusion:
   distribution builds against packaged libraries, Flatpak and Snap default
@@ -356,22 +398,18 @@ packs, the fixture and the seams they use need no change for it.
   lockdown** below). The client decides once, on the main thread, when it
   constructs its first widget host (`Tgw::PrepareRemoteEngines()` in
   `Runtime::construct()`), keeps that choice for the whole process and
-  names it in the main log: `Tgw: Widget engines run in the widget
-  helper.` or `Tgw: Widget engines do not run, no sandboxed widget helper
-  is available here: <reason>.`, on macOS `Tgw: Widget engines, validators
-  and renderers run in the widget helper.` or `Tgw: Widget engines,
-  validators and renderers do not run, no sandboxed widget helper is
-  available here: <reason>.`. Once it chose the
-  helper no engine of that process falls back to in process: a helper that
+  names it in the main log: `Tgw: Widget engines, validators and renderers
+  run in the widget helper.` or `Tgw: Widget engines, validators and
+  renderers do not run, no sandboxed widget helper is available here:
+  <reason>.`. Every widget takes a hosted route, the helper's or, where no
+  helper is available, one that refuses it with that reason. Once it chose
+  the helper no widget of that process runs anywhere else: a helper that
   cannot start or refuses its lockdown ends its widgets with a diagnostic,
   and the failure limit stops further starts (**Runtime log and deaths**
   and **Failure limit** below). Release builds,
-  `TDESKTOP_RELEASE_TEST_HARNESS` ones included, read no switch, never
-  probe and, like every build other than Debug, run no engine in process
-  on any platform: the default never chooses in process and always
-  installs a channel factory, the helper's or one that refuses every
-  engine, with which `twidget::SandboxEngine::make()` builds no in-process
-  engine. Telegram has no `-widgethelper` entry on any platform; its
+  `TDESKTOP_RELEASE_TEST_HARNESS` ones included, read no switch and never
+  probe.
+  Telegram has no `-widgethelper` entry on any platform; its
   helper, where it has one, is the separate `TelegramWidgetHelper` (**The
   shared helper** and **The Windows helper** below), whose Release build
   contains no probe and accepts only its channel token. On Linux
@@ -381,34 +419,42 @@ packs, the fixture and the seams they use need no change for it.
   answered no valid opening on the inherited pipe
   ([Verification](#verification)). A Windows helper that runs without the
   client's confinement refuses in its lowering (`LockDownHelper()`, **The
-  Windows lowering** below) before Ready. The Windows helper has run only
-  on Windows 11 build 26300 (10.0.26300): in Win32 (x86 on WOW64) and x64
+  Windows lowering** below) before Ready. The Windows helper has run on
+  Windows 11 build 26300 (10.0.26300): in Win32 (x86 on WOW64) and x64
   Debug builds, and from Release packages (test harness on, LTO off), x86
   installed, portable and updated and x64 installed, and in an x64 Store
   Debug build installed as a test package
-  ([Verification](#verification)); ARM64, an x86 or Release Store build
-  and Windows before that build have not.
-- **Debug switch.** Debug builds also read `TDESKTOP_WIDGET_ENGINES` at
-  that point:
+  ([Verification](#verification)), all with the QuickJS engine, before
+  the Nova change; with Nova, the x86 and x64 helpers have since run
+  there under the full policy in Debug and Release-configured (LTO off)
+  builds
+  (`2026/11/21/build-the-x64-windows-widget-helper-image-for-windows-7`
+  and
+  `2026/11/21/build-the-x86-windows-widget-helper-image-for-windows-7`,
+  their `work/test.md`). Before that build it has run on Windows 10 22H2
+  (10.0.19045.6466) in a Hyper-V guest: the x86 (on WOW64) and x64 Debug
+  clients and their Nova helpers, outside the Store, under the full tier
+  that each process chose from its own unforced version reading, once
+  the non-Store package SID was fixed data (**The Windows lowbox** below)
+  (`2026/11/15/run-the-lpac-windows-widget-helper-on-a-windows-build-before-26300`,
+  its `work/test.md`). ARM64, an x86 or Release Store build, a Release or
+  Store build before 26300, the other builds from 10.0.17763 to
+  10.0.26299 and a Windows before 26300 on bare metal have not. A tier
+  other than the full one runs only as a simulation on build 26300,
+  forced by a disposable overlay, and a real Windows below 10.0.17763 is
+  field coverage (**The Windows sandbox tiers** below).
+- **Debug switch.** Debug builds that keep the private Qt API also read
+  `TDESKTOP_WIDGET_ENGINES` at that point:
   - unset or any other value: the platform default, so a Debug build runs
-    its engines in the helper wherever that default is true and stops
+    its widgets in the helper wherever that default is true and stops
     every widget elsewhere;
   - `helper`: the sandboxed helper explicitly, the same as the default on
     macOS (the Mac App Store build from macOS 12), on Linux and on Windows
-    10 1809 or later, so command lines that name it keep working; on macOS
-    it hosts the whole widget as the default does (**Hosted widgets on
-    macOS** below), and on Windows it is the restricted helper (**The
+    7 SP1 or later, so command lines that name it keep working; it selects
+    the helper, never its Windows sandbox tier; it hosts
+    the whole widget as the default does (**Hosted widgets on macOS, Linux
+    and Windows** below), and on Windows it is the restricted helper (**The
     Windows helper** below);
-  - `helper-engines`: the sandboxed helper running the engines alone, on
-    every platform, macOS included: the arrangement before the helper
-    rendered, with each widget's validator and renderer in the client, a
-    Debug comparison value for runs that set the hosted arrangement
-    against it;
-  - `in-process`: the whole widget runs in the client, its engine, its
-    validator and its renderer (on the `widget.render` thread), also where
-    the default stops them; it is the only way to run widget engines in the
-    client's own process, for tests and the harness, and the control of a
-    run that compares the arrangements;
   - `probe` and `probe-unsandboxed`: on macOS every helper, whose Debug
     build carries the probe, hosts its widgets as `helper` does, probes its
     lockdown, or runs the same probe without it as the control, and
@@ -416,20 +462,20 @@ packs, the fixture and the seams they use need no change for it.
     probe fixture asks for the serving variant, which a disposable overlay
     gives (`rendering:<ms>`,
     [Serving while rendering](test_widget_helper_probe.md#serving-while-rendering));
-    an engine-only probe for comparison is the overlay's too, with these
-    arguments on a `helper-engines` launch; its listing goes to
+    its listing goes to
     `app_stderr.txt` and its summary to the main log's `stream ended` line
     ([test_widget_helper_probe](test_widget_helper_probe.md); the Mac App
     Store service gets the mode in its channel message,
     [Mac App Store](test_widget_helper_probe.md#mac-app-store)). Each
     refusal counts as a failure (see the failure limit below). On Windows
-    `probe` runs the restricted helper with its native probe and serves
-    widgets as `helper` does (**Windows probe** below), and
+    `probe` runs the restricted helper with its native probe and then
+    hosts its widgets as `helper` does (**Windows probe** below), and
     `probe-unsandboxed` makes every helper refuse the stream with `the
     widget helper probe is not available on this platform`, each refusal
     a failure as well. On Linux both start the sandboxed helper, whose
     Debug build carries the probe too; it writes its probe lines to
-    `app_stderr.txt` and then serves widgets (**Linux probe** below):
+    `app_stderr.txt` and then serves widgets, hosting them as `helper` does
+    (**Linux probe** below):
     `probe` under the real lockdown, which still refuses the stream when
     it fails, and `probe-unsandboxed` with no lockdown at all, so that
     helper runs its widgets unconfined.
@@ -443,7 +489,7 @@ packs, the fixture and the seams they use need no change for it.
   ```sh
   python3 .agents/skills/process-inbox/scripts/workspace.py test-run \
     --exe out/Debug/Telegram.app/Contents/MacOS/Telegram --run-dir "$run" \
-    --env TDESKTOP_WIDGET_ENGINES=in-process
+    --env TDESKTOP_WIDGET_ENGINES=helper
   ```
 
   and on Windows, from PowerShell:
@@ -462,43 +508,36 @@ packs, the fixture and the seams they use need no change for it.
   `modules/x64/` next to its own `Telegram.exe`. A Store build is run from
   an installed test package through its alias instead (**Windows Store
   test runs** below). The main log names a
-  recognized value: `Tgw: Widget engines run in the widget helper
-  (TDESKTOP_WIDGET_ENGINES=helper).`, the same with `probe`,
-  `probe-unsandboxed` or `helper-engines`, on macOS `Tgw: Widget engines,
-  validators and renderers run in the widget helper
-  (TDESKTOP_WIDGET_ENGINES=helper).` for `helper` and the probe values, or
-  `Tgw: Widget engines run in process
-  (TDESKTOP_WIDGET_ENGINES=in-process).`.
-- **Hosted widgets on macOS.** `Platform::WidgetHelper::Renders()` says
-  where a build renders its widgets: true in every macOS build, the Mac
-  App Store build included, false on Windows, Linux and the header's
-  fallback, fixed at build time by `widget_helper_renders` in
-  `telegram_widget_helper.cmake` (which also picks the helper's thin
-  `_other/widget_helper_renderer.cpp` entry, with the portable glue
-  `tgw/tgw_hosted_glue.cpp` and the renderer message rules it shares with
-  `RendererWork`, `tgw/tgw_renderer_rules.h`, over `widget_helper_serve.cpp`) and
-  read even where `Enabled()` is false. With it, the default, `helper` and
-  the probe values host each widget in the helper, in Release with no
+  recognized value: `Tgw: Widget engines, validators and renderers run in
+  the widget helper (TDESKTOP_WIDGET_ENGINES=helper).`, the same with
+  `probe` or `probe-unsandboxed`; any other value is logged as the default
+  is, with no value named.
+- **Hosted widgets on macOS, Linux and Windows.** The helper always
+  renders: every macOS, Linux and Windows build, the Mac App Store build,
+  both Linux layouts and the Windows Store build included, builds it with
+  the thin `_other/widget_helper_rust.cpp` entry over twidget's Rust
+  serving (`twidget_helper_ffi`, `lib_widget_helper_rust.cmake`), whose
+  hosted glue keeps the renderer message rules `RendererWork` keeps
+  (`tgw/tgw_renderer_rules.h`, mirrored in twidget's `rust/crates/helper`),
+  while Telegram links only TwidgetCore's platform end with its wire,
+  remote messages, PNG and filter code (`lib_widget_renderer_platform`). The default, `helper`
+  and the probe values host each widget in the helper, in Release with no
   switch at all:
   - *Where the work runs.* The helper serves the hosted opening
-    (`serveHosting`): at each widget's hosted start, after its lockdown, it
-    builds a served `WidgetHost` with the engine, the `TrustedValidator`
-    and a TwidgetCore `RendererEnd` over the litehtml fork, built on the
-    glue thread from the client's `Open` control with the device pixel
-    ratio. Layout, style, display lists, layout queries and held context
+    (`serve_hosting`): at each widget's hosted start, after its lockdown,
+    it builds a served host with the engine, the trusted validator and a
+    renderer end over twidget's Rust litehtml, built on the glue thread
+    from the client's `Open` control with the device pixel ratio. Layout, style, display lists, layout queries and held context
     menus are the helper's, and so is the check of each canvas font
-    spelling, under Telegram's rule (*Canvas fonts* below). Before it
-    serves, the helper fills TwidgetCore's lazily built `ImageData`
-    decoding table on its main thread, so the widgets' glue threads only
-    read it. The client builds a hosted `WidgetHost` (no
-    QuickJS runtime, no validator, no litehtml document, cursor styles
+    spelling, under Telegram's rule (*Canvas fonts* below). The client builds a hosted `WidgetHost` (no
+    Nova runtime, no validator, no litehtml document, cursor styles
     included), whose client decides every privileged call again on the
     presses its stream writer admitted (*Presses and grants* below), and
     one `RendererWork` per widget on
     `widget.render` driving the shipped platform end (`RendererPlatform`):
     its `QtBackend` answers the renderer's font, text-width, image and
-    canvas requests and paints each display list with the same checks as
-    in process (the paint bounds, the raster deadline, the image formats),
+    canvas requests and paints each display list with its checks (the
+    paint bounds, the raster deadline, the image formats),
     and the work keeps the clock, the input serials, the sizes and the
     pictures. The embedding's own controls cross as opaque platform
     messages (`tgw/tgw_hosted_wire.h`: `Open`, the deliveries of held
@@ -531,6 +570,111 @@ packs, the fixture and the seams they use need no change for it.
     for a layout query counts only time its glue did not spend waiting for
     the client's answers. The chat's 150 ms menu and claim deadlines are
     unchanged.
+  - *A renderer that stops answering.* The widget helper's stream times its
+    renderers' answers by Telegram's reading of the hosted messages,
+    `Tgw::HostedAnswers()` (`tgw_remote.cpp`), which `Manager::launch()`
+    gives every hosting start (widget-sandbox's `SandboxHostedAnswers`).
+    The Linux source selects the same manager and classifier; the deadline
+    was measured only in the macOS arm64 direct-download Debug client
+    ([Verification](#verification)).
+    Telegram expects exactly one answer, per widget in the order it sent
+    them, to each frame request (the frame of its sequence, painted or
+    unchanged, a painted one whole or as a frame delta), each touch or
+    hover (a Pointer) and each claim query (the claim answer of its
+    sequence); every other message it sends, a width, height, theme or
+    selection change among them, expects none. A frame
+    request is timed only when sent while the widget is on screen; a touch,
+    a hover and a claim query are timed whatever the widget's visibility.
+    The runtime gives the host a visibility change before the frame request
+    it causes (`Runtime::syncHostVisibility()`), so a frame request sent off
+    screen is never timed, and one sent on screen stays timed when the card
+    leaves the screen. A timed message's answer is due after 3 s of the
+    renderer's own time from the stream writer's admission of that message
+    (`SandboxEngine::kPlatformAnswerSeconds`): the time from the arrival of
+    one of the renderer's own requests (*Hold and timeouts* above) until
+    Telegram's answer to it is written is not that renderer's, and an answer
+    counts at its arrival from the helper, however long it then waits on
+    `widget.render` behind Telegram's own work. An answer settles nothing
+    when it does not answer its widget's oldest owed message (another family
+    or another sequence), when it is past its size cap (for a frame or a
+    frame delta the 8 MiB `HostedWire::kMaxFrameBytes`) or when the stream's
+    own reading refuses it (`ReadExchange()`): a claim answer TwidgetCore's
+    `decode()` refuses, a pointer cut short, malformed or with bytes after
+    its fields, a frame whose fixed part (sequence, state, flags) is cut
+    short or malformed, whose list or damage has another form or version, a
+    flag that is no flag or a count past its cap or past what the bytes
+    after it can hold (for an empty list, any byte after it), whose damage
+    is not whole or that has bytes after its values (`FrameComplete()`,
+    `ListAdmitted()`, `DamageComplete()`), and a frame delta TwidgetCore's
+    `delta_scan()` refuses (its fixed part, a run of an unknown tag, empty,
+    past the bytes or with a copy past the 256 KiB delta base, runs that do
+    not make its length exactly, a damage value not whole or bytes after
+    it, the frame it stands for past the caps), whose list length no list
+    `ListAdmitted()` takes can have (exactly 6 bytes empty, at least 11 with
+    a command) or whose damage `DamageComplete()` refuses (`DeltaKey()`).
+    Those frame checks read a list's header and command count, never its
+    commands: a painted frame that passes them earns its request's credit
+    even when TwidgetCore's `wire::decode()` would refuse its commands, and
+    TwidgetCore's platform end on `widget.render`, which decodes the frame
+    whole, refuses it only afterwards, a stop of the widget's own (below). A
+    frame delta's checks walk its runs, at most one more than the command
+    cap, without making them, and never rebuild its list, which needs the
+    kept base only that platform end holds: a delta that passes them earns
+    its credit even when its base is not the last painted frame or its
+    copies pass the kept list, and the platform end, which rebuilds and
+    decodes it, refuses it only afterwards, as it does a frame's commands.
+    The cases the self-check reads are listed under
+    [test_widget_ops](test_widget_ops.md#verification). A deadline runs only
+    while a timed message is unanswered: a card with none outstanding sets
+    none, whether idle, off screen or static, and one that answers within
+    3 s never reaches it. In the campaign an idle chat whose running card
+    answered its timed frame requests in time, cards placed off screen with
+    nothing timed admitted there and a static card with no frame request
+    admitted each kept the helper for 10.5 s
+    ([Verification](#verification)). A card that leaves the screen still
+    owes, on its deadline, the frame of a request it sent on screen. A frame
+    request sent off screen is never timed but still owed in order: an
+    answer to a later message that comes before its frame settles nothing,
+    and at an end that is neither the unanswered one nor the owner's stop
+    its route counts among those with a message unanswered (`Ordinary`, not
+    `Spared`), so its run is charged (**Runtime log and deaths** below).
+    A look of the
+    stream's monitor more than 1 s after the wake it planned (a Mac that
+    slept, or a thread that did not run) concludes nothing and looks once
+    more 1 s later, so a run that measures the 3 s must keep the Mac awake.
+    When a timed message's answer is overdue the stream ends with `a hosted
+    renderer left a platform message unanswered for more than 3000 ms`, and
+    the manager retires and reaps that helper as after any end it did not
+    ask for (`Manager::ended()`, `retireLocked(false)`, `reap()`):
+    `complete(kExitWait, kKillWait)` waits up to 1 s for its exit and only
+    then kills it and waits up to 1 s more (in the Mac App Store build it
+    cancels the service's connection instead, **The Mac App Store service**
+    below; read, not run there). That end counts as one helper failure
+    (**Failure limit** below). At that end the stream decides each live
+    route that takes part (`Connection::blameLocked()` in widget-sandbox's
+    `remote_stream.cpp`): `Stalled` for each one whose oldest timed message
+    was overdue at that instant, one or several, `Spared` for the others.
+    The run of a route it decided `Stalled` is charged, with the reason
+    `The widget stopped responding` (`StalledReason()` in
+    `tgw_renderer_work.cpp`, which `HostLink::postDeath()` gives when its
+    own channel's `death()` is `Stalled`, and `RendererWork::refuseRoute()`
+    when Telegram refuses that route after the stream decided);
+    **Runtime log and deaths** below says which widget, if any, shows that
+    stop. A route it decided `Spared` gets no charge from
+    that end; whether its widget then starts again is **Runtime log and
+    deaths** below. A widget whose route Telegram refused for good first (a frame
+    of another sequence, a bound: `RendererPlatform::refused()` and
+    `fail()`, `RendererWork::refuseRoute()` and `backendRefused()`, through
+    `HostLink::localStop()`), or whose hosted client a counted stop
+    (`SandboxEngine::stop()`) ended first, stops with its own reason, and
+    the same step (`SandboxHostedChannel::localStop()` and the client's
+    claim of its own death) takes everything its renderer owed out of the
+    stream's account, so none of it times out the helper its siblings still
+    use. Such a refusal is that widget's own charge, once, also when an end
+    that spared its route came first: until the run settles at that end's
+    marker (*Deaths* below), a surviving core that refuses an answer the
+    stream had already credited still charges its run (`Refused`, with the
+    stream's `Spared` kept apart).
   - *Frames.* One frame request is outstanding at a time, a tick apart
     from a paint. A frame that answers no outstanding request, or a tick
     with a paint or the reverse, a malformed state or a list the checks
@@ -554,8 +698,10 @@ packs, the fixture and the seams they use need no change for it.
     geometry no longer counts as painted. The chat keeps its picture,
     height and anchor until a new one comes, and the work keeps its record
     of what the chat was given (below). A
-    build with `DESKTOP_APP_DISABLE_PRIVATE_QT_API` refuses a hosted list
-    with an explicit clip push. Every accepted list is painted whole,
+    build with `DESKTOP_APP_DISABLE_PRIVATE_QT_API` never hosts: without the
+    private API the painter charges nothing for the copies that nested
+    clips make, so such a build stops every widget (**Platform default**
+    above). Every accepted list is painted whole,
     inside the painter's 1 s raster deadline; the helper's damage is
     ignored. The painted picture goes to the chat at once (*Kept
     pictures* below), and a draw demand or a cut change that came while
@@ -605,8 +751,8 @@ packs, the fixture and the seams they use need no change for it.
     keeps that record; a pixel drop and the route's end clear it. A paint
     that could not allocate its picture (a null destination, no paint
     limit) publishes nothing and is not asked for again until the size,
-    the cut, the pixel-drop generation or the document's state changes, as
-    in process, or until a later paint is refused (above). A frame painted
+    the cut, the pixel-drop generation or the document's state changes,
+    or until a later paint is refused (above). A frame painted
     while an emoji tile was still loading asks
     for a fresh frame once a tile lands or a quota retry comes, while the
     route lives. A large glyph a picture shows as its large-tile fallback,
@@ -654,23 +800,22 @@ packs, the fixture and the seams they use need no change for it.
     cancel. At most 256 input replies may be outstanding per widget; the
     next stops it as a checked stop on its last picture.
   - *Cursor.* The glue evaluates the cursor at the pointer's last position
-    as the in-process renderer does, at two points: right after each
+    at two points: right after each
     pointer input it delivers (a touch or a hover), whose own Pointer reply
     reads the element's cursor before the new hover and active elements
     are restyled and so lags a move behind a `:hover`- or `:active`-only
     rule; and, while a pointer rests over the widget, after each step that
-    rebuilt the document (new ops, a width change, a theme). It runs
-    `CursorStyles::pointer()` (`tgw/tgw_cursor.cpp`, compiled into the
-    helper too) on the helper's renderer, with the hit from the no-event
-    `elementFromPoint` local query and the hover and active elements
-    chosen from the hit, a held primary press and the element it pressed
-    by the one rule `RendererWork::handAt()` uses too,
-    `RendererRules::PointerTargets()`. The glue follows the primary press
-    from the touches it delivers (where it went down, the element hit
-    there, the documents parsed by then) and, as
-    `RendererWork::trackHover()` does, ends its `:active` for the rest of
-    the press once a move past the slop finds another element or a
-    reparsed document. It builds its cursor document lazily, at the first
+    rebuilt the document (new ops, a width change, a theme). Its
+    `Glue::hand_at()` runs `CursorStyles::pointer()` (`cursor.rs` of
+    twidget's `rust/crates/helper`) on the helper's renderer, with the hit
+    from the no-event `elementFromPoint` local query and the hover and
+    active elements chosen from the hit, a held primary press and the
+    element it pressed by `pointer_targets()` of `rules.rs`. Its
+    `Glue::track_press()` follows the primary press from the touches it
+    delivers (where it went down, the element hit there, the documents
+    parsed by then) and ends its `:active` for the rest of the press once a
+    move past the slop finds another element or a reparsed document. It
+    builds its cursor document lazily, at the first
     hit on an element (a hit on none is `auto`, with no document), drops
     it at hover leave, a freeze and a stop, and sends no DOM event. It
     keeps only whether the cursor is the hand, the one value Telegram
@@ -690,15 +835,15 @@ packs, the fixture and the seams they use need no change for it.
     stalled main thread therefore finds at most one cursor per widget,
     the newest, and the post is closed, dropping both, when the route
     deactivates, closes, detaches, freezes or stops.
-  - *Canvas fonts.* A canvas `font` spelling gets the same rule in the
-    helper as in process, `RendererRules::CanvasSpellings`, which
-    `QtBackend::canvasFont()` and the glue share: a spelling over 512
+  - *Canvas fonts.* A canvas `font` spelling gets Telegram's rule in the
+    helper, the glue's `RendererRules::CanvasSpellings`
+    (`tgw/tgw_renderer_rules.h`): a spelling over 512
     bytes is refused before it is parsed, one seen since the cache was
     last cleared answers from that cache (64 spellings, cleared when
     full), and at most 64 new spellings are parsed per refill. The glue
-    applies it in TwidgetCore's canvas font hook
+    applies it in the renderer's canvas font hook
     (`Renderer::set_canvas_font_hook`), installed right after it builds
-    the `RendererEnd` on `Open`, so TwidgetCore parses and caches no
+    the renderer end on `Open`, so the renderer parses and caches no
     canvas spelling itself and the raw spelling never crosses the stream;
     an admitted one becomes the same font request as before, whose
     resolved families and font handle Telegram still checks, and a new
@@ -720,34 +865,74 @@ packs, the fixture and the seams they use need no change for it.
     of 0); the widget's first such refusal sends one `CanvasRefused`
     control, which Telegram notes
     as the widget's one `canvas-font-limit` diagnostic
-    (`QtBackend::noteCanvasFontRefused()`), the diagnostic a refusal in
-    process gives. Telegram's own refusals of a font request (its check
-    of the families, 16 new canvas fonts per frame, 32 per widget) are
-    handled on its side as in process, and the helper sends no
+    (`QtBackend::noteCanvasFontRefused()`). Telegram's own refusals of a
+    font request (its check of the families, 16 new canvas fonts per
+    frame, 32 per widget) are handled on its side, and the helper sends no
     `CanvasRefused` for them.
-  - *Deaths.* The hosted host's `onDeath` freezes the widget on its last
-    picture as an in-process death does, a kill of the client's own (the
-    helper ended, a flood, an unanswered request) included, with the same
-    localized pill and the diagnostic in the runtime log. From a stop
-    until the chat retires its core, the live work asks the helper for no
-    paint and paints no late answer, so the picture it published before
-    the stop is the one the chat takes with it or before it, and the
-    retirement sees that picture's height. A current answer still meets
-    the public-Qt clip check first, so a list it refuses closes the route
-    with the same diagnostic whether it arrives before or after the
-    retirement's detach. A reflow still owed (an explicit demand, a
-    current answer the stop consumed for a size, cut or height the
-    published picture does not have, a clock-driven resize included, or
-    a newer size whose paint waited behind an older request, that
-    request's obsolete answer consumed in order) is asked for once, on
-    the kept route, once the core is retired with a kept document; a
-    pixel drop or the route's end before that cancels it.
+  - *Deaths.* The hosted host's `onDeath` reaches `HostLink::postDeath()`,
+    which reads its own channel's `death()` once, at that admission. A
+    `Stalled` or `Ordinary` death, a kill of the client's own (the
+    helper ended, a flood, an unanswered request) included, records the
+    run's decision there and freezes the widget's core on its last
+    picture, which a widget still live on that core shows under the
+    localized pill, with the diagnostic in its runtime log (`The widget
+    stopped responding` for a `Stalled` death, *A renderer that stops
+    answering* above). A
+    `Spared` death only ends the widget's input
+    (`RendererCore::hostFrozen()`); a marker goes to `widget.render` behind
+    the traffic the helper sent before the end (`RendererWork::hostDied()`),
+    and the run settles `Spared` once the work consumed that traffic, a
+    credited answer still held there included (`HostLink::reached()`),
+    unless a refusal of it recorded the run's decision first. The decision
+    recorded first stays the run's: its posted application, a withdrawal
+    at the core's retirement or the core's disposal (`SealRoute()` in
+    `tgw_runtime.cpp`, `HostLink::forget()`) delivers it, whichever comes
+    first, a refusal whose posted application was still delayed included.
+    A disposal that finds none recorded ends that order:
+    `Runtime::RunGone()` finalizes the run from the withdrawal, `Spared`
+    here, at once or once the stream settles the route; traffic not yet
+    delivered to the work is dropped (`HostLink::postTraffic()`), and no
+    refusal can charge the run any more (`HostLink::localStop()` records
+    nothing once the link is gone). What a final run does next is
+    **Runtime log and deaths** below. An
+    attached
+    work publishes the stop only after it has consumed the traffic the
+    helper sent before the death (its platform queue drained), and, when
+    that traffic reported a paint-limit stop and the card is on screen,
+    after the answer to its ask for the stopped frame, so the card shows
+    that stopped frame. A stale answer (an older size, or
+    a picture the chat dropped since) asks again, and no frame is asked
+    for when none can be (not loaded, no size or cut, a blocked size, or
+    a clean picture already painted). Off screen it waits for the drain
+    alone. Once detached, or once the route's end reaches Telegram, it is
+    published at once, as before. Every hold ends at the latest
+    `SandboxEngine::kPlatformAnswerSeconds` (3 s) after the freeze, and
+    the stop then goes out without the stopped frame: a live route that
+    ends with no word to Telegram (the helper crashed or was killed, a
+    flood or backlog cut by the client) leaves that ask unanswered. From
+    the stop's publication until the chat retires its core, the live
+    work asks the helper for no paint and paints no late answer, so the
+    picture it published with or before the stop is the one the chat
+    takes with it or before it, and the retirement sees that picture's
+    height. A reflow still owed (an explicit demand, a current answer
+    the stop consumed for a size, cut or height the published picture
+    does not have, a clock-driven resize included, or a newer size whose
+    paint waited behind an older request, that request's obsolete answer
+    consumed in order) is asked for once, on the kept route, once the
+    core is retired with a kept document; a pixel drop or the route's
+    end before that cancels it.
   - *Kept renderers.* A loaded widget retired by an ordinary release or a
     natural stop keeps its document in the helper
     (`WidgetHost::keepRenderer`), so its still can reflow: at most 8 kept
     routes in the process, a keep in progress and a release not yet
     complete counted; with all 8 taken the newly retiring widget's route is
-    closed instead. A checked refusal or a drain never keeps. Kept routes
+    closed instead. A checked refusal or a drain never keeps. Nor does a
+    widget retired after its helper's end came first while its run still
+    awaits that end's marker: its still holds the host and the route open
+    (`Runtime::keepStill()`, `HostLink::holdRoute()`), outside the 8, until
+    the work reaches the marker, and the route then closes; a disposal of
+    that still first ends the hold and settles the run as *Deaths* above
+    says. Kept routes
     do not hold the helper's 30 s idle exit; that exit, a crash or a
     release ends them, and their stills lose their documents. A route
     that ended for good also ends its work's wait for emoji, and the
@@ -808,8 +993,7 @@ packs, the fixture and the seams they use need no change for it.
       `KeptBudget::Pixels`); a picture's own image goes before its holder
       (`RendererLayout::pixels` is declared first), so a stale, replaced,
       withdrawn or closed picture stays counted until its bitmap is freed.
-      An allocation that fails counts nothing, and a
-      paint of an in-process or engine-only widget counts nothing at all.
+      An allocation that fails counts nothing.
       The making and its count are one step against releases on other
       threads (`KeptBudget::Acquisition`): a holder the chat drops while a
       backing is being made is freed right after it, so both counts see
@@ -862,14 +1046,12 @@ packs, the fixture and the seams they use need no change for it.
       helper's exit or a crash) the card waits. Drawn on screen again, a
       card that can start starts again (`Runtime::ScheduleStarts()`) and
       its new live core draws it; one that cannot (stopped, failed, past
-      its crash limit or with newer content) keeps the empty card. An
-      in-process or engine-only still keeps its document, which repaints a
-      dropped picture and reflows as before.
+      its crash limit or with newer content) keeps the empty card.
   - *Failure.* A helper that cannot start or refuses its lockdown ends its
     widgets with the diagnostic and counts towards the failure limit, as
-    below. Where no helper is available a build that renders in the helper
-    builds only a refusing hosted client, so no QuickJS runtime, validator
-    or litehtml document exists in the client either.
+    below. Where no helper is available the client builds only a refusing
+    hosted client, and no Nova runtime, validator or litehtml document
+    exists in the client either.
   - *Seams and probes.* The ops tap installs itself on the hosted host
     ([Hosted widgets](test_widget_ops.md#hosted-widgets)) and, in a
     Release harness, whose helper has no Debug tap, reads the theme the
@@ -877,16 +1059,20 @@ packs, the fixture and the seams they use need no change for it.
     renderer completed instead of the mirror
     ([Which reading each build uses](test_widget_ops.md#which-reading-each-build-uses)), the host watch
     reads the hosted host's diagnostics and its work scopes time only the
-    client's share ([In the hosted arrangement](test_widget_host.md#in-the-hosted-arrangement)),
-    and the macOS probe's serving variant takes its listing while widgets
-    render ([Serving while rendering](test_widget_helper_probe.md#serving-while-rendering)).
+    client's share ([The helper's share](test_widget_host.md#the-helpers-share)),
+    the macOS probe's serving variant takes its listing while widgets
+    render ([Serving while rendering](test_widget_helper_probe.md#serving-while-rendering)),
+    the Linux probe's helper writes its lines before it serves and
+    then hosts its widgets (**Linux probe** below), and the Windows probe
+    reports before Ready and its helper then hosts the widgets (**Windows
+    probe** below).
 - **Store, packaged and other platforms.** macOS, Windows and Linux have a
   helper. The non-Linux all-other platforms, FreeBSD among them, build
   none (no `TelegramWidgetHelper` target) and start none: their default
   stops every widget with `no sandboxed widget helper is available here:
   the widget helper is not available on this platform`. An explicit
-  `helper` or probe value there fails closed as well: no engine runs in
-  process, and each widget dies with `the widget helper could not start:
+  `helper` or probe value there fails closed as well: each widget dies
+  with `the widget helper could not start:
   the widget helper is not available on this platform` until the failure
   limit below stops the attempts. On a Linux architecture other than
   x86_64 and aarch64 the default stops every widget the same way, with
@@ -902,16 +1088,16 @@ packs, the fixture and the seams they use need no change for it.
   macOS 12 or later in the Store build`, and an explicit Debug `helper` or
   probe value fails every start before any connection with `the widget
   helper could not start: the widget helper needs macOS 12 or later in the
-  Store build`, each a failure towards the failure limit, with no engine in
-  process; that path has not run (no macOS before 27.0.1 was available).
+  Store build`, each a failure towards the failure limit; that path has
+  not run (no macOS before 27.0.1 was available).
   A macOS packaged build builds, stages and runs the same helper as every
   other non-store macOS build: the helper links no Qt, so the external Qt
   of the packaged workflow (Homebrew's) never reaches it. Every Linux build
   defines the helper. A package-managed build, one with packaged libraries
   (`DESKTOP_APP_USE_PACKAGED`) and no special target (distributions, Snap
   and Flathub), installs it into
-  `${CMAKE_INSTALL_LIBEXECDIR}/telegram-desktop/` and builds it at the same
-  place relative to its built binary (`../libexec/telegram-desktop/` with
+  `${CMAKE_INSTALL_LIBEXECDIR}/TelegramDesktop/` and builds it at the same
+  place relative to its built binary (`../libexec/TelegramDesktop/` with
   the default directories); every other build, the official tarball's
   (packaged too, with the special target `linux`) and the Docker
   development builds included, puts it into `TelegramHelpers/` next to the
@@ -937,14 +1123,15 @@ packs, the fixture and the seams they use need no change for it.
   package-managed build holds no file (**The shared helper** below). The
   Snap's `telegram` part builds with the prefix `/usr` and no special
   target, so it stages and primes
-  `usr/libexec/telegram-desktop/TelegramWidgetHelper`, which the renamed
+  `usr/libexec/TelegramDesktop/TelegramWidgetHelper`, which the renamed
   `usr/bin/telegram-desktop` finds. The Snap's `avif` part writes the
   forced `dav1d` link,
   `-Wl,--push-state,--no-as-needed,-ldav1d,--pop-state`, into the `Libs:`
   line of the `libavif.pc` it builds, so the link reaches only the
   executables that link the avif decoder, Telegram and the
-  `codegen_emoji` build tool, and the Snap's helper links only glibc,
-  libm and the C++ runtime, like the other builds' helpers. A Snap built
+  `codegen_emoji` build tool, and the Snap's helper, read before the Nova
+  change, linked only glibc, libm and the C++ runtime, like the other
+  builds' helpers. A Snap built
   with snapcraft staged the helper, and a Release Telegram with the test
   harness, linked as that Snap's, started it from the Snap's unpacked
   tree, unconfined. A Snap that snapcraft built from the recipe, with the
@@ -954,17 +1141,28 @@ packs, the fixture and the seams they use need no change for it.
   ([Verification](#verification)).
   The Windows Store build is no build without a helper any more: it
   builds, packages and starts `TelegramWidgetHelper.exe` like the other
-  Windows builds (**The Windows Store build** below). Windows before 10
-  1809 stops every widget with `no sandboxed widget helper is available
-  here: the widget helper needs Windows 10 1809 or later`, because the
+  Windows builds (**The Windows Store build** below). Windows before 7
+  SP1, or one whose version cannot be read, stops every widget with `no
+  sandboxed widget helper is available here: the widget helper needs
+  Windows 7 SP1 or later`, and Windows 7 without update KB2533623 with
+  `... the widget helper needs update KB2533623 on Windows 7`, because the
   default is false there; an explicit `helper` or probe value makes the
   seam fail every launch closed with the same reason, `the widget helper
   could not start: <reason>`, before it builds the helper's path, each a
-  failure towards the failure limit. That floor holds for the Store build
-  too, whose package declares Windows 10.0.14316 as its minimum; it has
-  not been run. The Windows default reads nothing else, so a Windows
-  build with packaged libraries defaults to the helper as well; no such
-  build has been run.
+  failure towards the failure limit. Neither path has run on such a
+  Windows: any reading of them is a simulation on Windows 11 (**The
+  Windows sandbox tiers** below). The Store build keeps the floor it had
+  before the tiers: its package declares Windows 10.0.14316 as its
+  minimum, and `ChooseTier()` in `widget_sandbox_win.cpp`, compiled with
+  `OS_WIN_STORE` into its client and its helper alike, maps no version
+  below 10.0.17763 (Windows 10 1809) to a tier, so a Store build before
+  1809, or one whose version cannot be read, stops every widget with `...
+  the widget helper needs Windows 10 1809 or later` the same way, and from
+  1809 on it runs the full tier alone. That Store branch was read in the
+  source and the CMake that defines `OS_WIN_STORE` only; no Store build
+  has been built or run with it. The
+  Windows default reads nothing else, so a Windows build with packaged
+  libraries defaults to the helper as well; no such build has been run.
 - **The shared helper.** One helper serves every widget of the client, of
   every account. The first host construction that needs one starts it from
   its `Build()` worker, and later widgets attach to the same process. On
@@ -994,32 +1192,54 @@ packs, the fixture and the seams they use need no change for it.
   slice it actually runs (`SecCodeCopyGuestWithAttributes` by its pid,
   then `SecCodeCheckValidity` with one requirement), so a file put at the
   helper's path runs no code of its own unless it passes. A
-  certificate-signed client requires `identifier
-  "com.tdesktop.Telegram.WidgetHelper" and certificate leaf = H"<SHA-1 of
-  the client's own leaf certificate>"`, read at each start from the
-  running client after it validated itself dynamically against its own
+  certificate-signed client builds that requirement at each start from
+  `identifier "com.tdesktop.Telegram.WidgetHelper" and certificate leaf =
+  H"<SHA-1 of the client's own leaf certificate>"`, read from the running
+  client after it validated itself dynamically against its own
   designated requirement (`SecCodeCopyDesignatedRequirement`, then
   `SecCodeCheckValidity`), which binds the reading to the running image,
-  so no build records a signer. An ad hoc client, and a genuinely unsigned
-  one (no signature, and no valid status from the kernel), requires
-  `cdhash H"<digest>"` instead: the CDHash its build recorded for that
-  slice in the generated `widget_helper_identity.h`, which
+  so no build records a signer. Before the spawn it then checks the
+  helper file statically, slice by slice (`SignerRequirement()` and
+  `CheckSlice()` in `platform/mac/widget_helper_mac.mm`): for arm64 and
+  for x86_64 it opens that slice
+  (`SecStaticCodeCreateWithPathAndAttributes` with
+  `kSecCodeAttributeArchitecture`; only a slice the file lacks,
+  `errSecCSBadObjectFormat` from that call, is skipped), validates it
+  against the identifier-and-leaf text (`SecStaticCodeCheckValidity`)
+  and reads, from the same static code, its signed entitlement
+  dictionary and its CDHash (`kSecCodeInfoEntitlementsDict`,
+  `kSecCodeInfoUnique`). That dictionary, an empty one when the slice
+  has none, must equal the build's `kEntitlements` (below) with every
+  value's type: the client compares the two as CF's XML serializations,
+  which keep the types and sort the keys, since `CFEqual` takes a boolean
+  and the number 1 for equal. Every present slice is checked, the one
+  the client does not run too, for the reason of **The Mac App Store
+  service** below. The requirement of the suspended child is then
+  `<identifier-and-leaf> and (cdhash H"<arm64>" or cdhash H"<x86_64>")`
+  with the CDHash of each checked slice, one clause for a thin helper,
+  so a file replaced after that reading fails the dynamic check. An ad
+  hoc client, and a genuinely unsigned one (no signature, and no valid
+  status from the kernel), requires `cdhash H"<digest>"` instead: the
+  CDHash its build recorded for that slice in the generated
+  `widget_helper_identity.h`, which
   `Telegram/cmake/widget_helper_identity.py` writes from the helper
-  target's final file. A mismatch, or a check that cannot complete, fails
-  the start: the client kills the suspended child, or spawns none when its
-  own identity is what failed (**Runtime log and deaths** below).
+  target's final file once it has checked that file's entitlements, so
+  such a client reads none at the start. A mismatch, or a
+  check that cannot complete, fails the start: the client kills the
+  suspended child, or spawns none when its own identity or the static
+  slice check is what failed (**Runtime log and deaths** below).
   The helper moves to the working directory `/` itself, in
-  `WidgetHelper::Adopt()` before it adopts the channel. It links only
-  libSystem and libc++, its Debug build too: no Qt, lib_base, crl or
-  framework, built from widget-sandbox's engine end, QuickJS, the POSIX
-  stream and its own `_other/widget_helper*` sources, without Telegram's
-  precompiled header and before Telegram. On macOS it also links the
-  served host's half of widget-sandbox, TwidgetCore's renderer end and the
-  litehtml fork, the last two built standalone for both binaries and
-  litehtml without CoreFoundation (`TW_LITEHTML_NO_CORE_FOUNDATION`, so an
-  empty date input's hint is the same fixed pattern in the helper and in
-  an `in-process` client), and its Debug build the helper's half of the ops
-  tap ([test_widget_helper_tap](test_widget_helper_tap.md)).
+  `WidgetHelper::Adopt()` before it adopts the channel. It has no Qt,
+  lib_base, crl or framework, its Debug build neither: it is built from its
+  own `_other/widget_helper*` sources, the POSIX stream and
+  widget-sandbox's platform answers (`lib_widget_sandbox_platform`) over
+  twidget's Rust serving, the engine, validator, served host and renderer
+  with the helper's half of the ops tap in a Debug build
+  ([test_widget_helper_tap](test_widget_helper_tap.md)), built by cargo for
+  each architecture and joined by `lipo`, without Telegram's precompiled
+  header and before Telegram. The C++ helper before it linked only
+  libSystem and libc++; the Rust one has not been built on a Mac yet
+  (twidget's `rust/PLAN.md`, stages H3 and H5).
   Only a Debug probe value adds arguments after the `3`: the mode, the
   client's working directory and Application Support path, as
   [test_widget_helper_probe](test_widget_helper_probe.md) describes; the
@@ -1033,11 +1253,28 @@ packs, the fixture and the seams they use need no change for it.
   `Telegram/build/version`, which equals the client's `AppVersion`; a
   helper of another version refuses the opening with `build "<client's>",
   this end's is "<helper's>"`. The helper target strips its file outside
-  Debug and then signs it ad hoc with the hardened runtime and the
-  identifier `com.tdesktop.Telegram.WidgetHelper`, before its CDHash is
-  recorded; Xcode never signs that target (`CODE_SIGNING_ALLOWED NO`),
-  and no build gives the helper an entitlement. Ad hoc Xcode and Ninja
-  builds, `build_mac.py`'s included, stage that file unchanged
+  Debug and then signs it ad hoc with the hardened runtime, the
+  identifier `com.tdesktop.Telegram.WidgetHelper` and
+  `Telegram/Telegram/TelegramWidgetHelperDirect.entitlements`, in Debug
+  and Release alike, before its CDHash is recorded; Xcode never signs
+  that target (`CODE_SIGNING_ALLOWED NO`). That file is the helper's
+  whole entitlement set, the Enhanced Security policy and nothing else:
+  `com.apple.security.hardened-process` and its `.checked-allocations`,
+  `.dyld-ro` and `.hardened-heap` as boolean true, and its
+  `.enhanced-security-version-string` and
+  `.platform-restrictions-string` as the string `2`, so the helper has
+  no file, network, device or keychain entitlement. An edit of that
+  file relinks, re-signs and re-pins the helper (`LINK_DEPENDS` under
+  Ninja and Makefiles, the POST_BUILD that runs on every Xcode build).
+  `widget_helper_identity.py` refuses a slice without the `runtime` flag
+  or whose entitlements differ from the file's, types included
+  (`check_slice()`: each value compared as `plistlib.dumps` output, the
+  error naming each missing, unexpected or differently typed key, such
+  as `com.apple.security.hardened-process is 1 (int) instead of true`),
+  and writes the file's dictionary into the header as `kEntitlements`,
+  its `plistlib.dumps(..., sort_keys=True)` XML as adjacent C string
+  literals, one per line, for the start's check above. Ad hoc Xcode and
+  Ninja builds, `build_mac.py`'s included, stage that file unchanged
   (`build_mac.py`'s universal app merges the two slices with `lipo`,
   which keeps each slice byte for byte), so each staged slice has the
   recorded CDHash, and `codesign --verify --deep --strict` of the Xcode
@@ -1045,57 +1282,199 @@ packs, the fixture and the seams they use need no change for it.
   certificate signing go through `Telegram/build/sign_mac.py`, which
   `build.sh`, the canary workflow, `build_mac.py`'s Debug app and a
   POST_BUILD step of Telegram's Xcode target call, the Mac App Store
-  build's included: it signs the other nested code with the caller's
-  identity, options and entitlements, except the Mac App Store service and
-  any Mach-O inside a `Resources` folder, re-signs the helper only for a
-  certificate identity, with that identity, the hardened runtime, its
-  preserved identifier and no entitlement, and then signs the app without
-  `--deep` (in an Xcode build Xcode signs the app itself). The release strip of
+  build's included. Each helper form has its file: the helper
+  `TelegramWidgetHelperDirect.entitlements`, the Mac App Store service
+  `TelegramWidgetHelper.entitlements`. For a certificate identity it
+  first checks each staged form, before it signs anything with that
+  identity (`widget_helper_identity.check_staged()`): each slice's
+  entitlements must equal the form's file, so a staged extra grant
+  fails with `macOS signing failed: <path>: the <arch> slice's
+  entitlements differ from <file>: <differences>` and never receives
+  the certificate. It then signs the other nested code with the
+  caller's identity, options and entitlements, except the Mac App Store
+  service and any Mach-O inside a `Resources` folder, and re-signs each
+  helper form with that identity, the hardened runtime, its preserved
+  identifier (`--preserve-metadata=identifier`) and its form's file as
+  `--entitlements`; an ad hoc identity leaves the helper as built.
+  After that last helper write every signing, nested-only and full, ad
+  hoc included, checks each staged form (`check_helpers()`, through
+  `widget_helper_identity.check()`): each slice needs the `runtime` flag
+  and exactly its form's entitlements, under a certificate or an ad hoc
+  signature, and then the form's own `codesign --verify
+  --all-architectures --strict` must pass. It prints `Widget helper
+  checked: Contents/Helpers/TelegramWidgetHelper (<slices>)` per form
+  and otherwise fails, exit 1, with `macOS signing failed: <path>: the
+  <arch> slice's entitlements differ from
+  TelegramWidgetHelperDirect.entitlements: <differences>`, `macOS signing
+  failed: <path>: the <arch> slice has no hardened runtime flag`,
+  `macOS signing failed: <path>: codesign --verify --all-architectures
+  --strict <path> failed: <codesign's error>` for a helper changed after
+  its signature (a `strip` of a signed, unstripped helper) or `macOS
+  signing failed: <bundle> has no widget helper`. Every signing, before
+  it signs any nested code, and both checks first read each present
+  form's path as CMake stages it without following links: `Contents`
+  and `Contents/Helpers` must be directories and the helper a regular
+  file; for the service `Contents`, `Contents/XPCServices`, the `.xpc`
+  folder, its `Contents`, `Contents/MacOS` and `Contents/_CodeSignature`
+  directories, and its `Contents/Info.plist`, the
+  `Contents/MacOS/<CFBundleExecutable>` that plist names and
+  `Contents/_CodeSignature/CodeResources` regular files
+  (`check_layout()`). A link on that path, even to another folder of
+  the app, which the generic signing would reach under its other name
+  and Packer would skip, fails with `macOS signing failed: <path> is a
+  link`, another kind of file with `<path> is not a directory` or
+  `<path> is not a regular file`, a service plist without a plain
+  executable name with `<plist> has no valid CFBundleExecutable` and a
+  missing entry with Python's `No such file or directory` error, before
+  any signature is read or written; links elsewhere in the app stay
+  allowed. Each other file of the service bundle must then resolve
+  inside the checked bundle: a link out of it fails with `macOS signing
+  failed: <path> resolves outside <bundle>`. A full signing
+  (`build.sh`'s, the canary's signed loop, `build_mac.py`'s Debug app)
+  then signs the app without `--deep` and
+  ends with its `codesign --verify --deep --strict`, which alone would
+  pass another entitlement set: the app's seal records nested code by
+  its designated requirement, not its CDHash, so a same-team re-sign
+  with other entitlements keeps the app valid. The Xcode POST_BUILD
+  (`--xcode`) signs and checks only the nested code when Xcode allows
+  code signing, and Xcode signs the app after it; otherwise it leaves
+  the nested code as built and checks nothing. `sign_mac.py --check
+  <bundle>` runs only the final check and signs nothing, and
+  `sign_mac.py --check-layout <bundle>` only the reading of each present
+  form's path above, with its errors, and reads no signature. `build.sh`
+  runs `--check` on a request-UUID resume (`request_uuid <id>` with an id
+  other than `go`, which does not sign that bundle again) on
+  `$ReleasePath/$BundleName` and on the bundle inside the reused setup
+  dmg, attached read-only at a temporary mount point, before
+  `Beginning notarization process.`. A
+  failure stops the script with `Checking the widget helper in <name>
+  failed!`, after `TelegramWidgetHelper not found in <bundle>!` for a
+  bundle without the helper or `<bundle> in <setup file> is a link!`
+  for an archived bundle that is a link, and a missing or unreadable
+  dmg stops it with `<setup file> not found or not readable!`. The dmg
+  check runs `hdiutil attach` and `hdiutil detach` in a process group of
+  their own (a `python3` that calls `os.setpgrp()` and then executes
+  `hdiutil`), so a `HUP`, `INT` or `TERM` sent to the build's process
+  group or to the checking subshell lets them finish: the subshell only
+  records the signal (a group signal also ends a running `sign_mac.py
+  --check`), skips any inspection not yet started, then detaches
+  whatever is mounted at its mount point and removes that folder once,
+  and fails, for a signal that arrives during that detach too. The run
+  doing the check takes such a signal, or one sent to it alone, only
+  once the subshell has ended, and then stops with `Interrupted while
+  checking <setup file>!`, so a universal run releases its build lock
+  only after that detach, whether the check was its own or a thin
+  run's. A
+  universal run (`build.sh` without an architecture) packs both thin
+  updates itself on every route. Right after taking its build lock it
+  stops with `Update files already exist in <release folder> (arm64
+  <file>, x86_64 <file>), set them aside before rerunning!`, naming
+  each architecture whose final update name
+  (`td-update-mac-arm-<version>` or `td-update-mac-x64-<version>`, with
+  `-beta` on the beta channel) is taken by a file, folder or link,
+  before any thin run, signing, submission or deploy output. It then
+  hashes `TelegramWidgetHelperDirect.entitlements` into memory and
+  stops with `TelegramWidgetHelperDirect.entitlements could not be
+  read!` when it cannot. A fresh run and `request_uuid go` run both thin
+  runs fresh, `request_uuid <id>` runs both fresh from the staged
+  universal app before its own resume checks, `request_uuid_arm64 <id>`
+  resumes the arm64 run with that id and runs the x86_64 one fresh, and
+  `request_uuid_x86_64 <id>` runs the arm64 one fresh and then resumes
+  the x86_64 one; a failed thin run stops the universal run, so the
+  deploy folder receives only the two updates this run's thin runs
+  packed. It starts each thin run as `<script folder>/build.sh <arch>
+  request_uuid <id>`, the id empty for a fresh one, so a relative or an
+  absolute path to the script reaches them, and keeps its build lock
+  until that thin run has ended: a `HUP`, `INT` or `TERM` sent to the
+  universal run during a thin run takes effect once the thin run has
+  finished, or has ended on that signal too, and then stops it with
+  `Interrupted while preparing the single updates!` before the next
+  thin run, signing, submission or deploy output, its exit releasing
+  the lock, so a rerun cannot share the release folder with a thin run
+  still at work. Before it creates the deploy folder the universal run
+  hashes the policy file again and stops with that read error, or with
+  `TelegramWidgetHelperDirect.entitlements changed during the build!`
+  when the two hashes differ, so a persistent edit during a thin run,
+  the universal signing or check or a notarization wait ships nothing.
+  A thin run refuses an existing update of its own with `Update file
+  for version <version> already exists!`, every run refuses an existing
+  deploy folder of its version, and a thin run started on its own
+  (`build.sh arm64`, `build.sh x86_64 request_uuid <id>`) packs only its
+  update. A thin run copies the staged universal app to
+  `Telegram.<arch>.app` with `cp -R`, which copies links as links, and
+  runs `--check-layout` on the copy before `lipo -thin` writes any slice
+  into it, so a link on the helper's path, such as a linked
+  `Contents/Helpers`, stops it with `Checking the widget helper in
+  Telegram.<arch>.app failed!` before a thin slice replaces a file that
+  link reaches. A thin run keeps its setup dmg through its checks,
+  notarization, stapling and packing and removes it (`Setup file
+  <file> removed.`) only after moving its finished update into the
+  release folder: a thin `request_uuid <id>` run stopped before that
+  move finds its dmg again when the same command runs again, and one
+  stopped after it leaves a complete update for the existing-update
+  guard. The canary
+  workflow's macOS job runs `--check` on `Telegram.x86_64.app`,
+  `Telegram.arm64.app` and `Telegram.app` when no signing certificate
+  leaves them unsigned. The release strip of
   `build.sh` and the canary leaves the already stripped and signed helper
   byte for byte unchanged (measured with CLT 26.6's `strip`, which still
   warns that its changes will invalidate the code signature). The pin
   refuses a helper whose CDHash differs from the recorded one, such as
   another build's (an identical ad hoc re-sign can keep the CDHash),
-  while the signer rule accepts any helper with the helper identifier
-  that the client's own certificate signed, a re-signed release's
-  included, and refuses an ad hoc one, the build's own too. A copy signed
-  with a certificate for a test needs `sign_mac.py` too: `codesign
-  --force --deep` of the app gives the helper Telegram's entitlements and
-  another identifier. No helper build carries `get-task-allow`, so a
+  while the signer rule accepts a helper with the helper identifier that
+  the client's own certificate signed, a re-signed release's included,
+  only when each of its slices carries exactly this build's
+  entitlements, and refuses before the spawn an ad hoc one, the build's
+  own too, and a same-leaf one with another entitlement set (an added
+  key, the integer 1 for a boolean or a missing key, on either slice). A
+  copy signed with a certificate for a test needs `sign_mac.py` too:
+  `codesign --force --deep` of the app gives the helper Telegram's
+  entitlements and another identifier, which the start refuses. No
+  helper build carries `get-task-allow`, so a
   debugger cannot attach to the helper; observe it from the client and
   through its stderr. A running client refuses every later start once its
   own executable or its signed `Info.plist` changed on disk, as a
   rebuild, a re-sign or a reinstall under it can do: start a fresh client
   after each. A client whose code a debugger modified may lose its valid
-  status and refuse the same way (not measured); `in-process` keeps a
-  Debug client's engines out of the helper then. To test a refusal,
+  status and refuse the same way (not measured). To test a refusal,
   replace only `Contents/Helpers/TelegramWidgetHelper` in a copy of the
   bundle: the client's own identity stays valid, and the check reads the
   replacement.
   On Linux it is `TelegramWidgetHelper` as well, built from the same
-  engine end, QuickJS, POSIX stream and `_other/widget_helper.cpp`, with
+  POSIX stream and `_other/widget_helper.cpp`, with
   `_other/widget_helper_linux.cpp`, the Linux lockdown and the descriptor
   closing (`platform/linux/widget_{lockdown,descriptors}_linux.cpp`;
   Telegram no longer links the lockdown) in place of the macOS sources,
-  without Telegram's precompiled header and before Telegram. It links
-  only glibc's objects, libm and the C++ runtime, its Debug build too:
+  without Telegram's precompiled header and before Telegram. As on macOS
+  its engine, validator, served host and renderer are twidget's Rust
+  serving, with the helper's half of the ops tap in its Debug build
+  ([test_widget_helper_tap](test_widget_helper_tap.md)), and it reaches
+  the helper as one static library: cargo builds `twidget_helper_ffi` for
+  the host, always `--release`, into the build tree's
+  `widget_helper_rust/libtwidget_helper_ffi.a`
+  (`Telegram/cmake/lib_widget_helper_rust.cmake`,
+  `build_widget_helper_rust.cmake`), fetching its crates into
+  `widget_helper_rust/cargo` unless the toolchain is `prepare.py`'s, and
+  Telegram links no copy. It links
+  only glibc's objects, libm and the C++ runtime, its Debug build too,
+  as the C++ helper before it did:
   the Docker build links the C++ runtime statically, so its NEEDED are
   `libc.so.6`, `libm.so.6`, `libpthread.so.0`, `libdl.so.2` and the
-  loader, and a build that links the C++ runtime dynamically adds
+  loader, and a build that linked the C++ runtime dynamically added
   `libstdc++.so.6` and `libgcc_s.so.1`. Its file is
   `TelegramHelpers/TelegramWidgetHelper` next to the client's binary
   (`out/Debug/TelegramHelpers/TelegramWidgetHelper` in the Docker
   tree, the tarball layout) or, in a package-managed build,
-  `<libexecdir>/telegram-desktop/TelegramWidgetHelper`
-  (`/usr/libexec/telegram-desktop/` with the prefix `/usr`,
-  `/app/libexec/telegram-desktop/` inside Flatpak,
-  `$SNAP/usr/libexec/telegram-desktop/` in the Snap). The client finds it
+  `<libexecdir>/TelegramDesktop/TelegramWidgetHelper`
+  (`/usr/libexec/TelegramDesktop/` with the prefix `/usr`,
+  `/app/libexec/TelegramDesktop/` inside Flatpak,
+  `$SNAP/usr/libexec/TelegramDesktop/` in the Snap). The client finds it
   as `cExeDir()`, the canonical directory of its own binary that it
   resolved once at start from `/proc/<pid>/exe`, joined with the relative
   path CMake fixed at configure time (`TDESKTOP_WIDGET_HELPER_PATH`, a
   definition on `widget_helper_linux.cpp` only:
   `TelegramHelpers/TelegramWidgetHelper`, or the path from the bindir to
-  the libexec folder, `../libexec/telegram-desktop/TelegramWidgetHelper`
+  the libexec folder, `../libexec/TelegramDesktop/TelegramWidgetHelper`
   with the default directories) and cleaned lexically (`QDir::cleanPath`).
   So a binary started through a symlink or renamed, as the Snap's
   `telegram-desktop` is, finds it. The path does not follow a folder
@@ -1105,7 +1484,7 @@ packs, the fixture and the seams they use need no change for it.
   which looks the old path up at each start, misses its helper. An
   absolute `CMAKE_INSTALL_LIBEXECDIR`, such as `/usr/lib/x86_64-linux-gnu`,
   still gives a path relative to the configured prefix
-  (`../lib/x86_64-linux-gnu/telegram-desktop/TelegramWidgetHelper`), so
+  (`../lib/x86_64-linux-gnu/TelegramDesktop/TelegramWidgetHelper`), so
   `cmake --install --prefix <another prefix>` puts the helper into that
   absolute directory while Telegram moves, and that Telegram misses it;
   package tooling installs at the configured prefix, staged with
@@ -1192,7 +1571,7 @@ packs, the fixture and the seams they use need no change for it.
   failed: <reason>.` and the client clones it again as a plain child.
   Inside Flatpak the Flatpak portal starts it instead, through
   `Spawn` with the flags 28 (`SANDBOX`, `NO_NETWORK` and `WATCH_BUS`): the
-  same argv, `/app/libexec/telegram-desktop/TelegramWidgetHelper 3` in an
+  same argv, `/app/libexec/TelegramDesktop/TelegramWidgetHelper 3` in an
   `/app` install, the working directory `/`, the same four
   descriptors and an empty environment table, so the helper gets the
   environment of the portal's sandbox, not the client's. That helper is
@@ -1261,7 +1640,12 @@ packs, the fixture and the seams they use need no change for it.
   ms` added when its job had to be killed, which ends it with `exit 1067`
   (`ERROR_PROCESS_ABORTED`): `exit 1067, terminated after 1000 ms` after
   the 1 s wait for its own exit. A helper that does not end even then
-  reads `not reaped after N ms` before that addition. A stop by the client
+  reads `not reaped after N ms` before that addition. A helper that was
+  never put into its job (a failed assignment on the AppContainer and
+  Windows 7 tiers) is killed through its process handle instead, with
+  `TerminateProcess failed: <reason>` in place of the addition when that
+  fails, and on the Windows 7 tier a failed close of its desktop adds
+  `, CloseDesktop failed: <reason>`. A stop by the client
   reads `the host stopped the stream`; that stop drops unsent frames, so
   the helper can exit 1 after it, with a `Widget helper: <reason>` line in
   `app_stderr.txt`. That exit is no helper failure: after a stop by the
@@ -1275,22 +1659,28 @@ packs, the fixture and the seams they use need no change for it.
   and `XPCService` `ServiceType` `Application`
   (`Telegram/TelegramWidgetHelper.plist`). Its identifier is the main
   bundle's plus `.WidgetHelper` (`org.telegram.desktop.WidgetHelper` as
-  built) and its only entitlement the App Sandbox
-  (`Telegram/Telegram/TelegramWidgetHelper.entitlements`), so it runs in
+  built) and its entitlements those of
+  `Telegram/Telegram/TelegramWidgetHelper.entitlements`: the App Sandbox,
+  the one key it shares with Telegram Lite, and the direct helper's
+  Enhanced Security set (**The shared helper** above), so it runs in
   its own empty container with no network, file, device or keychain
   entitlement. The target's POST_BUILD strips it outside Debug and signs
   the bundle ad hoc with the hardened runtime, that identifier and that
-  file; the generated pin is that signature's CDHash
-  (`widget_helper_identity.py --entitlements` requires the slice's
-  entitlements to equal the file's exactly), and
+  file, in Debug and Release alike; the generated pin is that
+  signature's CDHash (`widget_helper_identity.py --entitlements`
+  requires each slice's `runtime` flag and its entitlements equal to
+  the file's, types included, and writes them as `kEntitlements`), and
   `TelegramWidgetHelper_bundle` copies the bundle's `Info.plist`,
   executable and `CodeResources` into the app. An edit of the plist
   template or the entitlements relinks, re-signs and re-pins it. It links
   only libSystem and libc++. `sign_mac.py` leaves it as built for an ad
-  hoc identity, since its build signature is the pin, and re-signs it for
-  a certificate identity with the hardened runtime and
-  `--preserve-metadata=identifier,entitlements` (the identifier alone
-  would drop the App Sandbox). It also skips every Mach-O inside a
+  hoc identity, since its build signature is the pin, and for a
+  certificate identity first compares the staged service's entitlements
+  with `TelegramWidgetHelper.entitlements`, then re-signs it with the
+  hardened runtime, `--preserve-metadata=identifier` and that file as
+  `--entitlements` (the identifier alone would drop the App Sandbox and
+  the Enhanced Security keys), as it does the direct helper. It also
+  skips every Mach-O inside a
   `Resources` folder, so Breakpad's `Resources/breakpadUtilities.dylib`
   keeps what each caller's own line gives it. `build.sh`'s macstore branch signs that
   dylib, then the app through `sign_mac.py` with the Mac App Store
@@ -1298,23 +1688,45 @@ packs, the fixture and the seams they use need no change for it.
   runtime; `build_mac.py`'s Store Debug signs the dylib ad hoc and calls
   `sign_mac.sign(bundle, '-')`; the Xcode Store target runs the same
   `sign_mac.py --xcode` POST_BUILD as other Xcode builds, without
-  `--deep`. `build.sh`'s and `build_mac.py`'s lines end with
-  `sign_mac.sign()`'s `codesign --verify --deep --strict`. The Xcode
-  POST_BUILD signs only the nested code, and Xcode signs the app after it
-  without a strict verify, so verify an Xcode product with `codesign
-  --verify --deep --strict` yourself. `codesign --force --deep` keeps the
-  service's identifier and gives it that command's entitlements: with
+  `--deep`. Each of these, the Xcode one when Xcode allows code signing,
+  runs `sign_mac.sign()`'s check of the service against
+  `TelegramWidgetHelper.entitlements`, with its own strict verify,
+  after the service's last signature; `build.sh`'s and
+  `build_mac.py`'s lines then sign the app and end with its `codesign
+  --verify --deep --strict` (**The shared helper** above), so
+  `build.sh`'s `productbuild` packages only a service that passed both.
+  The Xcode POST_BUILD signs and checks only the nested code, and Xcode
+  signs the app after it without a deep strict verify, so verify an
+  Xcode product's app with `codesign --verify --deep --strict`
+  yourself. `codesign --force
+  --deep` keeps the service's identifier and gives it that command's
+  entitlements: with
   `Telegram Lite.entitlements` (`build.sh`'s old line) Telegram Lite's
   nine, the network, camera, microphone, location and user file grants
   among them; with none (`build_mac.py`'s old ad hoc line) none, so the
-  service loses the App Sandbox and its pinned CDHash.
+  service loses the App Sandbox and its pinned CDHash. Neither set is
+  the service's file, so `sign_mac.py --check` and a certificate-signed
+  client's start refuse such a service.
   Telegram's `Launch()` (`platform/mac/widget_helper_store_mac.mm`) names
   the service after its own `[[NSBundle mainBundle] bundleIdentifier]`
   plus `.WidgetHelper`, so a copy re-identified for a test reaches its
-  own service. It builds the requirement as on direct download,
+  own service. It builds the requirement as on direct download, before
+  it creates the channel or the connection: a certificate-signed client
+  checks each present arm64 and x86_64 slice of its
+  `Contents/XPCServices/TelegramWidgetHelper.xpc` statically against
   `identifier "<main bundle id>.WidgetHelper" and certificate leaf =
-  H"<SHA-1 of the client's own leaf>"` for a certificate-signed client and
-  `cdhash H"<pin>"` for an ad hoc one, and sets it with
+  H"<SHA-1 of the client's own leaf>"`, compares the slice's signed
+  entitlements with the build's `kEntitlements` (the service's file, the
+  App Sandbox included) and requires `<identifier-and-leaf> and (cdhash
+  H"<arm64>" or cdhash H"<x86_64>")`; an ad hoc one requires `cdhash
+  H"<pin>"`. The certificate form admits every checked slice because
+  launchd starts the service's native slice even for a client under
+  Rosetta, so binding the client's own slice would refuse its own
+  service. The comparison is exact after Apple's Mac App Store
+  re-signing too, so a distributed service whose entitlement dictionary
+  differed in any key or type would refuse every widget start of that
+  build; no Apple-signed build has been checked. The client sets
+  the requirement with
   `xpc_connection_set_peer_code_signing_requirement`. XPC checks it only
   on replies and delivers an outgoing message before it checks the peer,
   so the first message, the hello, carries no descriptor. Only after XPC
@@ -1337,9 +1749,9 @@ packs, the fixture and the seams they use need no change for it.
   `channel` on 3, refuses a second `channel`, and starts one serve thread
   (8 MiB stack) that runs the direct helper's argument check,
   `WidgetHelper::Adopt()` (`chdir("/")`) and the direct helper's
-  `WidgetHelper::Serve()` with the lockdown, so it hosts whole widgets on
-  either opening as the direct helper does (**Hosted widgets on macOS**
-  above); it
+  `WidgetHelper::Serve()` with the lockdown, so it hosts whole widgets
+  as the direct helper does (**Hosted widgets on macOS,
+  Linux and Windows** above); it
   `_Exit`s on any error event of its peer connection. It is a child of
   launchd with its own container as `HOME`, launchd's `/dev/null` on 0
   and 1, on 2 Telegram's stderr when that is no terminal and the relay's
@@ -1352,17 +1764,27 @@ packs, the fixture and the seams they use need no change for it.
   created the service's container.
   A start failure reads `the widget helper could not start: <error>`, the
   errors among them `stderr is not open`, `the bundle identifier of this
-  build is unknown`,
-  the client's own identity errors of **Runtime log and deaths**,
+  build is unknown`, `the widget helper path is unknown`,
+  the client's own identity errors and the certificate-signed client's
+  static slice refusals of **Runtime log and deaths** (`the widget helper
+  failed the signer check: the <arch> slice's entitlements differ from
+  this build's` and the others there), which come before the channel and
+  the connection exist and have no cleanup,
   `xpc_connection_set_peer_code_signing_requirement failed: <error>`, `the
   widget helper failed the signer check: <XPC error>` or the same with
-  `the build identity check` (`Peer Forbidden` on macOS 27.0.1), `the
+  `the build identity check` (`Peer Forbidden` on macOS 27.0.1: XPC
+  refused the peer requirement on the hello's reply, as it does for a
+  service replaced after the static reading), `the
   widget helper service <name> is unavailable (<XPC error>)` (a bundle
-  without the service: `Connection invalid (Connection init failed at
-  lookup with error 3 - No such process)`), `the widget helper ended
-  before it took the channel`, `the widget helper did not answer within
+  without the service under an ad hoc client: `Connection invalid
+  (Connection init failed at lookup with error 3 - No such process)`;
+  a certificate-signed client's static check fails first, with its
+  `SecStaticCodeCreateWithPathAndAttributes` error), `the widget helper
+  ended before it took the channel`, `the widget helper did not answer within
   15000 ms` or `the widget helper refused the channel: <reason>`; once
-  the client watches a pid, the cleanup follows in parentheses. As for
+  the client watches a pid, after the hello's reply, the cleanup follows
+  in parentheses, read from the service's `NOTE_EXIT` as in the `ended`
+  line below, not from a wait status. As for
   the direct-download helper, when Telegram's stderr is a terminal and
   the relay of **The shared helper** cannot be made, the start fails
   before the client creates its connection, with `socketpair failed:
@@ -1401,7 +1823,9 @@ packs, the fixture and the seams they use need no change for it.
   `CFBundleURLTypes` and `CFBundleDocumentTypes` so that the copy never
   becomes the `tg://` handler, set the service's `CFBundleIdentifier` to
   `<test id>.WidgetHelper` and re-sign the service ad hoc with that
-  identifier, the hardened runtime and `TelegramWidgetHelper.entitlements`,
+  identifier, the hardened runtime and `TelegramWidgetHelper.entitlements`
+  (exactly that file: `sign_mac.py` checks it, and the stand-in-signed
+  copy compares it at each start),
   then sign the copy with `sign_mac.py --identity <stand-in>
   --entitlements <file> --runtime --keychain <throwaway keychain>`, never
   a real identity or the owner's keychains. The file is `Telegram
@@ -1462,10 +1886,13 @@ packs, the fixture and the seams they use need no change for it.
   from the held file's own normalized path, and before it resumes confirms
   the child's image is that same file (its `PROCESS_NAME_NATIVE` name equals
   the held file's and its `FILE_ID_INFO` matches); then it attaches the
-  initial token and resumes. A digest mismatch, a file it cannot open that
-  way, a failed digest call, a redirected path component or a started image
-  that is not the held file stops widgets with a diagnostic and starts no
-  engine in process, and a path it cannot build still fails with
+  initial token and resumes. On the Windows 7 tier the same pin is
+  computed and every identity is read without the Windows 8 functions
+  (**The Windows 7 tier** below). A digest mismatch, a file it cannot
+  open that way, a failed digest call, a redirected path component or a
+  started image
+  that is not the held file stops widgets with a diagnostic, and a path
+  it cannot build still fails with
   `GetModuleFileNameW failed: <reason>`, `the executable path is too long`
   or `the executable path has no directory`. Telegram's build depends on
   the helper target, which puts the file there. Every Windows package
@@ -1492,10 +1919,11 @@ packs, the fixture and the seams they use need no change for it.
   The system cannot find the file specified.`. The
   client starts it as `"<path>" <handle>`, where `<handle>`
   is the decimal value of the pipe handle it inherits, without
-  `-testagent`, with the client's environment and the system directory as
-  its working directory (`C:\WINDOWS\system32` as `GetCurrentDirectoryW`
-  reads it, which an x86 helper on 64-bit Windows holds open through
-  WOW64 as `C:\Windows\SysWOW64`). Only a Debug probe value adds
+  `-testagent`, with the system directory as its working directory
+  (`C:\WINDOWS\system32` as `GetCurrentDirectoryW` reads it, which an x86
+  helper on 64-bit Windows holds open through WOW64 as
+  `C:\Windows\SysWOW64`) and with the client's environment except
+  `__COMPAT_LAYER`. Only a Debug probe value adds
   arguments after the handle, the same ones as on macOS: the mode, the
   client's working directory and its
   `QStandardPaths::GenericDataLocation`, each quoted for
@@ -1509,7 +1937,11 @@ packs, the fixture and the seams they use need no change for it.
   creation's handle list passes it nothing else. The channel is one
   overlapped duplex named pipe with an unpredictable name, one instance,
   remote clients rejected and access for the client's user only; the
-  client opens the helper's end itself before the spawn. The client
+  client opens the helper's end itself before the spawn. Both ends give
+  each overlapped `ReadFile` and `WriteFile` a byte-count variable of its
+  own that lives through the completion, since Windows 7 requires one,
+  and take the count from `GetOverlappedResult`
+  (`widget_channel_win.cpp`). The client
   creates the helper suspended with `CreateProcessAsUserW` on a lockdown
   primary token derived from its own: Low integrity, no privilege but
   `SeChangeNotifyPrivilege`, the user and every group but the integrity
@@ -1517,9 +1949,13 @@ packs, the fixture and the seams they use need no change for it.
   Before it resumes the helper it attaches an initial impersonation token
   to the helper's main thread and reads it back: Low as well and
   restricted to the client's user and enabled groups, so that the helper's
-  startup can load its DLLs. Both are AppContainer tokens of the helper's
-  package, and the creation makes the primary a less privileged one
-  (**The Windows lowbox** below). The creation puts the helper in a new job
+  startup can load its DLLs. On the lowbox tiers both are AppContainer
+  tokens of the helper's package, and on the two LPAC tiers the creation
+  makes the primary a less privileged one (**The Windows lowbox** below);
+  the Windows 7 tier keeps both unboxed. What follows is the full tier's
+  launch, from Windows 10 1809; each older tier sets the part of it that
+  its Windows version documents (**The Windows sandbox tiers** below).
+  The creation puts the helper in a new job
   (one active process, kill on job close, death on an unhandled exception
   and the eight UI restrictions) and sets every mitigation the helper
   takes at its creation, from `SandboxPolicies()` in
@@ -1540,38 +1976,494 @@ packs, the fixture and the seams they use need no change for it.
   Low-labelled images depend on where the user put the files, and CFG and
   strict CET need another binary contract, so none of them is set. A
   creation the system refuses, the job included, is a start failure: no
-  helper runs outside its job or without these policies.
-  The helper links no Qt, user32 or gdi32: it is built from
-  widget-sandbox's engine end, QuickJS, the shared `main()` of
-  `_other/widget_helper.cpp`, `_other/widget_helper_win.cpp` and the
-  client's own Qt-free `platform/win/widget_channel_win.cpp` and
-  `widget_sandbox_win.cpp`, which Telegram compiles too, without Telegram's
-  precompiled header, as a Windows GUI image with `/ENTRY:mainCRTStartup`
-  (so that no console is started) and the static CRT. Its static imports
-  are ADVAPI32 and KERNEL32, both KnownDLLs, loaded from the system
-  directory (`/DEPENDENTLOADFLAG:0x800`); `bcrypt.dll` is delay-loaded in
-  every configuration and bound in its lowering (**The Windows lowering**
-  below), and the Debug build's `WS2_32.dll`, delay-loaded too, has no
-  caller but the probe. Its build string, argument gate and Release
-  refusals are the shared `main()`'s, as on macOS and Linux (**The shared
-  helper** above). At its entry, in `WidgetHelper::Adopt()`
-  (`_other/widget_helper_win.cpp`), it first limits its later DLL loads to
-  the system directory (`SetDefaultDllDirectories` with
-  `LOAD_LIBRARY_SEARCH_SYSTEM32`), then takes the token only as a decimal
-  handle value without a sign, a leading zero or trailing text that is no
-  pseudo-handle, and adopts only the byte-mode client end of a pipe, whose
-  inheritance it clears; anything else is `Widget helper: the channel
-  could not be adopted`, exit 1, before it reads the channel.
-- **The Windows lowbox.** `NtCreateLowBoxToken` boxes each of the two
-  restricted tokens with one package SID, derived from the fixed name
-  `telegram.desktop.widget-helper` by
-  `DeriveAppContainerSidFromAppContainerName` (loaded from `USERENV.dll`),
+  helper runs outside its job or without its tier's policies.
+  The helper links no Qt, user32 or gdi32: it is built from the shared
+  `main()` of `_other/widget_helper.cpp`, `_other/widget_helper_win.cpp`,
+  the client's own Qt-free `platform/win/widget_channel_win.cpp` and
+  `widget_sandbox_win.cpp`, which Telegram compiles too, and
+  widget-sandbox's platform answers (`lib_widget_sandbox_platform`), with,
+  as on macOS and Linux, twidget's Rust serving through the entry
+  `_other/widget_helper_rust.cpp` (**Hosted widgets on macOS, Linux and
+  Windows** above), its Debug build also the helper's half of the ops tap
+  ([test_widget_helper_tap](test_widget_helper_tap.md)), without
+  Telegram's precompiled header, as a Windows GUI image with
+  `/ENTRY:mainCRTStartup` (so that no console is started) and the static
+  CRT. That serving reaches it as one static library: cargo builds
+  `twidget_helper_ffi` for the helper's target with `-Z build-std`,
+  `+crt-static`, control-flow guard, link-time optimisation and overflow
+  checks, always `--release`, into the build tree's
+  `widget_helper_rust\twidget_helper_ffi.lib`
+  (`Telegram/cmake/lib_widget_helper_rust.cmake`,
+  `build_widget_helper_rust.cmake`), and only the helper links it:
+  `Telegram.exe` on Windows links without any widget engine. The target is
+  `x86_64-win7-windows-msvc` in an x64 tree, the one `prepare.py`'s
+  `tdesktop_rust` stage builds for x64, and `i686-win7-windows-msvc` in a
+  Win32 tree, whose std supports Windows 7 and links ADVAPI32; and
+  `aarch64-pc-windows-msvc` for ARM64, whose helpers have not been built
+  in Rust. An `i686-win7-windows-msvc` archive built before the
+  engine's metering allocator reached its block headers through the
+  system allocation's exposed provenance ended the process with
+  `0xC0000374` (heap corruption) whenever it compiled a script that
+  declares a class
+  (`2026/11/21/build-the-windows-widget-helper-image-for-windows-7`, its
+  `work/decisions.md`, W16). That was the fold of the allocator's header
+  reads that
+  `2026/11/21/remove-the-misaligned-nova-result-writes-and-turn-on-overflow-checks-on-x86-windows`
+  diagnosed on the pc target with overflow checks, reached here through
+  the win7 std's OS TLS slots, which keep the allocator an out-of-line
+  call as the checks did, and that task's metering fix alone removes it
+  (`2026/11/21/build-the-x86-windows-widget-helper-image-for-windows-7`,
+  its `work/decisions.md`, D2). The archive the Win32 helpers link, built
+  by the same recipe with overflow checks, compiled and evaluated W16's
+  class scripts and the class cases of that diagnosis in a standalone x86
+  driver, three processes each, while W16's archive still ended each of
+  them with `0xC0000374`.
+  Under `DESKTOP_APP_WIN7_BASELINE`, the Windows 7 baseline of the x86 and
+  x64 builds, the helper links `/SUBSYSTEM:WINDOWS,6.01` as `Telegram.exe`
+  and the Updater do, so its header names 6.01, Windows 7, as the lowest
+  Windows version; ARM64 has no such baseline and keeps the linker's
+  default version.
+  The x86 and x64 helpers import statically only KERNEL32 and ntdll, and
+  delay-load ADVAPI32, `bcrypt.dll` and, in the Debug build for the probe
+  alone, `WS2_32.dll`. Their win7 std draws its random bytes through
+  ADVAPI32's `SystemFunction036` (`RtlGenRandom`), which the x86 and x64
+  images import by name. The Windows 7 SP1 export database
+  `win7sp1_exports.txt` of the import gate that
+  `.github/workflows/win7-gate.yml` runs on `Telegram.exe` records that
+  function as ADVAPI32's own export. On Windows 10.0.26300, where the
+  helpers were first measured, both ADVAPI32 copies, the System32 one and
+  the SysWOW64 one that x86 processes load, forward it to
+  `CRYPTBASE.SystemFunction036`, `cryptbase.dll` is no KnownDLL, and a
+  lookup through the forwarder maps it: for a static import at process
+  start, where Windows' parallel loader can open it on a worker thread
+  that runs as the LPAC primary (P6 in **The Windows lowering** below),
+  and for a delay import in the `GetProcAddress` of the CRT's delay-load
+  helper. Windows 10 22H2 (10.0.19045.6466) has the same forwarder in
+  both copies and no `cryptbase.dll` among its KnownDLLs
+  (`2026/11/15/run-the-lpac-windows-widget-helper-on-a-windows-build-before-26300`,
+  its `evidence/record.md`). So the delay-load notification hook of the
+  x86 and x64 helpers
+  (`__pfnDliNotifyHook2` in `_other/widget_helper_win.cpp`, compiled for
+  x86 and x64, not for ARM64) answers that one import at
+  `dliNotePreGetProcAddress`, before that `GetProcAddress`, with the
+  helper's own function, declared `BOOLEAN WINAPI` like `RtlGenRandom`
+  (stdcall on x86), which draws the bytes with `bcryptprimitives.dll`'s
+  `ProcessPrng` where Windows has it, resolved in `WidgetHelper::Lockdown()`
+  before the lowering, and with `BCryptGenRandom` and
+  `BCRYPT_USE_SYSTEM_PREFERRED_RNG` where it does not (Windows 7), and
+  returns whether that succeeded: under the impersonated initial token only
+  one preferred-RNG `BCryptGenRandom` succeeds, `WarmUp()`'s, so the
+  threads started after the lockdown draw their keys through `ProcessPrng`;
+  the delay-load helper
+  writes that address into the import table, and every other import
+  resolves as without the hook. The x86 tables were read on the Win32
+  Debug and Release-configured helpers on Windows 10.0.26300: static
+  `KERNEL32.dll` and `ntdll.dll` (`NtWriteFile` and
+  `RtlNtStatusToDosError`), and the delay descriptors `ADVAPI32.dll`
+  (23 functions in Debug, 13 in Release), `bcrypt.dll` (`BCryptGenRandom`)
+  and, in Debug only, `WS2_32.dll` (`WSAStringToAddressW` and 18
+  ordinals), `ADVAPI32.dll` and `bcrypt.dll` spelled as `WarmUp()` binds
+  them. These are the readings of the final helpers of
+  `2026/11/21/choose-the-windows-widget-helpers-sandbox-tier-by-windows-version`
+  (its `evidence/imports.md`): in Debug 170 static functions (KERNEL32
+  168, ntdll 2) and 43 delayed ones on x86 and on x64. The fixed
+  non-Store package SID removed the helper's only call to the delayed
+  `ADVAPI32!FreeSid`. The repaired x86 and x64 Debug helpers of
+  `2026/11/15/run-the-lpac-windows-widget-helper-on-a-windows-build-before-26300`
+  (its `work/test.md`, Attempt 1 Run 4) import 170 functions statically
+  and delay-load 42, 22 of them from `ADVAPI32.dll`, in the same three
+  descriptors, with nothing added; their Release tables have not been
+  read again. The clean x64 Store Debug helper measured in
+  `2026/11/22/prove-the-windows-store-widget-helper-on-windows-10`
+  added static `KERNEL32!GetCurrentPackageFamilyName` and delayed
+  `bcrypt!BCryptHash` and dropped delayed `ADVAPI32!FreeSid` compared
+  with its pre-repair image (213 imports before, 214 after). The x64
+  Store Debug client added the same static family lookup and imported
+  `BCryptHash` through delayed `ncrypt.dll`. Both non-Store Debug
+  helpers, x86 and x64, matched all 212 reference entries.
+  When
+  `2026/11/21/build-the-x86-windows-widget-helper-image-for-windows-7`
+  first read these tables, the Release `ADVAPI32.dll` descriptor had 12
+  functions: the later task's Windows 7 lowering (`LockDownWindows7()`)
+  added `OpenProcessToken`, for its own `TOKEN_QUERY` handle, to the
+  Release descriptor of both the x86 and the x64 helper, 12 functions to
+  13 each, while the Debug descriptors imported it already. Built for the
+  pc target `i686-pc-windows-msvc` before, the same
+  helpers imported statically ADVAPI32, KERNEL32, ntdll and the pc std's
+  API set `api-ms-win-core-synch-l1-2-0.dll` (`WaitOnAddress`,
+  `WakeByAddressAll` and `WakeByAddressSingle`), and delay-loaded
+  `bcrypt.dll`, `bcryptprimitives.dll`, whose `ProcessPrng` was that
+  std's random source, and the Debug `WS2_32.dll`. Windows 7 SP1, as the
+  import gate's database records it, lacks three of those imports: the
+  API set, KERNEL32's `GetSystemTimePreciseAsFileTime` and
+  `ProcessPrng`. The win7 images import none of them.
+  The ARM64 helper keeps the pc target's std, whose random source is
+  `bcryptprimitives.dll`'s `ProcessPrng`, so by its build rules (no ARM64
+  helper's tables have been read) it imports ADVAPI32 and the pc std's
+  API set `api-ms-win-core-synch-l1-2-0.dll` statically and delay-loads
+  `bcrypt.dll`, `bcryptprimitives.dll` and, for the probe, `WS2_32.dll`.
+  No helper imports user32, gdi32 or Qt, and each binds its delay-loaded
+  DLLs, `WS2_32.dll` aside, in its lowering (**The Windows lowering**
+  below); only the Windows 7 tier's lowering loads `user32.dll`, at run
+  time from the system directory (**The Windows sandbox tiers** below).
+  The imports before the Nova change
+  were read on helpers built with the QuickJS engine, the hosted helper's
+  the same as the engine-only one's: their static imports were ADVAPI32 and
+  KERNEL32, both KnownDLLs, loaded from the system directory
+  (`/DEPENDENTLOADFLAG:0x800`); `bcrypt.dll` was delay-loaded in every
+  configuration, and the Debug build's `WS2_32.dll`, delay-loaded too,
+  had no caller but the probe. Its build string,
+  argument gate and Release refusals are the shared `main()`'s, as on
+  macOS and Linux (**The shared helper** above). At its entry, in
+  `WidgetHelper::Adopt()` (`_other/widget_helper_win.cpp`), it first
+  limits its later DLL loads to the system directory
+  (`SetDefaultDllDirectories` with
+  `LOAD_LIBRARY_SEARCH_SYSTEM32`, looked up at run time in the already
+  mapped kernel32, because Windows 7 has it only with KB2533623, so no
+  helper image imports it; without kernel32 or the function, or when the
+  call fails, it refuses as below before it reads the token, while the
+  client looks the same export up first on Windows 7 and stops at the
+  nowhere place without it, **Platform default** above), then takes
+  the token only as a decimal handle value without a sign, a leading zero
+  or trailing text that is no pseudo-handle, and adopts only the
+  byte-mode client end of a pipe, whose inheritance it clears; anything
+  else is `Widget helper: the channel could not be adopted`, exit 1,
+  before it reads the channel. The CRT's delay-load helper loads its DLLs
+  with no search flags of its own, and every such load comes after
+  `Adopt()`, so it inherits that limit.
+- **The Windows sandbox tiers.** The Windows helper runs from Windows 7
+  SP1 on, confined by one of four tiers, four strictnesses of the same
+  launch. The owner chose them on 2026-11-20: the x86 and x64
+  direct-download builds are Windows 7 SP1 baseline builds
+  (`DESKTOP_APP_WIN7_BASELINE`), and widgets in direct downloads should
+  work as broadly as possible, so every Windows Telegram runs on gets the
+  helper, each in the strongest confinement its version has, while the
+  full tier stays exactly as it was
+  (`2026/11/21/choose-the-windows-widget-helpers-sandbox-tier-by-windows-version`;
+  its `work/plan.md` (Tier table), `work/context.md` (section 3) and
+  `evidence/call-ledger.md` name the documented floor and the source of
+  every policy, attribute and function a tier uses, and its
+  `evidence/record.md` joins them per tier). The tiers below the full
+  one are the direct downloads': the Store build maps no version below
+  10.0.17763 to a tier (**The Windows Store build** below). The version
+  alone picks the tier: `CurrentSandbox()` in `widget_sandbox_win.cpp`
+  reads it once per process with `RtlGetNtVersionNumbers`, looked up in
+  the mapped ntdll, which no compatibility manifest lowers as it does
+  `GetVersionExW`, takes the build from its low 16 bits, compares major,
+  minor and build in that order and caches the version with its tier.
+  Telegram and the helper compile that unit and each reads the version
+  itself; nothing the helper receives (its arguments, the channel, the
+  environment) selects a tier, no product switch does, and a failed
+  reading selects none. By the version read:
+  - **Full**, from 10.0.17763 (Windows 10 1809): the launch of **The
+    Windows helper** above and **The Windows lowbox** below, unchanged:
+    an LPAC primary and a regular AppContainer startup token of the
+    package with no capability, the five creation attributes in the order
+    handle list, mitigation policy, child-process policy,
+    all-application-packages opt-out and job list, and the words
+    `0x1001101111010101` (8 bytes) on x86 and `0x1001101111110100`, with
+    `0x10000000` (16 bytes in all) where `IsUserCetAvailableInEnvironment`
+    offers CET, on x64. The helper reads back, in order, DEP (x86 only),
+    ASLR, extension points, dynamic code, win32k, child process, shadow
+    stack (with CET), signature, strict handles, fonts and image load.
+  - **LPAC 1703**, from 10.0.15063 (10 1703) through 1803: the full tier's
+    tokens, attributes and first word, no CET word, and the readback
+    without child process and shadow stack, whose queries Microsoft
+    documents from 1709 and 2004. Its x86 creation equals the full tier's,
+    and an x64 helper linked `/CETCOMPAT` may get shadow stacks without the
+    word, so a full helper under this launch can find nothing weaker to
+    refuse.
+  - **AppContainer**, from 6.2 (Windows 8) through 8.1 and 10 1507 to 1607:
+    regular AppContainer tokens of the same package for both, with no
+    capability, no opt-out and no job-list attribute; the handle list, the
+    mitigation policy (8 bytes) and, from 10.0.10586, the child-process
+    policy. Its words hold the full set minus what its version lacks:
+    dynamic code joins at 6.3 (8.1), fonts at 10.0.10240, Microsoft-signed
+    only at 10.0.10586 and System32 images preferred at 10.0.14393, from
+    `0x0000000111010101` on x86 and `0x0000000111110100` on x64 at 6.2 to
+    the full tier's first word at 10.0.14393, and its readback is the
+    full tier's list without child process and shadow stack and without
+    each policy below its floor.
+  - **Windows 7**, 6.1.7601 (7 SP1): the restricted pair at Low with no
+    lowbox, the handle list and, on x86 alone, the mitigation policy as
+    one 4-byte word, `PROCESS_CREATION_MITIGATION_POLICY_DEP_ENABLE` (DEP
+    with ATL thunk emulation off; a 64-bit word is illegal on 32-bit
+    Windows 7), with the measures of **The Windows 7 tier** below.
+  - **None**, below 6.1.7601 or with no reading: no helper starts, and
+    every widget stops at the nowhere place (**Platform default** above).
+
+  Every tier keeps the job's limits `0x2408` (one active process, kill on
+  job close, death on an unhandled exception) and its UI restrictions
+  `0xFF`, the pin through the held handle, no thread token after the
+  lowering, the forgotten registry roots and the helper's own check
+  before Ready. The two LPAC tiers put the helper into its job at the
+  creation through the job-list attribute, a Windows 10 one. On the
+  AppContainer and Windows 7 tiers the client assigns the suspended
+  helper with `AssignProcessToJobObject` right after the creation, before
+  the image check, the token attachment and the resume; a failed
+  assignment keeps the error, terminates that helper through its process
+  handle, never the job, and waits up to 1 s for its end with the same
+  wait and texts as every other end (`Complete()` in
+  `widget_helper_win.cpp`), failing the start with
+  `AssignProcessToJobObject failed: <reason> (<end>, terminated after <n>
+  ms)` (`TerminateProcess failed: <reason>` for the termination when that
+  failed, `not reaped after <n> ms` for `<end>` when the wait ran out), so
+  a parent job that forbids the assignment, such as one without breakaway
+  on Windows 7, which nests no jobs, fails closed. When that wait does not
+  confirm the end, the failed start keeps the helper's process handle and
+  hands it to the client's reaping, as for an ended helper: no other
+  helper starts while the reaping waits 1 s for the end and, if the
+  helper still runs, terminates it again through its process handle and
+  waits 1 s more, and an end it never confirms stops launches for the
+  rest of the process. `Manager::reap()` in `tgw_remote.cpp` then logs
+  the helper's pid as not reaped and latches `the widget helper was not
+  reaped` only when no reason is latched yet; when that failed start was
+  the third failure in a row, its own charge has already latched `the
+  widget helper failed 3 times in a row`, which stays (**Failure limit**
+  below). On those two tiers the assignment is not atomic with the
+  creation: a client that dies in between leaves a suspended helper that
+  never ran. Only the full
+  tier reads the helper's child-process policy back (below 10.0.10586 the
+  child-process attribute is not even set), so on the Windows 7,
+  AppContainer and LPAC 1703 tiers the job is the one checked hold on the
+  helper's children, and the helper's own job check there also refuses a
+  job that allows breakaway, silent or not, with `the job's limits
+  0x<flags> allow breakaway`.
+
+  The client checks each tier's own pair. Before the creation it checks
+  the lockdown and initial token shapes (on Windows 7 reading its own
+  token through a real `TOKEN_QUERY` handle, since the pseudo token
+  handles are Windows 8 ones) and, on the lowbox tiers, a regular
+  AppContainer token of the package with no capability for both. Before
+  the resume it checks the actual primary's shape and, on the LPAC tiers,
+  an LPAC token, on the AppContainer tier an AppContainer token of either
+  level, then the attached startup token the same way; the AppContainer
+  tier leaves the `WIN://NOALLAPPPKG` attribute unread, since Microsoft
+  marks its token class reserved and that tier never passes the opt-out.
+  The texts and prefixes are those of **The Windows lowbox** below. The
+  helper checks the set of the tier its own reading maps to (**The Windows
+  lowering** below) and never learns which tier the client launched, so
+  a helper whose reading maps to a stronger tier refuses before Ready
+  wherever its launch lacks a protection that tier requires (a full
+  helper under an AppContainer launch, at its LPAC check), and nothing
+  refuses where the launch has the same effective protections. No
+  refusal leads to a weaker tier: each is a start failure or a refused
+  stream (**Failure limit** below).
+
+  Every mechanism of every tier exists on Windows 11, so each tier is
+  tested there: that task's disposable overlay overrides only
+  `ReadWindowsVersion()`, in the client and in the helper, or in the
+  client alone while the helper reads its own version, and every reading
+  of a forced tier is such a simulation on Windows 11 build 26300
+  (10.0.26300). The full tier alone has also run unforced on a real older
+  Windows, Windows 10 22H2 (10.0.19045.6466) in a Hyper-V guest, in x86
+  and x64 Debug builds: Telegram and the helper each read 10.0.19045 and
+  chose it, that build accepted the tier's attributes and creation words,
+  and its tokens' `WIN://NOALLAPPPKG`, the mitigation readbacks the full
+  tier requires and the probe's socket denials read as on Windows 11,
+  while the helper's package derivation failed there under the LPAC
+  primary until the non-Store package SID became fixed data
+  (**The Windows lowbox** below;
+  `2026/11/15/run-the-lpac-windows-widget-helper-on-a-windows-build-before-26300`,
+  its `work/test.md`). No other build from 10.0.17763 to 10.0.26299 and
+  no bare-metal Windows before 26300 has run it. For the lower tiers,
+  what only a real older Windows shows is field coverage
+  that no record here claims: whether it accepts each attribute and flag
+  as documented and reads them back as Windows 11 does, its loader, the
+  win7 Rust std there, the Windows 8 functions really missing, nested
+  jobs, KB2533623 missing, AppContainer networking on 8 and 8.1 and the
+  `WIN://NOALLAPPPKG` reading on 1703 to 1803. The forced tiers' readings
+  are that task's evidence campaign's (its `work/test.md` and
+  `evidence/`), and they agree with the tier lines on this page and on
+  [test_widget_helper_probe](test_widget_helper_probe.md#windows-tiers)
+  ([Verification](#verification)). Compatibility modes were measured on
+  Windows 11 build 26300 (10.0.26300.9711) only, with an x64 Debug pair
+  and an x86 Release pair built with the harness: the Windows 8, Windows
+  7 and Windows Vista (Service Pack 2) modes, set per user on the copied
+  `Telegram.exe` in the Compatibility tab's form or given through
+  `__COMPAT_LAYER`, move Telegram's `GetVersionExW` to the mode's
+  version, yet both processes read 10.0.26300 and the full tier, the
+  helper starts without the layer and reaches Ready, and the widget
+  renders. Before that change the same modes moved Telegram's
+  `RtlGetVersion` reading to 6.2.9200 (AppContainer; the x64 helper read
+  the same and served under it) or to 6.1.7600 and 6.0.6002 (no tier, so
+  no helper started), and an x86 helper that inherited the layer ended
+  at DLL initialization. An x86 Debug client stalls at startup under
+  these modes in the Debug CRT's heap check, so its x86 cells used the
+  Release pair
+  (`2026/11/22/prove-the-windows-widget-helper-tier-under-a-compatibility-mode`).
+- **The Windows 7 tier.** Its path, from Telegram's launch to the
+  helper's Ready, is built to call only functions that Windows 7 SP1 has,
+  imported or looked up at run time (that task's audit of every call is
+  its evidence), and of what Chromium's Windows 7 sandbox took it adds an
+  alternate desktop, DEP with ATL thunk emulation off on x86 and heap
+  termination (that task's `work/plan.md`, P-T8). Telegram's
+  `UnsupportedReason()` first requires `SetDefaultDllDirectories` in
+  kernel32, KB2533623's (**Platform default** above).
+  - **Desktop.** For each helper the client creates a desktop with
+    `CreateDesktopW` on its own window station, named
+    `TelegramWidgetHelper-<client pid>-<32 hex digits>` (the prefix
+    `kHelperDesktopPrefix`, then the client's pid and 128 bits of
+    `BCryptGenRandom` with `BCRYPT_USE_SYSTEM_PREFERRED_RNG`, whose
+    failure fails the start with `BCryptGenRandom failed: status
+    0x<status>` before any desktop or helper exists), asking
+    `DESKTOP_CREATEWINDOW`, `DESKTOP_READOBJECTS`, `DESKTOP_WRITEOBJECTS`
+    and `WRITE_OWNER` (`CreateDesktopW` documents the two object rights as
+    required with `WRITE_OWNER`), with no hook flag, no inheritable handle
+    and the window station's default security, and passes
+    `<station>\<name>` as the creation's `lpDesktop`. `CreateDesktopW` is
+    documented to assign the new desktop to its calling thread, so the
+    client calls it on a short-lived thread of its own and joins that
+    thread before the launch goes on: the launching thread's desktop never
+    changes, and no thread of the client is left on the helper's desktop.
+    That thread only creates the desktop and keeps the handle and the
+    call's error for the join. After the join, back on the launching
+    thread and before any helper exists, the client owns the handle and
+    labels the new desktop Low with no-write-up (`S:(ML;;NW;;;LW)`, the
+    label `WinSta0\Default` carries) through `SetSecurityInfo` with
+    `LABEL_SECURITY_INFORMATION`, which is what `WRITE_OWNER` is for; the
+    owner and DACL stay as created. Unlabelled, the desktop counts as
+    Medium, and the helper's Low startup token cannot connect to it
+    (`user32.dll` fails to initialize there, `the widget helper is not
+    sandboxed: LoadLibraryExW failed: error 1114`).
+    It holds that handle
+    with the helper's process and job handles, and it neither switches the
+    input desktop nor changes its own window station. Once the helper's
+    end is confirmed the client closes the desktop itself and lets go of
+    the handle only when that close succeeds; a failed `CloseDesktop`
+    adds `, CloseDesktop failed: <reason>` to the end's status and keeps
+    the handle held. A handle still held, after a failed close or for a
+    helper whose end is not confirmed, is closed unchecked when the
+    client lets go of that helper: at the end of its failed start, or
+    when it drops the helper's completion. A desktop it cannot
+    create fails the start with `CreateDesktopW failed: <reason>`, or the
+    station name's `GetProcessWindowStation failed: <reason>` or
+    `GetUserObjectInformationW failed: <reason>`. A label it cannot set
+    fails the start with `SetSecurityInfo failed: <reason>` (or
+    `CreateWellKnownSid`, `InitializeAcl` or `AddMandatoryAce failed:
+    <reason>` while building it): the creating thread has already exited,
+    so the launching thread closes the desktop before the start fails,
+    and no helper is created. Window messages are not access-checked
+    between the windows of one desktop, so a desktop of its own keeps the
+    helper from the user's windows. The window station
+    stays Telegram's, because another one would change a process-wide
+    resource of Telegram.
+  - **Tokens.** The restricted pair of **The Windows helper** above, both
+    Low and unboxed. Untrusted integrity, a lockdown default DACL and
+    closing other handles before the lowering are not taken: the pair
+    stays the one every tier checks, its default DACL is its own, and the
+    helper inherits only the pipe and the stderr copy.
+  - **Pin.** The pin of **The Windows helper** above without its Windows 8
+    functions. The identity of each held folder, of the file and of the
+    started image is `GetFileInformationByHandle`'s volume serial and
+    64-bit file index, read on NTFS only (`GetVolumeInformationByHandleW`;
+    `the <fs> file system has no reliable file index` otherwise, since FAT
+    identifiers can change and ReFS's 64-bit ones are not unique), and
+    never a zero index, the value of an unavailable file ID, which would
+    make any two such files of a volume equal (`the file index is
+    unavailable`). The
+    digest is the same pinned Authenticode digest, computed without
+    `wintrust.dll`. `widget_helper_identity.py` also derives the
+    checksum's offset, the certificate-table directory entry's offset and
+    the unsigned image's end from the built image, requires the SHA-256
+    of the three ranges they bound to equal the catalog digest (`the
+    helper image digest differs from its Authenticode digest` stops the
+    build otherwise) and writes them into `kBuiltDigests`. Telegram reads
+    the 8-byte directory entry at that offset through the held handle,
+    accepts either no certificate table with the file ending at the
+    unsigned end or a non-empty table, a multiple of 8 bytes, that starts
+    exactly there and ends the file (`the widget helper image extent is
+    invalid` otherwise), and hashes exactly those ranges in 64 KiB reads
+    with BCrypt's SHA-256 (`the widget helper digest does not match this
+    build` for any other bytes). Windows' PE subject interface provider
+    was not taken: its SHA-256 on an unupdated Windows 7 SP1 is
+    undocumented.
+  - **Lowering.** `LockDownWindows7()` in `widget_sandbox_win.cpp`. Under
+    the startup token, restricted to the user and the enabled groups at
+    Low, the helper still opens what the user may read: it runs the
+    warm-up's binds and random draw (without the mitigation functions and
+    the package, which Windows 7 lacks), opens its own process token with
+    `TOKEN_QUERY`, turns on heap termination on corruption
+    (`HeapSetInformation(HeapEnableTerminationOnCorruption)`) and checks
+    its desktop: the startup request (`GetStartupInfoW`) must be
+    `<station>\TelegramWidgetHelper-<decimal pid>-<32 hex digits>` before
+    it loads `user32.dll` from the system directory, an ordinary USER call
+    (`GetDesktopWindow`) connects the serving thread, and the names of
+    `GetProcessWindowStation()` and of `GetThreadDesktop()` of that thread,
+    read with `GetUserObjectInformationW(UOI_NAME)`, must equal the
+    request but for case (`the widget helper is not on its own desktop`,
+    or the failing call with its error). Then it reverts, forgets the
+    registry roots and checks no thread token, the one step every tier's
+    lowering shares (`DropStartupToken()`), then the lockdown token through
+    its own handle, the job, which must not allow breakaway either (**The
+    Windows sandbox tiers** above), and, on x86, `GetProcessDEPPolicy`'s
+    `0x3`, permanent (`the DEP policy reads 0x<flags>, permanent <0|1>`); the
+    handle is closed when the lowering returns. The independent evidence
+    of the desktop is an outside reading of `GetThreadDesktop` of the
+    serving thread from Telegram's window station: a startup name records
+    only what was asked.
+  - **What it leaves.** By design, which only simulations on Windows 11
+    read here, the Windows 7 tier leaves unconfined:
+    - the network: without a lowbox nothing keeps native code from
+      sockets. A restricted Low token with its job and policies created a
+      socket and connected to a loopback listener in the helpers before
+      the lowbox (**What the Windows lowering leaves** below), so the
+      probe's socket and AFD lines of this tier are recorded as they
+      read, never judged as denials;
+    - win32k: no Windows 7 policy disables it, and the helper connects
+      to USER in its own lowering, so user32 and win32k stay reachable on
+      its own desktop of Telegram's window station, within the job's UI
+      restrictions (no USER handles of processes outside the job, no
+      clipboard, its own atom table, no desktop creation or switch,
+      system parameters, display settings or exit);
+    - the mitigations: no readback but x86's DEP, since
+      `GetProcessMitigationPolicy` is Windows 8: no ASLR, extension point,
+      dynamic code, strict handle, signature, font or image load policy,
+      no child-process attribute (the job's one process and the lockdown
+      token hold child creation), no SEHOP (no documented Windows 7
+      readback) and on x64 no creation policy at all;
+    - the heap: termination on corruption only, set in-process before the
+      lowering and never readable back.
+- **The Windows lowbox.** On the full, LPAC 1703 and AppContainer tiers
+  (**The Windows sandbox tiers** above; the Windows 7 tier has no lowbox)
+  `NtCreateLowBoxToken` boxes each of the two
+  restricted tokens with one package SID, that of the fixed name
+  `telegram.desktop.widget-helper`,
   with no capability and no handle; no AppContainer profile, named-object
-  directory, file grant or loopback exemption is created. The creation's
+  directory, file grant or loopback exemption is created. Outside the
+  Store build that SID is the unpackaged result of
+  `DeriveAppContainerSidFromAppContainerName` for the name, kept as fixed
+  data (`kPackageRids` in `widget_sandbox_win.cpp`):
+  `S-1-15-2-2297200083-2220774571-4131773200-153869053-3443934028-2520258059-2811718137`.
+  The earlier derivation loaded `USERENV.dll` and through it
+  `profext.dll`. It failed in the helper under its LPAC primary on Windows 10 22H2
+  (10.0.19045.6466): there `profext.dll` imports its dependencies
+  statically (10.0.26300 delay-loads them), and the loader's worker
+  threads, which run as the primary, could not map that graph, so every
+  confined start on x86 and x64 refused before Ready with `the widget
+  helper is not sandboxed: DeriveAppContainerSidFromAppContainerName
+  failed: 0x80004005`
+  (`2026/11/15/run-the-lpac-windows-widget-helper-on-a-windows-build-before-26300`,
+  its `work/decisions.md`, D1). The first start of the pre-repair x64
+  Store Debug helper on the same guest gave the same refusal. In that
+  run the packaged client's userenv call returned the same child SID
+  recorded for the stand-in family on 10.0.26300.9711
+  (`2026/11/22/prove-the-windows-store-widget-helper-on-windows-10`,
+  its `evidence/first-start.md`).
+  In the current Store build the client and helper each read their own
+  package family name with `GetCurrentPackageFamilyName` and lowercase
+  its ASCII letters. `BCryptHash` hashes the UTF-16LE bytes with
+  SHA-256, excluding the terminating NUL. After `S-1-15-2-` the child SID
+  contains the first seven little-endian DWORDs of that digest followed
+  by the last four of `kPackageRids`. Each process caches its result in
+  `ExpectedPackage()` for token creation or verification.
+  On the two LPAC tiers the creation's
   attribute list adds `PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY`
   with `PROCESS_CREATION_ALL_APPLICATION_PACKAGES_OPT_OUT`, which makes the
   helper's primary a less privileged AppContainer (LPAC) token, one that
-  `ALL APPLICATION PACKAGES` grants do not reach. The startup token stays
+  `ALL APPLICATION PACKAGES` grants do not reach; the AppContainer tier
+  leaves it out, so its primary stays a regular AppContainer token, which
+  those grants reach. The startup token stays
   a regular AppContainer token of the same package on purpose. In the
   experiment of
   `2026/11/14/confine-the-windows-widget-helpers-network-with-lpac-and-turn-it-on`
@@ -1589,29 +2481,41 @@ packs, the fixture and the seams they use need no change for it.
   LPAC token of that package with no capability (`the process token check
   failed: <error>`), then reads the attached initial token back and
   requires its shape and a regular AppContainer token of that package
-  (`the attached token check failed: <error>`); either failure ends the
-  suspended helper through its job and is a start failure (**Runtime log
-  and deaths** below). Building the pair can fail with
-  `NtCreateLowBoxToken is not available`, `NtCreateLowBoxToken failed:
-  status 0x<status>`, `DeriveAppContainerSidFromAppContainerName is not
-  available` or `DeriveAppContainerSidFromAppContainerName failed:
-  0x<hresult>`. The AppContainer check's errors are `the token is not an
+  (`the attached token check failed: <error>`); on the AppContainer tier
+  every one of these checks takes an AppContainer token of either level,
+  reading no `WIN://NOALLAPPPKG`, and on the Windows 7 tier only the
+  shapes are checked (**The Windows sandbox tiers** above). Either
+  failure ends the suspended helper through its job and is a start
+  failure (**Runtime log and deaths** below). Building the pair can fail
+  with
+  `NtCreateLowBoxToken is not available` or `NtCreateLowBoxToken failed:
+  status 0x<status>`, and in the Store build also with
+  `GetCurrentPackageFamilyName failed: error <n>` (the returned Win32
+  error) or `BCryptHash failed: status 0x<status>` (the NTSTATUS). The
+  AppContainer check's errors are `the token is not an
   AppContainer token`, `the token's AppContainer SID is not the widget
   helper's`, `the token has <n> capabilities`, `the token is not a less
   privileged AppContainer token` or `the token is a less privileged
   AppContainer token` (the level is read from the token's
   `WIN://NOALLAPPPKG` security attribute, because
   `TokenIsLessPrivilegedAppContainer` failed with error 87 on Windows
-  10.0.26300), `the token's AppContainer information is truncated`, `the
+  10.0.26300, and on 10.0.19045.6466 too), `the token's AppContainer
+  information is truncated`, `the
   token's security attributes version is <n>`, `the token's security
   attributes are malformed`, `the token's WIN://NOALLAPPPKG type is <n>`,
   `the token's WIN://NOALLAPPPKG has <n> values`, `the token's
   WIN://NOALLAPPPKG value is <n>` and `GetTokenInformation failed: error
   <n>`. The design makes no grant: the client opens the image, the
-  helper's static imports are KnownDLLs and every later DLL comes from the
-  system directory. The evidence campaign of
+  helper imports statically only system DLLs, on ARM64 with the pc std's
+  API set (**The Windows helper** above; the static imports of the
+  QuickJS-era helpers were ADVAPI32 and KERNEL32, both KnownDLLs), it
+  binds the delay-loaded DLLs it uses while it still impersonates (**The
+  Windows lowering** below), and every later DLL comes from the system
+  directory. The
+  evidence campaign of
   `2026/11/15/move-the-windows-widget-helper-into-a-qt-free-executable-and-run-it-on-x64`
-  (its `work/test.md`, Attempt 1 Run 3, Win32 Debug only) started
+  (its `work/test.md`, Attempt 1 Run 3, Win32 Debug only, with the
+  QuickJS engine) started
   `TelegramWidgetHelper.exe` to Ready that way through the product
   `Launch()` of account-free clients with fresh ordinary permissions:
   from the checkout's `out\Debug\modules\x86\`, from `setup.iss`'s files
@@ -1658,11 +2562,11 @@ packs, the fixture and the seams they use need no change for it.
   `setrlimit failed: <error>` for the ceiling. The main log has `Tgw:
   Widget helper <pid> stream ended: the engine process refused the stream:
   <reason>.`, its widgets die with `the widget engine process ended`, and
-  the refusal counts towards the failure limit below. No engine ever runs
-  in process instead. A hosted widget's served host, validator and
+  the refusal counts towards the failure limit below. No widget ever runs
+  in the client instead. A hosted widget's served host, validator and
   renderer are built only at its hosted start, after `Ready`, so the
   lockdown, its profile, its forbidden services and its descriptor ceiling
-  are those of the engine-only helper.
+  are taken before any of them exists.
   The Mac App Store service runs the same lockdown with four
   differences, each `#ifdef OS_MAC_STORE` in `_other/widget_helper_mac.cpp`.
   Its service check takes `BOOTSTRAP_NOT_PRIVILEGED` (1100) as not held:
@@ -1703,16 +2607,28 @@ packs, the fixture and the seams they use need no change for it.
   the framework's lockdown callback, after it accepted the opening and
   holds the bundles and before it answers Ready, so before any runtime
   exists (`LockDownHelper()` in `widget_sandbox_win.cpp`, which
-  `WidgetHelper::Lockdown()` calls). While still impersonating it checks
-  that the mitigation readback is available (`the mitigation policy
-  functions are not available` otherwise), binds the delay-loaded
-  `bcrypt.dll` imports with `__HrLoadAllImportsForDll`, derives its
-  package SID once (which loads `USERENV.dll`; the checkpoint of
+  `WidgetHelper::Lockdown()` calls). It lowers by the tier its own version
+  reading maps to: `LockDownLowBox()` on the full, LPAC 1703 and
+  AppContainer tiers, described here, and `LockDownWindows7()` on the
+  Windows 7 tier (**The Windows 7 tier** above); with no tier it refuses
+  with `the widget helper needs Windows 7 SP1 or later` (in the Store
+  build `the widget helper needs Windows 10 1809 or later`). While still
+  impersonating it checks that the mitigation readback is available (`the
+  mitigation policy functions are not available` otherwise), binds the
+  delay-loaded imports
+  with `__HrLoadAllImportsForDll`, on x86 and x64 those of `ADVAPI32.dll`
+  and then those of `bcrypt.dll`, on ARM64 those of `bcrypt.dll` and then
+  those of `bcryptprimitives.dll`, each by the exact name the linker gave
+  its descriptor (the CRT's `PiddFromDllName()` in `delayhlp.cpp` compares
+  names case-sensitively). On the lowbox tiers it then reads
+  `ExpectedPackage()`. The Store helper derives the child SID using
+  the family lookup and the just-bound `bcrypt!BCryptHash`. The
+  non-Store helper uses its fixed SID (**The Windows lowbox** above).
+  The `USERENV.dll` and `profext.dll` mappings observed in
   `2026/11/14/confine-the-windows-widget-helpers-network-with-lpac-and-turn-it-on`
-  saw it map `profext.dll` as well, the host of the API set USERENV
-  delay-imports for the derivation) and draws random bytes once, which
-  starts the random provider that a widget's `crypto.getRandomValues` uses
-  later. `bcrypt.dll` was the image's one static import that is no
+  came from the earlier userenv derivation. Warm-up then draws random
+  bytes once to start the provider a widget's `crypto.getRandomValues`
+  uses later. `bcrypt.dll` was the image's one static import that is no
   KnownDLL, and the system directory does not let the LPAC primary open
   it, so it is delay-loaded and the impersonating main thread maps it.
   While the helper still imported it statically, 3 of 5 confined launches
@@ -1720,19 +2636,59 @@ packs, the fixture and the seams they use need no change for it.
   trace pointed to Windows' parallel loader opening it on a worker thread
   that runs as the primary
   (`2026/11/15/move-the-windows-widget-helper-into-a-qt-free-executable-and-run-it-on-x64`,
-  its `work/decisions.md`, P6). Telegram, which compiles the same unit and
-  delay-loads `bcrypt.dll` too, never runs this lowering. A failed bind
-  stays closed before Ready either way: a missing delay descriptor refuses
-  with `__HrLoadAllImportsForDll(bcrypt.dll) failed: 0x<hresult>`, and a
-  module that cannot be loaded raises the delay-load exception, which
-  nothing catches, so the helper dies before any frame with `exit
-  0xC06D007E` or `exit 0xC06D007F`; no run has seen either. Then it
-  reverts to its lockdown token, disables the predefined registry key
-  cache and closes the cached roots, and verifies itself: no thread token,
-  the lockdown token above, an LPAC token of exactly its package with no
-  capability (the AppContainer check's errors above), its job's limits and
-  UI restrictions, and every mitigation of its creation read back (**The
-  Windows helper** above); it sets no mitigation itself. The first step
+  its `work/decisions.md`, P6). On ARM64 the pc target's Rust runtime
+  adds `bcryptprimitives.dll`, its random source, which is not a KnownDLL
+  on every Windows either, so the ARM64 helper delay-loads it too and
+  binds it right after `bcrypt.dll`. On x86 and x64 the win7 runtime's
+  random source is ADVAPI32's `SystemFunction036`, which the delay-load
+  hook answers with the helper's own function over `ProcessPrng` or
+  `BCryptGenRandom` (**The Windows helper** above), so the ADVAPI32 bind
+  follows no forwarder into
+  `cryptbase.dll`. The x86 and x64 helpers bind the whole ADVAPI32
+  descriptor because ADVAPI32 is still called after the
+  reversion: the steps and checks after it call
+  `RegDisablePredefinedCacheEx`, `RegCloseKey`, `OpenThreadToken`,
+  `GetTokenInformation` and more, the Debug probe calls
+  `IsTokenRestricted`, and the Rust runtime calls `SystemFunction036`
+  during widget work. Left lazy, any of these first called after the
+  reversion would resolve its delay import after the lowering.
+  `RevertToSelf` itself is no such case: its lazy thunk would resolve on
+  its first call, before that call drops the impersonation. Telegram,
+  which compiles the same unit, never runs this lowering. A failed bind stays
+  closed before Ready either way
+  (`__HrLoadAllImportsForDll()` and `__delayLoadHelper2()` in MSVC
+  14.44's `delayhlp.cpp`). A name that is missing or in another case
+  matches no descriptor, so `__HrLoadAllImportsForDll` binds nothing and
+  returns `0x8007007E` (`HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND)`) to the
+  warm-up, which refuses with
+  `__HrLoadAllImportsForDll(<dll>) failed: 0x<hresult>`, here
+  `0x8007007e`, `<dll>` being `ADVAPI32.dll` or `bcrypt.dll` on x86 and
+  x64 and `bcrypt.dll` or `bcryptprimitives.dll` on ARM64. A matching
+  descriptor never makes it return a failure: it calls
+  `__delayLoadHelper2` for each of the descriptor's entries and returns
+  `S_OK` after the last, and `__delayLoadHelper2` raises `0xC06D007E`
+  (`ERROR_MOD_NOT_FOUND`) when `LoadLibraryEx` cannot load the DLL and
+  `0xC06D007F` (`ERROR_PROC_NOT_FOUND`) when neither the delay-load hook
+  of the x86 and x64 helpers nor `GetProcAddress` resolves a function of
+  the loaded DLL. No
+  failure hook is set and nothing catches either exception, so the
+  helper dies before Ready, and so before any frame, with
+  `exit 0xC06D007E` or `exit 0xC06D007F`. No run has seen either from the
+  warm-up; the `exit 0xC06D007E` that **What the Windows lowering
+  leaves** below records ended a helper later, during widget work before
+  the random warm-up existed. Then the helper reverts to its lockdown
+  token, disables the predefined registry key
+  cache and closes the cached roots, and verifies itself: no thread token
+  (these three are `DropStartupToken()`, the step the Windows 7 lowering
+  shares), the lockdown token above, an LPAC token of exactly its package
+  with no capability (the AppContainer check's errors above; on the
+  AppContainer tier an AppContainer token of either level, the one rule
+  `CheckAppContainerToken()` applies to the client's checks too), its
+  job's limits and UI restrictions (and, on every tier but the full one,
+  no breakaway, **The Windows sandbox tiers** above), and every
+  mitigation of its tier's creation read back
+  (**The Windows helper** and **The Windows sandbox tiers** above); it
+  sets no mitigation itself. The first step
   that fails refuses the stream: the helper writes `Widget helper: the
   widget helper is not sandboxed: <error>` to stderr and exits 1, the main
   log reads `Tgw: Widget helper <pid> stream ended: the engine process
@@ -1744,7 +2700,8 @@ packs, the fixture and the seams they use need no change for it.
   reading that failed, such as `the token's integrity 0x2000 is not Low`,
   `the token's user is not deny-only`, `the token's restricting SIDs are
   not exactly S-1-0-0`, `the job's limits are 0x<flags> for <n>
-  processes` or `the mitigation policy <policy> reads 0x<flags>`.
+  processes`, `the job's limits 0x<flags> allow breakaway` or `the
+  mitigation policy <policy> reads 0x<flags>`.
 - **Windows probe.** With `probe` the client passes the mode to the
   Windows helper, and the lockdown hook of its Debug build adds the
   native probe of `test/test_widget_helper_probe_lockdown_win.cpp`
@@ -1765,12 +2722,18 @@ packs, the fixture and the seams they use need no change for it.
   found in the system directory, and the time zone (`bias <minutes>`); a
   passing listener, directory or registry control reads `ok`, and the
   `whoami.exe` lookup `present`.
-  The startup token reaches a directory only where it grants the package
-  or `ALL APPLICATION PACKAGES`: the checkpoint named in **What the Windows
-  lowering leaves** read `error 5` for the client's working directory and
+  On the lowbox tiers the startup token reaches a directory only where it
+  grants the package or `ALL APPLICATION PACKAGES`: the checkpoint named
+  in **What the Windows lowering leaves** read `error 5` for the client's
+  working directory and
   `%APPDATA%` before the lowering, so their `after lowering:` denials have
   no control in the helper, and the same paths opened by the client are
-  their positive control.
+  their positive control. The Windows 7 tier's startup token, restricted
+  to the user and the enabled groups at Low with no package, opens them
+  (**The Windows 7 tier** above): in the forced Windows 7 probes
+  (simulations on Windows 11) they read `ok` before the lowering and
+  `denied (error 5)` after it
+  ([test_widget_helper_probe](test_widget_helper_probe.md#windows-tiers)).
   The lines that start `after lowering:` try `CreateProcessW` of that
   `whoami.exe`, a TCP socket and a 1 s connect to the listener (`socket:
   not tried, the loopback listener did not start` when Winsock failed
@@ -1778,10 +2741,21 @@ packs, the fixture and the seams they use need no change for it.
   (two when the client's working directory was not given),
   `HKEY_CURRENT_USER\Software` and
   `HKEY_LOCAL_MACHINE\SOFTWARE`; read back the thread token, the process
-  token and the job; read the helper's package identity (`package
-  identity: none (APPMODEL_ERROR_NO_PACKAGE)` in a process without one,
-  the package full name in an installed Store package, **The Windows
-  Store build** below, or `GetCurrentPackageFullName failed: error N`);
+  token (on the Windows 7 tier through the probe's own handle, opened
+  before the lowering and closed after the row) and the job; name the
+  helper's own tier and version, `tier: <tier>, version
+  <major>.<minor>.<build>` (`full`, `LPAC 1703`, `AppContainer` or
+  `Windows 7`), and, on the Windows 7 tier alone, the window station and
+  desktop of its serving thread, `desktop: <station>\<desktop> (thread
+  <tid>)`; read the helper's package identity through
+  `GetCurrentPackageFullName`, which `ProbePackage()` looks up at this
+  point, after the lowering, in the already mapped kernel32, a lookup
+  that binds no import slot (`package identity: none
+  (APPMODEL_ERROR_NO_PACKAGE)` in a process without one, the package full
+  name in an installed Store package, **The Windows Store build** below,
+  `GetCurrentPackageFullName failed: error N`, or `not available
+  (GetCurrentPackageFullName is missing)` where kernel32 lacks the
+  function from Windows 8 on);
   read back the win32k disable of the helper's creation
   (`win32k system calls: DISABLED (ProcessSystemCallDisablePolicy
   0x<flags>)`, `ENABLED (...)` when `DisallowWin32kSystemCalls` is clear,
@@ -1791,7 +2765,14 @@ packs, the fixture and the seams they use need no change for it.
   `dynamic code`, `handles`, `win32k`, `extension points`, `signature`,
   `child process`, `shadow stack`, `font disable` and `image load`; and
   run a thread, an event, `OpenProcess` of its own pid, 32 random bytes
-  and the time zone again. A refused process,
+  and the time zone again. The package, win32k and mitigation rows are
+  read only from the version whose documentation has their query, and
+  read `not read (<call> is documented from <version>)` below it, as
+  every one of them does on the Windows 7 tier but x86's DEP, read there
+  through `GetProcessDEPPolicy`
+  ([test_widget_helper_probe](test_widget_helper_probe.md#windows-tiers)).
+  A full-tier report has the rows it had before the tier row, in order,
+  plus that row. A refused process,
   socket, connect, directory or key reads `denied (error N)` only for
   access denied (5, or `WSAEACCES` for the socket and the connect) and
   `failed (error N)` for any other error, so a connect that timed out is
@@ -1810,7 +2791,14 @@ packs, the fixture and the seams they use need no change for it.
   ([test_widget_helper_probe](test_widget_helper_probe.md)), and so is the
   Linux one (**Linux probe** below); on the non-Linux all-other platforms
   no helper starts, so nothing is written.
-- **What the Windows lowering leaves.** Without the lowbox the Windows
+- **What the Windows lowering leaves.** The readings below were taken
+  before the tiers existed, first under the restricted token alone, then
+  under what is now the full tier, but for the Nova helpers' Ready
+  modules at the end, read under the unforced full tier. The Windows 7
+  tier runs without a
+  lowbox, so the first of them applies to it by design, and what else it
+  leaves is under **The Windows 7 tier** above; the AppContainer tier
+  keeps the lowbox without the LPAC opt-out. Without the lowbox the Windows
   helper was no network boundary. In the Windows runs of
   `2026/11/10/run-widget-engines-in-a-sandboxed-helper-process-on-windows`
   (its `work/decisions.md`, I1 to I3) and in the probe run of
@@ -1836,14 +2824,15 @@ packs, the fixture and the seams they use need no change for it.
   127.0.0.1, `::1` and the host's own LAN and link-local addresses, of a
   sibling process on 127.0.0.1 and `::1`, and one in the running WSL
   distribution received every ordinary control before, during and after
-  the helper and nothing from it. `TelegramWidgetHelper.exe` read the same
-  socket and AFD denials on x86 and on x64, while listeners of the client
+  the helper and nothing from it. `TelegramWidgetHelper.exe`, built with
+  the QuickJS engine, read the same socket and AFD denials on x86 and on
+  x64, while listeners of the client
   on 127.0.0.1 and `::1` received every control of the client and of new
   sibling processes and nothing from it; the other targets and
   `connect-control` were not run with it ([Verification](#verification)).
   Native code in the lowered helper could therefore create no TCP or UDP
   socket over IPv4 or IPv6 and open no AFD endpoint for those kinds, and
-  the ordinary helper holds no socket from before the lowering (its
+  the ordinary helper held no socket from before the lowering (its
   handles are below). Sockets that the probe's
   `connect-control` opens before the lowering delivered nothing after it:
   TCP connects to the host's own addresses timed out and one to WSL was
@@ -1866,7 +2855,8 @@ packs, the fixture and the seams they use need no change for it.
   replaced could not take it: `Telegram.exe` loads user32 during its
   static initialisation, so its runtime disable failed with error 19
   (`ERROR_WRITE_PROTECT`) without the lowbox and with error 5 under it.
-  After Ready, on x86, the helper held as File handles only the WOW64 pair
+  Measured with the QuickJS engine while the helper served engines alone,
+  after Ready, on x86, it held as File handles only the WOW64 pair
   of its working directory (`\Windows` and `\Windows\SysWOW64`, traverse
   access only), the crypto devices `\Device\KsecDD` and `\Device\CNG` of
   the random warm-up, the pipe and the stderr copy, the only inheritable
@@ -1889,16 +2879,36 @@ packs, the fixture and the seams they use need no change for it.
   KnownDll `ws2_32.dll`), so a path that needs a delay-loaded DLL the
   helper had not mapped before the lowering can end it: before the random
   warm-up existed, a widget's `crypto.getRandomValues` ended the helper
-  with `exit 0xC06D007E`. `TelegramWidgetHelper.exe` imports ADVAPI32
-  statically and binds `bcrypt.dll` before the lowering (**The Windows
-  lowering** above). At ordinary Ready and after widget work its modules
-  were its own image and system DLLs only: on x86 ntdll, KERNEL32,
+  with `exit 0xC06D007E`. `TelegramWidgetHelper.exe` binds the delay
+  imports it needs outside the probe before the lowering: `ADVAPI32.dll`
+  and `bcrypt.dll` on x86 and x64, and on ARM64, which imports ADVAPI32
+  statically, `bcrypt.dll` and `bcryptprimitives.dll` (**The Windows
+  lowering** above). At ordinary Ready and after
+  widget work, measured with the QuickJS engine while it served engines
+  alone, its modules were its own image and
+  system DLLs only: on x86 ntdll, KERNEL32,
   KERNELBASE, ADVAPI32, msvcrt, sechost, RPCRT4, bcrypt, userenv,
   ucrtbase, profext and bcryptprimitives beside it, with WOW64's six x64
   modules, and 13 x64 modules on x64; none from outside the system
   directories, no user32, gdi32, win32u, Qt or `WS2_32.dll`, and
   `bcrypt.dll` from the system directory. On x86 the first start of a copy
-  at a new path also mapped `apphelp.dll` from there. The warm-up covers
+  at a new path also mapped `apphelp.dll` from there. With Nova the same
+  13 names were read at Ready on both architectures on 10.0.26300.9711
+  on 2026-11-21
+  (`2026/11/21/choose-the-windows-widget-helpers-sandbox-tier-by-windows-version`,
+  its `evidence/full-tier.md`, E7). Since the non-Store package SID is
+  fixed data (**The Windows lowbox** above) `userenv`, `ucrtbase` and
+  `profext` no longer load: at Ready the repaired x86 and x64 Debug
+  helpers held 11 modules of their own machine, the image, ntdll,
+  KERNEL32, KERNELBASE, apphelp, ADVAPI32, msvcrt, sechost, RPCRT4,
+  bcrypt and bcryptprimitives, the same on 10.0.26300.9711 and on
+  Windows 10 22H2 (10.0.19045.6466), `apphelp.dll` on the first start
+  from a freshly staged path, with no `cryptbase.dll` and nothing else.
+  The x86 helper's x64 WOW64 view was the six modules on 10.0.26300 and
+  ntdll, wow64, wow64win and wow64cpu on 10.0.19045, where neither
+  `wow64base.dll` nor `wow64con.dll` appeared in that view
+  (`2026/11/15/run-the-lpac-windows-widget-helper-on-a-windows-build-before-26300`,
+  its `work/test.md`, Attempt 1 Runs 1 and 3). The warm-up covers
   the paths those runs found, not every load a later path can need.
 - **The Windows Store build.** In the Windows Store build
   (`OS_WIN_STORE`, the special targets `uwp`, `uwp64` and `uwparm`) the
@@ -1906,11 +2916,24 @@ packs, the fixture and the seams they use need no change for it.
   `Telegram/CMakeLists.txt` includes `init_standalone_target.cmake` and
   `telegram_widget_helper.cmake` in every Windows build, so the Store
   build compiles the helper and its client pins the Store helper's own
-  Authenticode digest. `UnsupportedReason()` keeps only the Windows 10
-  1809 floor, so the Store client starts the helper like the other
-  Windows builds, with the same `Launch()`, hold, pin, started-image
-  check, tokens, job and creation policies; the widget helper code of
-  the client and of the helper has no Store branch. `build.bat` signs
+  Authenticode digest. The Store build keeps the eligibility it had
+  before the sandbox tiers: the Store branch that decides it is in
+  `ChooseTier()` of the shared `widget_sandbox_win.cpp`, where
+  `OS_WIN_STORE` maps no Windows before 10 1809 (10.0.17763) to a tier,
+  so its client stops every widget below that with `no sandboxed widget
+  helper is available here: the widget helper needs Windows 10 1809 or
+  later`, the reason of the earlier 1809 floor, although its package
+  declares Windows 10.0.14316 as its minimum. Its package SID comes from
+  a separate Store branch, in `DerivePackage()` (**The Windows lowbox**
+  above). From 1809 on the Store client and helper each map their own
+  version reading to the full tier alone, and the client starts the
+  helper like the other Windows builds, with the same `Launch()`, hold,
+  pin, started-image check, tokens, job and creation policies of that
+  tier (**The Windows sandbox tiers** above). `OS_WIN_STORE` reaches
+  the helper too:
+  `init_standalone_target.cmake` copies `common_options`' definitions,
+  among them the one `cmake/options_win.cmake` adds for
+  `build_winstore`. `build.bat` signs
   `modules\%Platform%\TelegramWidgetHelper.exe` after `StartupTask.exe`
   for every Store target and copies it into the AppX folder's
   `modules\%Platform%\` (which it creates on ARM64, where no `d3d` folder
@@ -2115,7 +3138,10 @@ packs, the fixture and the seams they use need no change for it.
   first shows Landlock and the empty root with the seccomp install made to
   fail, the other two lock down and try `execve` and `socket`, which must
   end them. Then the helper locks itself down for real, reads its own
-  state and descriptors and goes on serving widgets as with `helper`. Its
+  state and descriptors and goes on serving widgets as with `helper`,
+  hosting them, so its `lockdown:`, `after
+  lockdown:` and `layers:` lines are those of the helper that then renders
+  them. Its
   lines, normally six, each one `Widget helper probe: <line>` on its
   stderr (`app_stderr.txt` under `test-run`), start `landlock alone:`,
   `execve:`, `socket:`, `lockdown:`, `after lockdown:` and `layers:`. A
@@ -2126,55 +3152,51 @@ packs, the fixture and the seams they use need no change for it.
   the helper serves its widgets unconfined. A probe helper that serves is
   no helper failure.
 - **Threads.** With the helper the client runs one `widget.client` thread
-  per engine and no `widget.sandbox`; `widget.validator` and the host's
-  `twidget-host` stay, and the channel adds `widget.reader`,
+  per engine and no `widget.sandbox` or `widget.validator`; the host's
+  `twidget-host` stays, and the channel adds `widget.reader`,
   `widget.writer` and `widget.monitor` per helper and a `widget.answer` per
   runtime that asked a synchronous question. On macOS and Linux a client
   whose stderr is a terminal also runs one relay thread per helper, with
   no name of its own (**The shared helper** above). The `widget.sandbox`
-  engines run in the helper. A hosted widget (**Hosted widgets on macOS**
-  above) has no `widget.validator` in the client either: its validator and
-  renderer threads are the helper's, and the client's share of its
-  renderer runs on the one `widget.render` thread, which answers the
-  helper's requests (`widget.answer` waits for each); the helper's Debug
-  probe adds a `widget.probe` thread in its serving variant.
+  engines and each widget's validator and renderer threads run in the
+  helper (**Hosted widgets on macOS, Linux and Windows** above), and the
+  client's share of each renderer runs on the one `widget.render` thread,
+  which answers the helper's requests (`widget.answer` waits for each);
+  the macOS helper's Debug probe adds a `widget.probe` thread in its
+  serving variant.
   Without a helper the client has no `widget.sandbox`
-  and no `widget.reader`, `widget.writer` or `widget.monitor`; each host
-  keeps its `widget.client`, `widget.validator` and `twidget-host` until
-  its death retires it. Windows threads carry none of these names (the
+  and no `widget.reader`, `widget.writer` or `widget.monitor`: where none
+  is available (Windows before 7 SP1, Windows 7 without update KB2533623
+  or the Windows Store build before Windows 10 1809, the Mac App Store
+  build before macOS 12, a Linux architecture other than x86_64 and
+  aarch64, a build without the private Qt API), each widget takes the
+  refusing hosted route, whose `WidgetHost` has no validator (*Failure*
+  under **Hosted widgets on macOS, Linux and Windows** above).
+  Windows threads carry none of these names (the
   framework names its threads only on Apple platforms and Linux): there
-  the `TelegramWidgetHelper.exe` child, the runtime log's `Started, its
-  engine is remote.` note and the main log's `Widget helper <pid>` lines
-  show where the engines run.
+  the `TelegramWidgetHelper.exe` child, the runtime log's start note
+  (`Started, its engine, validator and renderer run in the widget
+  helper.`) and the main log's `Widget helper <pid>` lines show where the
+  engines run.
 - **Seams.** [test_widget_ops](test_widget_ops.md),
   [test_widget_host](test_widget_host.md) and
-  [test_widget_bot](test_widget_bot.md) act in the client in every
-  arrangement: the options override edits the options before the `Job`
-  (they reach the helper inside the engine's configuration or the hosted
-  start), the host watch merges `WidgetHost::diagnostics()` on the client's
-  `twidget-host` thread, and the played bot answers at
+  [test_widget_bot](test_widget_bot.md) act in the client: the options
+  override edits the options before the `Job` (they reach the helper with
+  the hosted start), the host watch merges `WidgetHost::diagnostics()` on
+  the client's `twidget-host` thread, and the played bot answers at
   `Runtime::botRequested()` through the responder the client engine handed
-  the host. The tap wraps the renderer factory in `Runtime::construct()`
-  for a local host (`in-process`, `helper-engines`, Windows and Linux),
-  registering the core's work for the local press seams, whose click counts
-  as the work's forwarding hands it to the host and whose mark
-  `RendererCore::detach()` revokes once it closed the host link
-  ([Local presses](test_widget_ops.md#local-presses)); for
-  a hosted one it is installed on the hosted host by `Build()` and takes
+  the host. The tap is installed on the hosted host by `Build()` and takes
   the validated batches from its `onRenderOps` and, in Debug, the rest
   from the records the helper's tap mirrors
   ([Hosted widgets](test_widget_ops.md#hosted-widgets)). The disposable
-  overlay's work scopes in `RendererWork` time the whole renderer in
-  process and only the client's share of a hosted one
-  ([In the hosted arrangement](test_widget_host.md#in-the-hosted-arrangement)).
+  overlay's work scopes time only the client's share of a widget's
+  renderer ([The helper's share](test_widget_host.md#the-helpers-share)).
   The client's Qt provider of `tgw_intl.cpp` answers the engines' `Intl`
   questions over the channel.
 - **Runtime log and deaths.** The note of a host's start reads `Started,
-  its engine is remote.` with the helper and `Started, its engine does
-  not run.` where no helper is available, instead of the in-process
-  `Started.`, chosen by the client's mode; a hosted widget's note says
-  instead that its engine, validator and renderer run in the widget
-  helper. The summary and its first `Died:` line, which the packs parse,
+  its engine, validator and renderer run in the widget helper.` with the
+  helper and `Started, its engine does not run.` where no helper is
+  available. The summary and its first `Died:` line, which the packs parse,
   are unchanged. A hosted route that the client's own checks closed (a
   refused list or a malformed report) is a stop the desktop decided
   itself, read with `WidgetDesktopStop()`, never a death of the host. Where no helper is
@@ -2182,19 +3204,122 @@ packs, the fixture and the seams they use need no change for it.
   helper is available here: <reason>`, in the summary's `Died:` line and
   the host watch's `dead`: a fatal stop that counts towards the widget's
   crashes in a row like any other, with no `Tgw Error` line and no helper
-  start. A helper that ends under live widgets (killed, crashed or cut
-  off by a stream violation) kills each of them with `the widget engine
-  process ended`, the host watch's `dead`; the helper's own reason is only
-  in the main log's `stream ended` line, `the engine process closed the
-  stream` for a kill. That death is a fatal stop like any other: it counts
-  towards the widget's crashes in a row (two stop it), the card keeps its
-  last picture when it had loaded, is released when it leaves the view and
-  starts again, in a fresh helper, when it is painted visible. A widget
+  start. A helper that ends
+  under live widgets (killed, crashed or cut
+  off by a stream violation) ends each of their hosts with `the widget
+  engine process ended`, the host watch's `dead` and the summary's `Died:`
+  line alike, whatever the stream decided for that widget; the helper's
+  own reason is only in the main log's `stream ended` line, `the engine
+  process closed the stream` for a kill. What counts is each hosted run's
+  own decision, applied once on the main thread (`Runtime::FinishRun()`;
+  *Deaths* above says which decision is the run's):
+  - `Stalled` (*A renderer that stops answering* above) or `Ordinary`: the
+    run is charged (below), whether or not a widget shows its stop. A
+    widget still live on that run's core stops fatally once the core's
+    posted stop reaches it (`Runtime::coreStopped()`), keeping its last
+    picture under the localized pill when it had loaded, with
+    `Stopped (fatal): The widget stopped responding` or, for `Ordinary`,
+    the localized stop label (`Stopped (fatal): Widget stopped`); an
+    attempt discarded before its start that still owns its request stops
+    with the run's reason (`Runtime::stopForRun()`). A run whose message
+    was removed while its stop was held shows no stop and is still
+    charged as below. At
+    an unexpected end that was no timeout (a kill, a crash, a stream
+    violation) the stream decides `Ordinary` for each route taking part
+    that had a message unanswered then and `Spared` for the others, or
+    `Ordinary` for every route taking part when none had one
+    (`Connection::blameLocked()`); the owner's stop decides no route
+    (`Connection::endLocked()` skips that blame). An engine's own death on
+    a live helper reads `Ordinary` too, since no end decided its route.
+  - `Spared`: no charge from that end. Only a run whose final is `Spared`,
+    whose host had started and whose content is still current earns its
+    widget a start of its own (`Runtime::applyFinal()`): a widget still
+    live on that run is released (`Released to restart after its widget
+    helper ended.`, `Runtime::restartSpared()`), and the start then comes
+    with no repaint, scroll or input, in the replacement helper the manager
+    launches and locks down as for any start, the message's crash count
+    unchanged. That start needs what any start needs
+    (`Runtime::wantsStart()`), among them the card on screen, its content
+    current and the message's count below the two-crash cutoff, which the
+    charge of another run of the same message can have reached; and after
+    the third helper failure the manager launches no helper for it
+    (**Failure limit** below).
+  - `Refused`, a refusal Telegram itself made of the widget's own traffic
+    (*A renderer that stops answering* above): charged once with its own
+    reason, also on a route the stream spared; it earns no start.
+  - `None`, a run withdrawn before any end decided it, with no decision
+    recorded (its view unloaded or its message removed first): neither
+    charged nor spared. A decision recorded before the withdrawal, a
+    refusal included, stays the run's (*Deaths* above), and a
+    construction whose engine had claimed its own death before a guard
+    of its start, the two-crash cutoff or a stale or capacity discard of
+    a recovery attempt withdrew it reads `Ordinary`, with the localized
+    stop label and no end of the stream (`Runtime::RunGone()`).
+
+  A run's final survives an unload, a held delivery, the view's or the
+  message's removal and a construction discarded before its host started,
+  and the tap counts it
+  ([test_widget_ops](test_widget_ops.md#hosted-deaths-and-final-charges)).
+  A charge moves the crash count of the message and content serial the
+  run was built for (`Runtime::ChargeRun()`) only while that message's
+  memory lives, its content is still that serial and the count is below
+  the cutoff, and only then, while the run's runtime lives, is it noted,
+  `Counted a crash, N of 2: <reason>`; a run of HTML that an edit replaced
+  since leaves the new content's count alone. A present note proves that
+  an accepted charge moved that count. Its absence rules out no final, and
+  the note names no sampled work and says nothing of the tap's barrier:
+  the tap's finals do. Two charges in a row stop the widget: a later start
+  reads `Stopped: 2 crashes in a row.` and starts no host, while the
+  accounting of runs that already took part goes on. A release or
+  destruction of a healthy live widget (its core has reported content and
+  not stopped, its content is current and the count is below the cutoff)
+  ends the streak, its count back to 0 (`Runtime::breakCrashRun()`),
+  unless withdrawing its route finds its helper's end or a decision
+  already recorded, which keeps the count; a charge its run takes after
+  such a release counts from no less than the count the release ended.
+  While another run of
+  the same message and content is undecided (its construction not
+  returned yet, its core disposed before its final, or its link deciding,
+  `RunsDeciding()`), a start waits (`Runtime::wantsStart()`), keeping the
+  paint that asked for it and writing no note; the scheduler considers it
+  again once that construction returns and is bound to its run, or that
+  run's final is applied. An attempt already underway when such a run is
+  found is discarded (`Runtime::resourcesReady()`, `constructed()`),
+  noting `Released, a run of the same widget is still being decided.`
+  unless its own route had already ended, died or been decided. A helper
+  ended because a renderer stopped answering (*A renderer that stops
+  answering* above) reads `Tgw: Widget helper <pid> stream ended: a hosted
+  renderer left a platform message unanswered for more than 3000 ms.` in
+  the main log, then its `ended` line. For the direct-download helper
+  (`CompleteChild()` and `CompleteWith()` in `widget_reaping_posix.cpp`)
+  that line is `<status>, sent SIGKILL after N ms` when the helper missed
+  the 1 s exit wait and the kill ended it (`signal 9, sent SIGKILL after
+  1002 ms` in the campaign, for a helper stopped with `SIGSTOP`) and its
+  status alone when it exited within that wait (`exit 0` in the
+  campaign). The Mac App Store build's `Complete()`
+  (`widget_helper_store_mac.mm`) cancels the service's connection instead
+  of signaling it, and its `ended` line reads as **The Mac App Store
+  service** above lists; that path was read, not run.
+  The stream decides each live route at that end
+  (`Connection::blameLocked()`): the run of each route it decided
+  `Stalled` (its timed message overdue; one or several) is charged once,
+  and the end spares the others (*A renderer that stops answering*
+  above). The `Stalled` or `Ordinary` case above says which widget, if
+  any, then reads `Stopped (fatal): The widget stopped responding` in its
+  runtime log, under the same localized pill. A
+  widget that had already stopped keeps its own reason and count, since a
+  later stop changes neither (`RendererWork::freeze()`,
+  `Runtime::coreStopped()`). The app measured one overdue widget alone
+  and one beside a live sibling; two overdue routes of one stream both
+  read `Stalled` in the scripted timed cases
+  ([Verification](#verification)). A widget
   whose helper cannot start dies with `the widget helper could not start:
   <error>`, the seam's error such as `posix_spawn failed: <reason>` on
   macOS (`posix_spawn failed: No such file or directory` when the bundle
-  has no `Contents/Helpers/TelegramWidgetHelper`; the client never checks
-  the file before the spawn) or a Windows gate error. On Windows the file
+  of an ad hoc or unsigned client has no
+  `Contents/Helpers/TelegramWidgetHelper`, which such a client never
+  checks before the spawn; a certificate-signed client's static check
+  opens the file first, below) or a Windows gate error. On Windows the file
   is checked through the handle it is started from (**The Windows helper**
   above), so a missing file reads `could not hold
   modules\<arch>\TelegramWidgetHelper.exe: CreateFileW failed: The system
@@ -2206,20 +3331,62 @@ packs, the fixture and the seams they use need no change for it.
   `modules` or `modules\<arch>` or the file), `<function> is not available`
   or `CryptCATAdminCalcHashFromFileHandle2 failed: <reason>` (catalog
   hashing), and `the image check failed: the started image is not the
-  checked file` (the suspended child is not the held file); the main log
-  adds `Tgw Error: The widget helper could not start: <error>.`. The Mac
+  checked file` (the suspended child is not the held file). On the
+  Windows 7 tier (**The Windows 7 tier** above) the pin adds `the widget
+  helper image extent is invalid` (a certificate table that does not
+  start at the generated unsigned end or does not end the file), `the
+  <fs> file system has no reliable file index` (a volume that is not
+  NTFS), `the file index is unavailable` (a zero file index), the failed
+  call of the identity (`GetFileInformationByHandle`,
+  `GetVolumeInformationByHandleW`), of the reads (`GetFileSizeEx`,
+  `SetFilePointerEx`, `ReadFile`, or `ReadFile read <n> of <m> bytes`) or
+  of the hash (`BCrypt<function> failed: status 0x<status>`) in place of
+  the catalog's, and its desktop `BCryptGenRandom failed: status
+  0x<status>` (the name's random part), `CreateDesktopW failed:
+  <reason>` or, for its Low label, `SetSecurityInfo failed: <reason>`
+  (`CreateWellKnownSid`, `InitializeAcl` or `AddMandatoryAce` before
+  it); the AppContainer and Windows 7 tiers add
+  `AssignProcessToJobObject failed: <reason> (<end>, terminated after <n>
+  ms)` (**The Windows sandbox tiers** above), which, when `<end>` is not
+  an exit, is followed by the end lines of the reaping like an ended
+  helper's.
+  The main log adds `Tgw Error: The widget helper could not start:
+  <error>.`. The Mac
   App Store build's errors are listed under **The Mac App Store service**.
-  On macOS outside the Mac App Store build a helper that fails the
-  identity check of **The shared helper**
-  is killed before it runs: the error is `the widget helper failed the
-  signer check: <call> failed: <message> (<status>)`, or the same with
-  `the build identity check`, followed by the cleanup of the suspended
-  child in parentheses, `(signal 9, sent SIGKILL after N ms)`; a failed
-  resume reads `kill failed: <reason>` with the same cleanup. A helper of
-  another signer, an ad hoc one under a certificate-signed client, one
-  with another identifier or another build's reads `SecCodeCheckValidity
-  failed: code failed to satisfy specified code requirement(s) (-67050)`
-  there, and a helper file without read permission
+  On macOS outside the Mac App Store build a certificate-signed client
+  refuses a helper that fails the static slice check of **The shared
+  helper** before any spawn, with no cleanup: `the widget helper failed
+  the signer check: the <arch> slice's entitlements differ from this
+  build's` names the first slice, arm64 before x86_64, whose signed
+  entitlements are not exactly the build's (an added, missing or
+  differently typed key, on the slice the client runs or the other one),
+  and `the widget helper failed the signer check: the <arch> slice:
+  <call> failed: <message> (<status>)` one it cannot open, validate or
+  read: `SecStaticCodeCheckValidity failed: code failed to satisfy
+  specified code requirement(s) (-67050)` for a helper of another
+  signer, an ad hoc one or one with another identifier,
+  `SecStaticCodeCreateWithPathAndAttributes failed: cannot find code
+  object on disk (-67068)` for a missing file, and that call's status
+  100013 (`UNIX[Permission denied]`) for a file without read permission.
+  The same prefix with `the <arch> slice: the CDHash is unreadable` or
+  `the <arch> slice: the entitlements are unreadable` is a slice whose
+  signing information lacks them, and with `there is no arm64 or x86_64
+  slice` a helper with neither; `the widget helper entitlements of this
+  build are unreadable`, without the prefix, is a build whose
+  `kEntitlements` does not parse. A helper that passed that check, and
+  any helper under an ad hoc or unsigned client, can still fail the
+  dynamic check of the suspended child, and is then killed before it
+  runs: the error is `the widget helper failed the signer check: <call>
+  failed: <message> (<status>)`, or the same with `the build identity
+  check`, followed by the cleanup of the suspended child in parentheses,
+  its wait status `(signal 9, sent SIGKILL after N ms)`; a failed resume
+  reads `kill failed: <reason>` with the same cleanup. Under a
+  certificate-signed client a helper replaced after the static reading,
+  such as a same-leaf copy with other entitlements, and under an ad hoc
+  or unsigned client any helper but the build's own, another build's
+  included, read `SecCodeCheckValidity failed: code failed to satisfy
+  specified code requirement(s) (-67050)` there; under such a client a
+  helper file without read permission reads
   `SecCodeCopyGuestWithAttributes failed: UNIX[Permission denied]
   (100013)`. A refusal of the client's own identity comes before any
   spawn, with neither that prefix nor a cleanup, and names the failing
@@ -2282,37 +3449,63 @@ packs, the fixture and the seams they use need no change for it.
   On Windows a start that fails between the creation and the resume, while
   the helper's primary token is checked or the initial token is attached
   and checked, ends the suspended helper through its job first and adds
-  that end's status in parentheses.
+  that end's status in parentheses; a failed job assignment on the
+  AppContainer and Windows 7 tiers ends the helper, which is in no job
+  yet, through its process handle instead.
 - **Failure limit.** A start failure and an unexpected end are helper
   failures; an end after at least 60 s of helper uptime starts a new run at
   one, and a finished idle stop resets the run. The third failure in a row
   stops launches for the rest of the process: later widgets die with `the
-  widget helper failed 3 times in a row`. A `Launch()` that throws counts
+  widget helper failed 3 times in a row`. The end of a helper whose
+  renderer stopped answering (**Hosted widgets on macOS, Linux and
+  Windows** above) is such an unexpected end, one failure like a crash, under the
+  same run, limit and latch. A `Launch()` that throws counts
   as one start failure, `the widget helper could not start: <what()>`. A
   helper that did not exit even
-  when killed stops them the same way, with `the widget helper was not
-  reaped`. Two kills already stop the widgets they killed, so a test of
-  this limit needs fresh widgets. Once a quit has stopped the helper,
-  widgets die with `the widget helper was stopped`. None of these falls
-  back to an in-process engine. The stop of every widget where no helper
+  when killed stops them the same way: `Manager::reap()` logs its pid as
+  not reaped whether or not a reason is latched, and latches `the widget
+  helper was not reaped` only when none is latched yet; when the helper's
+  unexpected end was the third failure in a row, that end has already
+  latched `the widget helper failed 3 times in a row`, which stays. A
+  start failure whose `Launched` still carries a completion
+  (on Windows, a helper the client could not put into its job and whose
+  end its first wait did not confirm) counts as one start failure and is
+  then reaped like an ended helper before any other helper starts
+  (`Manager::launch()` in `tgw_remote.cpp`), so that helper too stops
+  them when its end is never confirmed: `Manager::reap()` logs its pid
+  as not reaped and latches `the widget helper was not reaped` only when
+  no reason is latched yet; when that start was the third failure in a
+  row, its own charge has already latched `the widget helper failed 3
+  times in a row`, which stays. An end charges only the widgets the
+  stream did not spare (**Runtime log and deaths** above), and a spared
+  one that can start
+  again does so in the next helper, so the same widgets can carry this
+  limit: one that hangs every helper it runs in stops at its own second
+  crash, before the third failure, while its spared sibling keeps
+  restarting. Once a quit has stopped the helper,
+  widgets die with `the widget helper was stopped`. None of these runs a
+  widget anywhere else. The stop of every widget where no helper
   is available is no helper failure: no start is attempted, so nothing
   counts towards this limit or stops launches.
 - **Timing.** Queries and probes cross the channel; a hosted widget's
   layout queries do not, they are answered by the renderer in the helper,
   while its renderer's backend requests cross the other way and wait for
-  the client's `widget.render` thread (**Hosted widgets on macOS** above).
+  the client's `widget.render` thread (**Hosted widgets on macOS,
+  Linux and Windows** above).
   `SandboxStats::queries` and `queryMs` are counted by the engine in the
   helper and reach the client with its stats, so each uncached query's
-  time includes both channel hops and the client's answer: compare query
-  times only between runs of the same mode. The host's own bound on a
-  query answer stays in the client, and a theme change's `probe()` is a
+  time includes both channel hops and the client's answer. The host's own
+  bound on a query answer stays in the client, and a theme change's
+  `probe()` is a
   channel probe bounded at 10 s. A widget that starts a helper spawns it
-  synchronously in the channel factory, before the host's creation time
+  synchronously when its build asks for its hosted channel
+  (`Tgw::HostedChannel()`), before the host's creation time
   that `loadedMs` counts from, so its `loadedMs` does not include the
   spawn itself; it can include the helper's own start-up and lockdown
-  before its engine answers. On macOS the spawn includes both identity
-  checks of **The shared helper**, Security calls without a time bound of
-  their own, and on Linux in the `TelegramHelpers` layout the read and
+  before its engine answers. On macOS the spawn includes the identity
+  checks of **The shared helper**, under a certificate-signed client the
+  static reading of each helper slice too, Security calls without a time
+  bound of their own, and on Linux in the `TelegramHelpers` layout the read and
   SHA-256 of the whole helper file; in the Mac App Store build the start
   waits for the service's two replies, at most 15 s together, and takes
   about 10 s when launchd defers it. Inside Flatpak it is a synchronous
@@ -2332,12 +3525,30 @@ packs, the fixture and the seams they use need no change for it.
   by terminating its job, inside Flatpak through the portal, in the Mac
   App Store build by canceling its XPC connection) and waits up to 1 s
   more; an outstanding theme probe can hold the quit for its 10 s
-  before that. Since the stop waits for build jobs, a build that is
-  starting a Mac App Store service holds the quit for that start: at most
-  16 s (`kStartWait` plus the 1 s cleanup) per start, with waiting builds
-  starting one after another up to the failure limit, so about 48 s only
-  for a service that neither answers nor ends and about 12 s for a
-  launchd-deferred start and its stop. Measured Store quits: 0.1-0.2 s
+  before that. The drain closes the manager's launch admission first,
+  before it releases the views (`Runtime::Drain()` calls
+  `RefuseRemoteEngines()`, `Manager::refuse()`): from then on a request
+  for a hosted channel, one waiting for a helper being launched or retired
+  included, gets `the widget helper was stopped` and launches nothing,
+  while a launch already underway finishes. The stop itself reaches the
+  stream only on the manager's reap worker (`Manager::stop()`,
+  `Manager::reap()`), after `Runtime::IsQuitPrevent()`'s drain and once
+  `BusyStoppingEngines()` finds no job left, and the stream keeps its
+  first end
+  (`Connection::endLocked()` in widget-sandbox's `remote_stream.cpp`).
+  So the stream's end reads `the host stopped the stream`, the owner's
+  stop, when that stop is the stream's first end; when the stream ended
+  first for an answer that ran out, the end is the unanswered one of *A
+  renderer that stops answering* above. The time of the quit request
+  alone does not decide which. In the campaign a quit 0.044 s after the
+  admission of a frame request whose helper was stopped (`SIGSTOP`) ended
+  the stream with the owner's stop 0.063 s after that admission, then
+  killed the helper after the 1 s exit wait (`signal 9, sent SIGKILL after
+  1011 ms`), and no helper started after it.
+  Since the stop waits for build jobs, a build that was already
+  starting a Mac App Store service when the drain began holds the quit
+  for that one start; builds waiting for it are refused at the drain.
+  Measured Store quits: 0.1-0.2 s
   with a live service, 1.1 s with a stuck serve thread and 2.1 s with a
   `SIGSTOP`ped service, which launchd ended about 5 s after Telegram
   exited.
@@ -2364,12 +3575,9 @@ packs, the fixture and the seams they use need no change for it.
   client. Inside Flatpak the portal kills the helper's sandbox when the
   client leaves the session bus (`WATCH_BUS`).
 - **Loopback.** The framework's own Debug switch `TW_ENGINE_LOOPBACK=1`
-  gives in-process loopback clients only when no factory is installed, so
-  engines in the helper ignore it, the macOS, Linux and Windows defaults
-  included, and so does a client without a helper, whose default installs
-  a factory that refuses every engine; with `in-process` its engines keep
-  the `Started.` note while running in the client. Leave it unset in both
-  modes.
+  acts only where `twidget::SandboxEngine::make()` builds an engine in the
+  client, and Telegram links no engine on any platform, so the switch has
+  nothing to act on there. Leave it unset.
 
 ## Readings and refusals
 
@@ -2378,10 +3586,12 @@ packs, the fixture and the seams they use need no change for it.
 | `InjectWidgetMessage` | Empty, `not injected: ...` (not registered, history gone or not at its bottom, list not shown, payload does not unpack) with nothing added, or `the injected message got id ..., not the armed ...`. |
 | `CheckWidgetMessage` | Fills `shape`; empty, or `no HtmlWidget view: ...` (not a local outgoing client-id message, not a `Tgw::WidgetMedia` of the bytes, `its media's flags, state or widget id are not the injected ones (the media has ...)` comparing `Tgw::WidgetMedia::fields()` with the record, absent and present-empty bytes and an absent and a zero id told apart, `it comes via bot <id or none>, not the injected <id or none>` comparing `HistoryItem::viaBot()` with `fields.viaBot`, no laid-out card of the list's own). `shape` includes the record's `flags=<copy\|query\|background or none> chat=<bytes or none> public=<bytes or none> widgetId=<id or none>`: sizes, never the state's contents (`chat=0` is present and empty). |
 | `RuntimeLogDecided` / `FinishRuntimeLog` | `log.source`: `requestLog`, `logText` (the runtime kept no callback), `logText-at-bound`, `unavailable`; `log.chars`, `log.pending`. |
-| `log.summary` | The raw `Tgw::Runtime::_summary` (the `Summarize()` text) with `log.summaryState`. |
+| `log.summary` | The raw `Tgw::Runtime::_summary` (the `Summarize()` text) with `log.summaryState` and `log.summaryWork`: the key of the host that summary was sampled from (`Tgw::Runtime::_summaryHost`, the `RendererCore::workId()` of that host's core), read with the text, whether or not the summary has a `Died: ` line; 0 and empty text without a summary. |
 | `RevalidateWidgetCard` | Empty, or what changed: show refused, list gone, no hover, view gone or another, card not ready, core, card or view geometry. |
-| `WidgetDesktopStop` | `RendererCore::stopReason()` verbatim, or empty: `core` 0, no own runtime or no current core, another core (the older still when the watched core stopped before its first delivered picture), a runtime not `Stopped` (a stop whose posted answer has not reached the chat yet; a stop off screen that `release()` already rearmed reads `Released`), a stop that is not fatal, or a fatal `frozen` counted on the tap. Empty is no desktop stop seen, never proof that the widget is alive. |
-| `FixtureBarrierDecided` | True once no tap, the tap finished (`WidgetTapFinished()`: every factory released, every wrapper destroyed), or the bound passed; only a reading after a finished tap is final. True at the bound too, so a caller that needs the hosts gone (one widget alive at a time) checks `WidgetTapFinished(ReadWidgetOps(*message.tap))` after it and stops before another injection when it is false. |
+| `WidgetDesktopStop` | `RendererCore::stopReason()` verbatim, or empty: `core` 0, no own runtime or no current core, another core (the older still when the watched core stopped before its first delivered picture), a runtime not `Stopped` (a stop whose posted answer has not reached the chat yet; a stop off screen that `release()` already rearmed reads `Released`), a stop that is not fatal, or a final ordinary or stalled charge counted on the tap (`fatalFrozen` above 0). Empty is no desktop stop seen, never proof that the widget is alive. |
+| `FixtureBarrierDecided` | The removal wait: true once there is no tap, the tap finished (`WidgetTapFinished()` of [test_widget_ops](test_widget_ops.md#readings-and-refusals): every factory released, every wrapper destroyed and every hosted work selected for the runtime's accounting final), or `kWidgetBarrierBound` (10 s) passed since the removal. It does not say which. A caller tests `message.tap` first, since with no tap there is nothing to read: the conformance runner then counts its reading not final (`readingFinal` needs a tap), and the attack audit judges a default reading, balanced and empty, so that file did not run. With a tap it checks `WidgetTapFinished(ReadWidgetOps(*message.tap))`, a finished reading taken at or past the bound included; only when that is false has the barrier timed out with an incomplete reading, which proves no absence and which the caller reports with `WidgetTapCounts()` and stops before another injection. |
+| `WidgetTapCounts` | The counts `WidgetTapFinished()` compares, for a diagnostic: `factories 1 of 2 released, wrappers 1 of 1 destroyed, hosted works 0 of 1 final`. The packs' aborts and rows and the stress-kit runner's barrier write it. |
+| `WidgetLogSummaryOwn` | Whether `log`'s summary is the one of the host the request was made for (`Fresh` or `Final`, below): the only summary whose `Died: ` line and `summaryWork` may describe that host, so the only one a reader takes a cause from. |
 | `ReadFixtureColumns` | The columns, or `error` `the primary window has no session controller, body or content` with only `threshold` set. `FixtureColumnsText()` is `layout: <error>`, or `columns=<name> body= threshold= bodyWidget= filters= content= chat= chatShown= dialogsShown= minimumWidth=` with each value. |
 | `MoveFixtureWindow` | `target.error`: the columns' error, or `the one-column frame <frame> does not fit in the screen's available area <inner> inside its margin`, and nothing moved; `moved` is false as well for a window already at the target. |
 | `FixtureWindowSettled` | True once placed and unchanged for 1 s, or at `kWidgetPlaceBound`; never a verdict: only the caller's gate after it judges the placement. |
@@ -2397,11 +3607,17 @@ summary:
   that was not final;
 - `Absent`: no summary, or no runtime.
 
-Only `Fresh` and `Final` describe the host the request was made for; a
-consumer that reads anything from the summary refuses the other two by name,
-as the conformance runner's
+Only `Fresh` and `Final` describe the host the request was made for
+(`WidgetLogSummaryOwn()`). The conformance runner's
 [bridge reader](test_widget_conformance.md#bridge-calls-and-uncaught-errors)
-does.
+refuses the other two by name. An `Absent` summary has no text and work 0.
+A `Stale` one may hold an older host's `Died: ` line and work: both packs'
+hosted death readings keep that line and `summaryWork` in their rows as
+diagnostics and take no cause from either, so a charge then reads
+`charged, reason unmeasured`
+([test_widget_ops](test_widget_ops.md#hosted-deaths-and-final-charges)),
+refused by name only for a conformance entry with `stops`
+([test_widget_conformance](test_widget_conformance.md#readings-and-refusals)).
 The summary and the log are bounded by the product (`kMaxLogLine`,
 `kLogBytes`, the tail limits of `Summarize()`), so neither proves an absence.
 
@@ -2445,12 +3661,22 @@ the move, after its renames (the conformance task's evidence records the
 command and its output). The attack audit's own self-check
 stage, its three verdict controls and three accepted regression files
 (`activation-animation-events.html`, `api-fetch.html`,
-`fallback-at-boot.html`) are planned for the conformance task's packed
-campaign, which records its results in that task's `work/test.md`; until it
-runs, the fixture after the move has no executed app evidence. The summary
-reading and the text injection are the conformance runner's
-([test_widget_conformance](test_widget_conformance.md)), and they too run
-in the app first in that campaign. The media-field parameter
+`fallback-at-boot.html`) ran on the shared fixture in the first launch of
+the macOS arm64 Debug campaign of
+`2026/10/24/run-the-widget-conformance-sets-through-the-chat-list-and-report`
+(its `work/test.md`, Attempt 1, Run 2, Tests 1, 2 and 7). The self-checks
+passed, all three files' rows matched the audit's accepted launch, and
+the 66 attack stage and Check names matched in order. The only N/A was
+the `not-live` click show for `fallback-at-boot.html`.
+The conformance runner ([test_widget_conformance](test_widget_conformance.md))
+also exercised the fixture's summary reading and text injection in
+that campaign. The merged run file had `observed.bridge` for all 120
+runs, with 16 calls total and no `host` judgement for a refused bridge
+reading (Run 3, Test 3). The runner injected four text fillers for
+`auto/20-client-behaviour` in the light launch (Run 2, Test 4), before
+the media-field campaign of
+`2026/10/26/move-widgets-to-widget-sandbox-v0-2-2-and-give-them-their-state-and-message-context`.
+The media-field parameter
 (`WidgetMessageFields`) ran in the macOS arm64 Debug client in the evidence
 campaign of the task named above (its `work/test.md`, Runs 1-3): the
 attack audit's 105 default calls each read back `flags=none chat=none
@@ -2479,21 +3705,35 @@ compiled in the Windows Win32 Debug build of
 `2026/10/31/let-widgets-pay-and-sign-data-through-gram-wallet-for-their-bot`,
 which adds it for local via-bot widget messages; no existing caller sets
 it, and it has not run in the app.
-`WidgetDesktopStop()` compiled, with its two consumers, in the Windows
-Win32 Debug build of
-`2026/10/31/stop-a-widget-on-its-last-picture-when-the-paint-bounds-refuse-its-frames`;
-it has not run in the app yet: that task's evidence campaign runs it
-through both runners.
+`WidgetDesktopStop()` ran through both runners in the Windows Win32 Debug
+client at DPR 2 in the evidence campaign of
+`2026/10/31/stop-a-widget-on-its-last-picture-when-the-paint-bounds-refuse-its-frames`
+(its `work/test.md`, Attempt 1). In the stress-kit runner (Runs 1 to 3,
+Tests 2, 5 and 8), the stopped entries recorded their own
+`Paint limit exceeded:` reasons in `dead`, naming filter or path work.
+In the conformance smoke (Run 8, Test 21), the paint-stop entry's `dead`
+carried the desktop's filter-work reason and the host counted-cap
+entry kept its own `Text limit exceeded:` reason.
 The [one-column window](#one-column-window) (its reading, target, move and
 settle, moved from the stress-kit runner, and
-`AppendWidgetFixtureOneColumn()`) has not run in the app yet. Before the
+`AppendWidgetFixtureOneColumn()`) ran in the Windows Win32 Debug client
+in the evidence campaign of
+`2026/10/31/put-the-conformance-runners-window-in-the-one-column-layout`
+(its `work/test.md`, Attempt 1, and `evidence/index.md`). In Runs 1 and
+5 the conformance runner put the window in one column before its first
+injection, from a normal window at the two-column threshold and an
+inactive maximized window, respectively. Both cores in each smoke measured
+390 CSS px without a runner refusal. The maximized window stayed inactive
+through teardown and ended normal. The stress-kit smoke confirmed
+placement on the screen with the highest refresh rate, in one column
+and on top (Run 3). Before the
 move the same reading, target and settle ran inside the stress-kit
 runner's Windows passes ([test_widget_stress](test_widget_stress.md#verification)).
-The evidence campaign of
-`2026/10/31/put-the-conformance-runners-window-in-the-one-column-layout`
-runs a conformance smoke from a normal window narrowed to the first
-two-column width, one from an inactive maximized window and a stress-kit
-smoke, and records what ran in that task's evidence.
+
+The runs below that name `in-process` or `helper-engines`, or a helper
+that served engines alone, predate
+`2026/11/14/build-release-telegram-without-the-in-process-widget-renderer`,
+which removed both values and every way to run widget code in Telegram.
 
 The [remote engines](#remote-engines) first ran in the same-binary macOS
 helper, the client's own `Contents/MacOS/Telegram -widgethelper 3` that
@@ -3003,9 +4243,10 @@ read 1 in an x64 process and 0 in a WOW64 one and no system or
 image-name mitigation override existed, in the evidence campaign of
 `2026/11/15/move-the-windows-widget-helper-into-a-qt-free-executable-and-run-it-on-x64`;
 its `work/test.md` (Attempt 1, Runs 1-4) is the record, and its
-`work/test-overlay.patch` keeps the disposable scenario. It ran in the
-Win32 Debug build (x86 on WOW64) and in an x64 Debug build of the same
-commit, and no reading is carried from one architecture to the other.
+`work/test-overlay.patch` keeps the disposable scenario. It ran, with the
+QuickJS engine, in the Win32 Debug build (x86 on WOW64) and in an x64
+Debug build of the same commit, and no reading is carried from one
+architecture to the other.
 The probe's lines are on
 [test_widget_helper_probe](test_widget_helper_probe.md#verification).
 
@@ -3015,8 +4256,9 @@ committed images (Run 1). Both were built before Telegram, each into its
 build's `modules\x86` or `modules\x64` folder, without a precompiled
 header or a Qt input, as Windows GUI images entered through
 `mainCRTStartup` with `/DEPENDENTLOADFLAG:0x800`, Dynamic base and NX,
-and on x64 High Entropy VA but no CET-compatible flag; each imported
-only ADVAPI32 and KERNEL32 and delay-loaded `bcrypt.dll` and the Debug
+and on x64 High Entropy VA but no CET-compatible flag; each of these
+QuickJS-era images imported only ADVAPI32 and KERNEL32 and delay-loaded
+`bcrypt.dll` and the Debug
 `WS2_32.dll`, whose 19 functions only the probe's object referenced. A
 product launch read every
 creation policy back from the suspended child before its resume (x86 DEP
@@ -3213,25 +4455,25 @@ and `twidget::SandboxEngine::make`, on a short-lived `std::thread` and on
   `execve` of the helper's file with argv `[<path>, 3]` and none carrying
   `-widgethelper`.
 - A package-managed tree (the same image, no special target, the prefix
-  `/usr`) compiled `../libexec/telegram-desktop/TelegramWidgetHelper`.
+  `/usr`) compiled `../libexec/TelegramDesktop/TelegramWidgetHelper`.
   `cmake --install --prefix <prefix>` put Telegram into `<prefix>/bin` and
-  the helper into `<prefix>/libexec/telegram-desktop`, and that Telegram
+  the helper into `<prefix>/libexec/TelegramDesktop`, and that Telegram
   started the installed helper (Run 4). A `DESTDIR` install with the prefix
   `/usr` and the binary renamed `telegram-desktop`, the Snap's shape,
-  started `usr/libexec/telegram-desktop/TelegramWidgetHelper` the same way.
+  started `usr/libexec/TelegramDesktop/TelegramWidgetHelper` the same way.
   With the installed helper removed, three starts failed with `execve
   failed: No such file or directory`, the fourth engine died with `the
   widget helper failed 3 times in a row`, and nothing ran in process. A
   configure with the absolute libexec directory `/usr/lib/x86_64-linux-gnu`
   (configured, not built) compiled
-  `../lib/x86_64-linux-gnu/telegram-desktop/TelegramWidgetHelper`, and its
+  `../lib/x86_64-linux-gnu/TelegramDesktop/TelegramWidgetHelper`, and its
   install script installs to that absolute directory. The official
   configuration compiles `TelegramHelpers/TelegramWidgetHelper`, and its
   install script installs to `bin/TelegramHelpers`.
 - Inside Flatpak 1.14.6 (an `/app` install of that tree in a privileged
   container, `org.freedesktop.Platform//24.08`, Run 4) the client called
   the portal's `Spawn` once per start with the working directory `/`, the
-  argv `/app/libexec/telegram-desktop/TelegramWidgetHelper 3`, descriptors
+  argv `/app/libexec/TelegramDesktop/TelegramWidgetHelper 3`, descriptors
   0 to 3, an empty `envs` and flags 28; the helper descended from the
   portal, not the client, with `Seccomp: 2`, `NoNewPrivs: 1`, no
   capabilities, user, PID, network and mount namespaces other than the
@@ -3261,7 +4503,7 @@ and `twidget::SandboxEngine::make`, on a short-lived `std::thread` and on
   (its `work/test.md`, Attempt 1, Runs 3-4), in an Ubuntu 24.04 VM
   (kernel 6.8): snapcraft 9.2.1 built the recipe with and without that
   task's change in destructive mode. With the change the `.snap`'s
-  `usr/libexec/telegram-desktop/TelegramWidgetHelper` had the NEEDED
+  `usr/libexec/TelegramDesktop/TelegramWidgetHelper` had the NEEDED
   `libstdc++.so.6`, `libm.so.6`, `libgcc_s.so.1`, `libc.so.6` and
   `ld-linux-x86-64.so.2`; without it `libdav1d.so.7` came first, before
   the same five. `usr/bin/telegram-desktop` had the same 80 NEEDED
@@ -3273,7 +4515,7 @@ and `twidget::SandboxEngine::make`, on a short-lived `std::thread` and on
   `.snap` tree in which only `usr/bin/telegram-desktop` was replaced, and
   with the `LD_LIBRARY_PATH` that the Snap's launch composes from snapd,
   `meta/snap.yaml`, `mesa-2404` and `gnome-46-2404`. It started that
-  tree's `usr/libexec/telegram-desktop/TelegramWidgetHelper`
+  tree's `usr/libexec/TelegramDesktop/TelegramWidgetHelper`
   (`/proc/<pid>/exe` that file, the path its lookup computes from the
   tree's `usr/bin/`), whose maps held its own file, glibc's objects, libm
   and the C++ runtime and nothing of `libdav1d`, while the client's held
@@ -3320,7 +4562,7 @@ put the helper with the pinned digest into its update and its portable
 archive. A Snap that snapcraft built from the base commit in an Ubuntu
 24.04 VM like the one above (the Snap builds no Updater and reads none
 of the other changed files) shipped
-`usr/libexec/telegram-desktop/TelegramWidgetHelper` `-rwxr-xr-x`,
+`usr/libexec/TelegramDesktop/TelegramWidgetHelper` `-rwxr-xr-x`,
 byte-equal to its build tree's, with its symbol table and without the
 `.gnu_debugdata` that `usr/bin/telegram-desktop` had. A Release client
 with the test harness, unconfined in a copy of that unpacked tree with
@@ -3359,7 +4601,7 @@ starts without namespaces: clone failed: Permission denied.`, after
 AppArmor had denied its namespaced `clone` (`userns_create`). Read as
 root, the helper with the plain recipe's bytes, which ran without the
 probe, had `/proc/<pid>/exe`
-`$SNAP/usr/libexec/telegram-desktop/TelegramWidgetHelper` with that
+`$SNAP/usr/libexec/TelegramDesktop/TelegramWidgetHelper` with that
 file's device and inode, the client's label, the client as its parent
 and the `cmdline` `<path>`, `3`. It shared the client's user, PID,
 network and mount namespaces, its `uid_map` the initial namespace's, and
@@ -3487,8 +4729,9 @@ ZIP and the update package carried byte-identical signed copies and no
 `.pdb`; `widget_helper_identity.py` over the signed helper reproduced the
 build's pin, so signing kept it, and a Telegram of another build refused
 that helper with `the widget helper digest does not match this build`.
-The Release helper imported only ADVAPI32 and KERNEL32 and delay-loaded
-only `bcrypt.dll`. The x86 and x64 setups installed it and their
+The Release helper, built with the QuickJS engine, imported only ADVAPI32
+and KERNEL32 and delay-loaded only `bcrypt.dll`. The x86 and x64 setups
+installed it and their
 uninstallers removed it, and `-cleanup` deleted every helper copy from
 the `x86`, `x64` and `arm64` folders, idle and while its client served
 live widgets. x86 copies were updated through a loopback update server,
@@ -3589,6 +4832,56 @@ system's, the startup-task and protocol-activation starts, and, in the
 Store build, `probe-unsandboxed`, `connect-control` and targets other
 than the loopback ones.
 
+The [Windows sandbox tiers](#remote-engines) (**The Windows sandbox
+tiers** and **The Windows 7 tier** above) were added by
+`2026/11/21/choose-the-windows-widget-helpers-sandbox-tier-by-windows-version`,
+whose `work/plan.md` records the tier table, and whose `work/context.md`
+(section 3) and `evidence/call-ledger.md` give the documented floor and
+source of every policy, attribute and function a tier uses
+(`evidence/record.md` joins them per tier). Its evidence campaign (its
+`work/test.md`, Runs 1-9, and `evidence/`) forced each tier on Windows 11
+build 26300 (10.0.26300.9711), on x86 and x64, through Telegram with a
+disposable overlay or through that task's tier driver, which mirrors
+Telegram's launch, overriding only the version reading of the launching
+process and of the helper, and repeated the unforced full tier's
+readings on the final images of its first attempt, whose lowbox and full
+paths its second attempt left unchanged. Those are the first readings
+of the tiers below the full one. They read:
+
+- both processes chose the table's tier on both sides of every threshold
+  and inner floor;
+- every tier reached Ready under its token, job and policies, and the
+  Windows 7 helper ran on its own Low-labelled desktop, read from
+  outside;
+- the Windows 7 helper's exposure matched **What it leaves** under **The
+  Windows 7 tier** above: every socket, loopback target and AFD endpoint
+  open on both families
+  ([test_widget_helper_probe](test_widget_helper_probe.md#verification));
+  its own desktop and `WinSta0` as its only USER handles, and `user32`,
+  `win32u`, `GDI32`, `gdi32full`, `msvcp_win` and `IMM32` as the modules
+  its USER connection added, with no `cryptbase.dll` (the identical
+  connection in an ordinary process loaded seven modules: those six and
+  `ucrtbase.dll`, already among the helper's core modules); and DEP
+  (`0x3`, permanent) as the one mitigation policy the x86 helper reads
+  back, while the x64 launch passes no creation word (the outside
+  reading of its shadow stack, `0x105`, is the `/CETCOMPAT` image on
+  that CET host, not a tier setting);
+- every fail-closed case refused before Ready with its own text against
+  a same-session positive, and a Windows 7 desktop left unlabelled made
+  the helper refuse with `the widget helper is not sandboxed:
+  LoadLibraryExW failed: error 1114`;
+- a one-byte change of the helper was refused on the Windows 7 and full
+  tiers;
+- the 211 hosted cards on Nova equalled each architecture's reference at
+  matched readings on all four tiers.
+
+Every forced reading is a simulation on Windows 11, and a real Windows
+7, 8, 8.1 or Windows 10 before 1809 is field coverage that no record
+here claims. The paragraphs above that name Windows 10 1809 as the
+helper's floor describe the
+campaigns of their own tasks, run before the tiers; only the Store build
+keeps that floor now (**The Windows Store build** above).
+
 The settle in `RemoveFixtureMessage()` compiled in the macOS arm64 Debug
 build of
 `2026/11/16/decide-a-right-click-released-before-the-widgets-answer`; its
@@ -3597,8 +4890,8 @@ the control, and a removal without the settle as the negative) is planned
 as that task's campaign check H2, which records its result in that task's
 `work/test.md`.
 
-**Hosted widgets on macOS** above, the `helper-engines` value and the
-hosted readings of the seams describe the arrangement of
+**Hosted widgets on macOS, Linux and Windows** above and the hosted
+readings of the seams describe the arrangement of
 `2026/11/14/run-widget-validators-and-renderers-in-the-macos-helper`,
 compiled in the macOS Debug build; their first runs, with every pack in
 the default arrangement against `in-process` and `helper-engines`, are
@@ -3636,6 +4929,108 @@ large-tile fallback) failed with an older neighbouring glyph that still
 paints and the cache unchanged. The kept readings above, the helper's
 cursor and canvas font rules, the click reports and the report post have
 no app reading yet.
+
+On Linux the same arrangement was turned on by
+`2026/11/14/run-widget-validators-and-renderers-in-the-linux-helper`,
+compiled in the Linux Debug builds of both layouts; that task's records
+hold its runs. Those builds predate the Nova engine, which was then
+linked into the Linux helper alone; the
+Linux source selects the same hosting, manager and answer classifier
+(*A renderer that stops answering* above).
+
+The end of a helper whose renderer stops answering (*A renderer that
+stops answering* under **Hosted widgets on macOS, Linux and Windows**, with its
+runtime log,
+failure and quit readings) ran in the macOS arm64 direct-download Debug
+client and its embedded Debug helper in the evidence campaign of
+`2026/11/20/kill-the-widget-helper-when-a-renderer-leaves-a-request-unanswered`
+(its `work/test.md`, Attempt 1, which holds the timelines), over three
+runs, each a client rebuilt with that run's disposable evidence overlay.
+Attempt 1 exercised that task's pre-rebase macOS build, from before the
+Nova engine; no Linux build ran it.
+The overlay's Debug helper tap made each stall real: a `SIGSTOP` of the
+helper at the ingress of a card's frame request, a withheld frame or a
+frame of another sequence. In Run 1, for a visible card whose helper
+stopped at its frame request, the stream's end was decided 3.0 s after
+the request's admission while the window scrolled and painted, the exact
+child was killed after the 1 s exit wait and gone within 5 s of that
+admission, and the card kept its last picture under the stop pill with
+`Stopped (fatal): The widget stopped responding` and `Crashes in a row:
+1 of 2.`; and a quit 0.044 s after such a request's admission ended the
+stream with the owner's stop 0.063 s after that admission, then that
+child, with no later start. In Run 3, with the frame of one of two live
+cards withheld, that card read the same, the other the localized stop
+label and `1 of 2` from 0, and the helper exited on its own. In Runs 1
+and 3, a frame of another sequence that Telegram refused before its
+deadline, and a counted stop of a fixture-owned hosted client, each ended
+that widget alone, with its own reason, while the other card went on
+answering on the same helper past that deadline. In Run 2, with the
+refusal held on `widget.render` until the stream's end came first, the
+refused card read the stopped-responding reason, and with that branch of
+`RendererWork::refuseRoute()` reverted its own refusal instead. In each
+of the three runs an idle chat with a running card, the cards placed off
+screen with nothing timed admitted there and a static card with no frame
+request admitted each kept the same helper for 10.5 s, and a matching
+frame held 3.6 s behind render work on `widget.render` ended nothing; no
+run's log had `failed 3 times` or `was not reaped`. In the Run 2 client
+the production classifier's timed cases over the framework's scripted
+engine end passed, among them a 3.6 s wait on the host's side for a
+renderer request's answer that ended nothing and two overdue routes of
+one stream both decided `Stalled`. Not run: the Mac App Store service's
+path (read in `widget_helper_store_mac.mm`) and a stall by a widget's own
+content. Those runs predate the per-run accounting of **Runtime log and
+deaths**: the live sibling Run 3 read stopped at `1 of 2` is now decided
+`Spared` and gets no charge from that end.
+
+The per-run accounting of **Runtime log and deaths** (stalled, ordinary,
+spared, refused and withdrawn runs, the spared restart, the held route and
+the start gate) and the removal barrier through every hosted final came
+with
+`2026/11/20/count-a-widget-helpers-death-only-against-widgets-with-work-in-flight`.
+Its evidence campaign (its `work/test.md`, Attempt 1, which holds the
+measurements) ran them in the macOS arm64 direct-download Debug client and
+its embedded Debug helper, each launch built with that campaign's
+disposable evidence overlay: Debug helper tap verbs that withhold a frame
+request or replace an answer, an external `SIGKILL` of the verified direct
+child, and bounded gates that only delay a delivery, a construction or a
+render creation. It observed:
+
+- a stall charging only its own widget, while the spared sibling started
+  again uncharged, with no paint, on a new helper verified as a sandboxed
+  direct child; the stalled widget stopping at `2 of 2` after its second
+  stall; and a third helper failure latching the manager;
+- an external kill charging only the route with a request open, and
+  both routes when neither had one;
+- a credited answer held across a sibling's timeout settling `Spared`, the
+  count unchanged, when the surviving core painted it, and charged
+  `refused/spared` when that core refused it; one paint given while that
+  run was undecided started its widget once after the `Spared` final, and
+  none after the refusal's second crash; a removal before such a refusal
+  finalized the run `Spared`, and the answer released afterwards charged
+  nothing;
+- an engine's own death charged once, whether its message was removed
+  while its stop was held or not, and nothing when withdrawn before its
+  admission;
+- healthy, hidden, static and kept cards and a credited answer held behind
+  render work keeping their helper and their count, and an ordinary quit
+  leaving no helper;
+- both packs' removal barriers closing with every hosted work final
+  ([test_widget_attacks](test_widget_attacks.md#verification),
+  [test_widget_conformance](test_widget_conformance.md#verification)).
+
+A render creation skipped because its link was already gone
+(`RendererCore`'s constructor tests `HostLink::gone()` before
+`RendererWork::Create`) leaves no renderer platform to send that work a
+timed request, and the open buffered for its route expects no answer, so
+that route is never `Stalled` by its own request; a decision already
+recorded for its run survives the skip. Not run: a Release build with the
+harness, the Mac App Store service and the other platforms.
+
+On Windows it was turned on by
+`2026/11/14/run-widget-validators-and-renderers-in-the-windows-helper`,
+whose first Windows builds and runs used the QuickJS engine, before the
+Nova change, and which then linked Nova into the Windows helper alone;
+that task's records hold its runs.
 
 ## Related guidance
 

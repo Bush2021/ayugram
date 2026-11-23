@@ -47,8 +47,11 @@ bool Launcher::launchUpdater(UpdaterLaunch action) {
 		const auto updaterDisabled = Core::UpdaterDisabled();
 #endif
 		if (updaterDisabled) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 			NSDictionary *conf = [NSDictionary dictionaryWithObject:[NSArray array] forKey:NSWorkspaceLaunchConfigurationArguments];
 			[[NSWorkspace sharedWorkspace] launchApplicationAtURL:[NSURL fileURLWithPath:Q2NSString(cExeDir() + cExeName())] options:NSWorkspaceLaunchAsync | NSWorkspaceLaunchNewInstance configuration:conf error:0];
+#pragma clang diagnostic pop
 			return true;
 		}
 	}

@@ -17,12 +17,12 @@ Internal to it, documented below:
 [test_widget_conformance_hosts.h](../../test_widget_conformance_hosts.h)
 ([the content safe area](#readings-and-refusals) and the host reading
 control of [verification](#verification)),
-[test_widget_conformance_paint_policy.h](../../test_widget_conformance_paint_policy.h)
-(the paint-policy fixture's read for [verification](#verification)),
 [test_widget_conformance_pictures.h](../../test_widget_conformance_pictures.h)
-([pictures](#pictures)) and
+([pictures](#pictures)),
 [test_widget_conformance_stop.h](../../test_widget_conformance_stop.h)
-([desktop stops](#preconditions-and-limits)).
+([desktop stops](#preconditions-and-limits)) and
+[test_widget_conformance_death.h](../../test_widget_conformance_death.h)
+([a run's death](#preconditions-and-limits)).
 
 ## Use when
 
@@ -124,11 +124,7 @@ Use something else when:
   `manifest.json`, `probe-fixture.json` and each selected entry's HTML, and
   nothing else; `refs/`, `catalogue.json`, `run.schema.json` and `tools/`
   are the report's. A missing or invalid manifest or probe fixture refuses
-  every run by name before anything is injected. The first stage reads one
-  more file of the same pin, outside the package: its sibling
-  `../core/tests/fixtures/paint-policy.json`, for the paint-policy rows of
-  [verification](#verification); a missing or unreadable one fails one
-  Check of that stage and refuses no run. A selected entry that is
+  every run by name before anything is injected. A selected entry that is
   malformed (no id, set, file or light/dark themes, `widths` without 390,
   actions that are not objects, a host check that is not an object with an
   id, a stage without a name, themes or a rect in whole CSS px, a `message`
@@ -190,9 +186,8 @@ Use something else when:
   must be 390 within 0.01 CSS px, or the run carries `width-mismatch` (the
   anchor was not honoured, or the chat column is too narrow); the light runs
   go in the app's day palette and the dark ones in its night palette, and a
-  renderer scheme other than the run's theme is `scheme-mismatch`. A hosted
   run is judged by the widget's own effective reading at its newest applied
-  theme instead, with the predicate the stress runner shares
+  theme, with the predicate the stress runner shares
   (`CheckWidgetTheme()`, [test_widget_ops](test_widget_ops.md#the-effective-theme)):
   another applied scheme or a reading that differs from the applied theme,
   a wrong palette key with the right scheme included, is `scheme-mismatch`;
@@ -216,29 +211,66 @@ Use something else when:
   (twelve at `v0.6.0`: `auto/31`-`auto/35` and `auto/38`-`auto/44`) waits
   for its widget's death instead, as `CLIENTS.md`'s step 4 asks: no status
   ends its wait, so a widget its host never stops publishes `done` and the
-  wait runs to the 20 s bound, and only a fatal `frozen`, a stopped or
-  failed runtime or the message gone end it sooner.
-  Its `dead` keeps its usual sources: the `Died: ` reason of the host's
-  fresh or final summary (`WidgetDiagnostics::dead` verbatim, cut at 240
-  characters), and only when the summary gives no reason but `terminated`,
-  the desktop's own stop ([desktop stops](#preconditions-and-limits));
-  never the localized stopped label. Whether it starts with the entry's
-  `stops` is `report.mjs`'s judgement alone.
+  wait runs to the 20 s bound, and only a charged death
+  (`WidgetTapCharged()`: a hosted work's final ordinary, stalled or
+  desktop charge), a stopped or failed runtime or the message gone end it
+  sooner. A raw death a host reports ends no wait. Its `dead` is read as
+  **A run's death** below, never the localized stopped label. Whether it
+  starts with the entry's `stops` is `report.mjs`'s judgement alone.
 - **Desktop stops.** A stop the desktop decided itself, such as a paint
-  bound's refusal of the widget's frames, reaches no host death: the
-  summary has no `Died: ` line or, once the retired host is gone,
-  `Died: terminated` ([test_widget_host](test_widget_host.md)). In every
-  run whose summary gives no other `Died: ` reason, `RecordLog()` reads it
-  once, in the log stage, with `ReadDesktopStop()` of
+  bound's refusal of the widget's frames, is no host death: the summary
+  has no `Died: ` line, `Died: terminated` once the retired host is gone,
+  or another death of that host, such as `Died: the widget engine process
+  ended` when the desktop refused the traffic of a route its helper's end
+  had spared ([test_widget_host](test_widget_host.md)). `RecordLog()`
+  reads it once in every run, in the log stage, with `ReadDesktopStop()` of
   `test_widget_conformance_stop.{h,cpp}`: the fixture's
   `WidgetDesktopStop()` for the core of the run's host watch, and only
   when that watch has exactly one attachment
-  ([test_widget_fixture](test_widget_fixture.md)). It reads it
-  whatever the result waits saw, so a stop after the last wait counts too.
-  A reason sets the run's death, and `dead` is `RendererCore`'s stop reason
-  cut as `Clip()` cuts the summary's (240 characters, its "..." included).
-  The runner keeps no field for it beyond `dead`; a host's own reason
-  always comes first.
+  ([test_widget_fixture](test_widget_fixture.md)), cut by
+  `Tgw::ClipLogLine()` as a summary's dead is (240 characters, its "..."
+  included). It reads it whatever the result waits saw, so a stop after
+  the last wait counts too, and keeps it in the run's `desktopStop`. It is
+  never a death's reason (below): a hosted widget's refusal is a charge of
+  its work instead, and a stop read apart only names itself in a
+  `stop-reason-unmeasured` detail.
+- **A run's death.** `ReadDeath()`, `ReconcileDeath()` and their texts are
+  `test_widget_conformance_death.{h,cpp}`. The log stage keeps, apart
+  from any measured reason, the summary's raw `Died: ` line
+  (`deathLine`), the work that summary was sampled from (`summaryWork`,
+  whatever its state) and `summaryOwn` for a `Fresh` or `Final` summary
+  (`WidgetLogSummaryOwn()`).
+  - Hosted, when the run's tap selected hosted works (`WidgetTapHosted()`):
+    `deathLine` is kept verbatim whatever the summary's state and never
+    makes a death by itself, since every host of an ended helper prints
+    `Died: the widget engine process ended`. The shared
+    reading `ReadHostedDeath()`
+    ([test_widget_ops](test_widget_ops.md#hosted-deaths-and-final-charges)),
+    given that work and line only for an own summary, decides `died`
+    alone: the run is dead when any of its selected works was charged. Its
+    `dead` is the cause measured from the sampled work's own final charged
+    record, else `charged, reason unmeasured` (`deathMeasured` false); a
+    desktop stop gives it nothing.
+    `FinalizeRun()` reads the death again from the run's last reading
+    after the removal (`ReconcileDeath()`), final or not, also for a run
+    whose log stage a fixture refusal skipped, the log stage's reading
+    standing for a record evicted since: a charge that came after a
+    healthy sample makes the run dead. That verdict is final only with
+    that reading final (`readingFinal`, `WidgetTapFinished()`). Otherwise
+    the run is incomplete, and the `dead` of its `CONFORMANCE_RUN` row, null
+    while nothing was charged, proves no survival.
+  - With no hosted selection, when the run's tap selected no hosted work:
+    `ReadDeath()` judges nothing, and `deathLine` takes an own summary's
+    line alone. No host was sampled for such a run, so its summary is
+    `Absent` (work 0, `summaryOwn` false) and `deathLine` is empty; its
+    host watch has no attachment, so `desktopStop` is empty too. Nothing
+    charged it, and `died`, `dead` and `deathMeasured` stay as its result
+    waits read them: alive and unmeasured. The final barrier leaves the
+    run as its earlier stages read it while its reading still has no
+    selection (`ReconcileDeath()`); a selection made since is read as
+    hosted above. A run whose log stage was skipped keeps these fields'
+    defaults (work 0, not own, `deathLine` and `desktopStop` empty) and
+    is incomplete.
 - **2x.** The stage crops and the picture bands need the device pixel ratio
   times the interface scale to be 200 % (a Retina display at 100 %, say), and
   the accepted image of each snapshot and band must be exactly twice its CSS
@@ -332,13 +364,22 @@ Every stage name, Check and Note of the pack starts `widget conformance: `,
 after `palette switch: ` or `palette restore: ` in the palette helpers'
 stages; the show helper's stages are `show in chat list: widget conformance
 <key> <what>`; the first stage takes the rows of the tap's, the played
-bot's, the probe fixture's and the paint-policy fixture's checks under their
-own names, such as `widget ops self-check: ` and `paint policy fixture: `
-([verification](#verification)). A run's key is `<id>|<theme>|390`. In
+bot's and the probe fixture's checks under their own names, such as
+`widget ops self-check: ` ([verification](#verification)). A run's key is
+`<id>|<theme>|390`. In
 order:
 
-- `tap, result reader, summary reader and run file self-check`, `report the
-  package, the selection and the output`;
+- `tap, result reader, summary reader and run file self-check`, which
+  Checks every main-thread self-check row in its run, then plays the ops
+  self-check's exchange leg on a thread of its own (`WidgetOpsExchanges`),
+  waits up to `kWidgetOpsExchangesTimeout` (30 s) for it with the event
+  loop running and Checks the leg's rows, normally seven, or one failed row
+  when its thread did not start or the leg threw
+  ([test_widget_ops](test_widget_ops.md#verification)). Taking them sets
+  the run file's `selfCheck.ran` whatever they read: that flag says only
+  that the stage got that far, and each row is its own Check
+  (`selfCheck.rows` counts the rows taken, `selfCheck.failed` names the
+  failed ones). Then `report the package, the selection and the output`;
 - the fixture's `capture the baseline and show the window normally`, `keep
   the window exposed`, `open the chat in the legacy HistoryWidget`, `move
   the window for the one-column layout` and `size the window for the
@@ -406,7 +447,7 @@ again: one that moved more than 0.5 CSS px is `target-moved`.
 | `hover` | the action show's own enter and move at the target; no leave, the pointer stays until the next action | `point`, `show` |
 | `wheel` | `Test::Wheel` at the target with angle delta `(0, -round(dy * 1.2))` (Chromium's 100 CSS px per 120 units), then a leave | `wheel`: the `WheelDelivery` |
 | `key` | `Enter` as `Test::PressKey(Qt::Key_Return)`, no text; `Space` and one printable character as `Test::TypeText`; sent to the window's focus child | `receiver`, `focusMoved`, `typed`, `cleared`, `composeBefore`, `composeAfter` |
-| `theme` | restore of the palette chain's last switch, then `AppendPaletteSwitch` to the day (`light`) or night (`dark`) palette, then up to 4 s for the widget's theme to match the target: of a hosted host its effective reading at a theme applied after the action began (`CheckWidgetTheme()` with the action's first reading), of a local one its renderer's scheme given after that | `palette`, `widgetTheme` (its scheme, generation and applied serial before and after, `effectiveSerial`, `effectiveScheme`, `verdict` `matches`, `unobserved` or `wrong`, `detail`, `reached` (live and matching), `liveRefusal`, `pending` (the token of an application still underway, 0 for none), `hostRetired`) |
+| `theme` | restore of the palette chain's last switch, then `AppendPaletteSwitch` to the day (`light`) or night (`dark`) palette, then up to 4 s for the widget's theme to match the target: its effective reading at a theme applied after the action began (`CheckWidgetTheme()` with the action's first reading) | `palette`, `widgetTheme` (its scheme, generation and applied serial before and after, `effectiveSerial`, `effectiveScheme`, `verdict` `matches`, `unobserved` or `wrong`, `detail`, `reached` (live and matching), `liveRefusal`, `pending` (the token of an application still underway, 0 for none), `hostRetired`) |
 | `visible: false` | one `Ui::ElasticScroll::scrollToY` of the list's own scroll putting the view's top 8 px below the viewport, then up to 4 s for the runtime to count it hidden | `before`, `scrollTo`, `after`, `runtimeVisible`, hosts |
 | `visible: true` | `AppendShowInChatList` of the card's top band, then up to 4 s for the runtime to count it visible | `show`, `after`, `runtimeVisible`, hosts |
 | `wait` | a stage of `wait` ms | `waitedMs`, `afterLastInputMs` |
@@ -636,10 +677,13 @@ still carry runner refusals; they fail the totals. Its fields:
 
 - `id`, `theme`, `width` (the measured core width rounded, or 390 with
   `widthMeasured` false), `loaded` (the host's post-load ack answered),
-  `dead` (null, a fatal `frozen`, a stopped runtime, the summary's `Died:`
-  reason other than `terminated`, a stop the desktop decided itself
-  ([desktop stops](#preconditions-and-limits)), or "died, reason not
-  observed"), `status`
+  `dead` (null while alive; for a hosted run its sampled work's measured
+  cause or `charged, reason unmeasured`, never the desktop's own stop
+  read apart ([desktop stops](#preconditions-and-limits)); a run whose
+  tap selected no hosted work keeps what its result waits read, null, as
+  nothing charged it; `DeadValue()` writes "died, reason not observed"
+  only for a dead run with an empty `dead`, which no reading leaves;
+  [a run's death](#preconditions-and-limits)), `status`
   and `checks` verbatim from the reported value;
 - `stages` as above; `observed`: `bridge` (`{method, args}`, `args` a JSON
   array), `height` (the card's height in CSS px before the removal),
@@ -653,10 +697,15 @@ still carry runner refusals; they fail the totals. Its fields:
 - extras: `key`, `set`, `skippedReasons`, `actions`, `runnerRefusals`
   (`{name, detail}`), `result` (`present`, `error`, generation, serial,
   values, html id, `retained`), `tap` (the final counts and leak and gap
-  examples), `focus`, `view` (list, load-show and final view, core, card,
+  examples, with `hostedSelected`, `hostedFinal`, `desktopCharges`,
+  `sparedRuns`, `unaffectedRuns` and `WidgetTapCounts()` as `counts`),
+  `focus`, `view` (list, load-show and final view, core, card,
   core width, scheme, scheme changes, generation, theme message), `load`
   (show, outcome, waits), `log` (source, summary provenance, the summary
-  reading's counts), `contentHeight`, `layers`, `message`
+  reading's counts, and the death's readings: `summaryWork`, `summaryOwn`,
+  `deathLine`, `deathMeasured`, `desktopStop` and `sampledRun`, the
+  sampled work's record as `WidgetHostedRunText()` gives it, null without
+  one), `contentHeight`, `layers`, `message`
   ([message contexts](#message-contexts)), `bot`
   ([played bot answers](#played-bot-answers)), `safeArea` once the run's
   host watch was read (below), with stages `snapshot`,
@@ -720,12 +769,22 @@ Run refusals (`runnerRefusals`), each failing the totals:
 caption, whose host got a nonzero field in any construction: the runner did
 not make `CLIENTS.md`'s all-0 state), `safe-area-unmeasured` (a loaded run
 with no watch reading or no `applied` entry), `stop-reason-unmeasured` (a
-run of an entry with `stops` that died without a `Died: ` reason other
-than `terminated` in its host's fresh or final summary and without a stop
-the desktop decided itself, so its `dead` is the runner's placeholder),
-and the summary reader's. None of the three
-drops a run from `runs`. A result value that is not a
-JSON object, not published for this run's id, or whose `checks` is not an
+run of an entry with `stops` that died without a measured reason, so its
+`dead` is the runner's placeholder: no cause its sampled work's own record
+gives, a stop the desktop decided itself giving none), and the summary
+reader's. None of the three drops a run from `runs`.
+`StopRefusal(stops, run)` judges the run's death as it stands, which is
+always a hosted reading's charge, as a run whose tap selected no hosted
+work is never dead then; its detail names, each apart, the raw
+`deathLine`, that the run's sample gave no attributable cause with that
+summary's eligibility (`fresh or final`, or `stale or absent`) and
+`summaryWork`, and the desktop's own stop, named when one was read and
+otherwise only not to have been observed, never denied, as the desktop's
+charge of a selected work may still stand. The log stage makes it. For a
+hosted run the final barrier replaces it as the death then stands
+(`ReconcileDeath()`, `RefuseUnmeasuredStop()`); a run whose tap selected
+no hosted work keeps the log stage's. A result value that is not a JSON
+object, not published for this run's id, or whose `checks` is not an
 array is not used; `result.error` names why.
 
 **Rows**, each `NOTE: <marker>: <compact JSON>`:
@@ -739,7 +798,7 @@ array is not used; `result.error` names why.
 | `CONFORMANCE_ACTIONS` | `run`, `actions`, `performed`, `notPerformed`, `elapsedMs`. |
 | `CONFORMANCE_SNAPSHOT` | The run's `snapshot` and every stage's crop, refusal and capture. |
 | `CONFORMANCE_PICTURE` | After each band's capture stage: the band's entry of the `picture` extra, plus `run`, `pictureCard`, `pictureCore` and `pictureGeneration`. |
-| `CONFORMANCE_LOG` | `run`, `source`, `summaryState`, `summary`, `pending`, `waitedMs`, `chars`, `truncated`, `text` (its first 32768 characters). |
+| `CONFORMANCE_LOG` | `run`, `source`, `summaryState`, `summaryWork`, `deathLine`, `summary`, `pending`, `waitedMs`, `chars`, `truncated`, `text` (its first 32768 characters). |
 | `CONFORMANCE_RUN` | The run's entry, plus `item`, `completed`, `progress`, `notRun`, `barrierMs`, `itemGone`, `fixture`. |
 | `CONFORMANCE_OUTGOING` | An outgoing message the runner did not inject: `run`, `id`, `wallMs`, `inChat`, `local`, `regular`, `service`. |
 | `CONFORMANCE_TOTALS` | `path`, counts and named lists of completed, incomplete, loaded, dead, focus, refusals, actions, crops, pictures (`requested`, `complete`, `missing`), leaks, gaps, violations, unfinished hosts, accepted `openTelegramLink` calls and layers; `absences` (`leaks`, `gaps`, `telegramLinks`: `selected`, `covered`, `found`, `certified`, `uncovered`); `abort`, `palette`, the self-check, and the run file's `written`, `file`, `bytes` and `error`. |
@@ -761,7 +820,8 @@ crop was saved, every requested picture is complete (only when one was
 asked for), the copied `--attacks` scan discriminates
 (`DiscriminatingScan`, the self-check's control leaks as its control) and no
 widget leaked a URL into its validated ops, no scan gap, every run's hosts
-finished before its final reading, no host accepted an `openTelegramLink`
+finished, and every hosted work it selected had its final, before its
+final reading (`WidgetTapFinished()`), no host accepted an `openTelegramLink`
 call (no scripted action asks for one, and it would leave the bubble through
 the app's t.me route), and `CheckNoBlockedLaunches`.
 
@@ -792,7 +852,9 @@ confirms a layer and never follows a link.
 ## Lifetime and cleanup
 
 `Runner::onFinish` is registered before any stage. On every exit path it
-stops the outgoing-message watcher, aborts every pointer sequence still
+stops the self-check's exchange leg without waiting for it
+([test_widget_ops](test_widget_ops.md#lifetime-and-cleanup)), stops the
+outgoing-message watcher, aborts every pointer sequence still
 running (its held buttons released and the list left), keeps every
 incomplete run's last tap reading, disarms every played bot by its run's kept
 key (the records stay with the runs), runs the fixture's idempotent release
@@ -800,8 +862,12 @@ key (the records stay with the runs), runs the fixture's idempotent release
 destroyed by id, the controls closed, the list left, the option, chat and
 a minimized window's state restored, never a maximized state the sizing
 left), then writes the run file and the totals row without the totals
-stage's Checks when that stage did not run. A run whose hosts did
-not finish within 10 s of its removal stops every later injection, by name.
+stage's Checks when that stage did not run. The removal waits up to 10 s
+for a run's tap to finish; a run whose reading taken after that wait is
+not final (`readingFinal`) stops every later injection, by name, with the
+tap's counts
+(`not run: the hosts of <key> had not finished <ms> ms after its removal
+(<WidgetTapCounts()>), so no later run was started`).
 
 The palette chain's final restore is a stage before the fixture's teardown;
 [test_palette](test_palette.md)'s own finish backstop restores an
@@ -1115,23 +1181,15 @@ would pass for the genuine one.
 
 ## Verification
 
-The pack's first stage runs, as Checks: `RunWidgetOpsSelfCheck()` (its
-scanner control is the leak scan's control in the totals);
+The pack's first stage runs, as Checks:
+`RunWidgetOpsSelfCheck(WidgetOpsExchangeLeg::Apart)` (52 rows in Debug;
+its scanner control is the leak scan's control in the totals) and, after
+every other row below, once its thread has played them, the exchange
+leg's rows from its `WidgetOpsExchanges`
+([test_widget_ops](test_widget_ops.md#verification));
 `RunWidgetBotSelfCheck()` ([test_widget_bot](test_widget_bot.md#verification));
 `RunWidgetConformanceProbeCheck()` on the package's `probe-fixture.json`
-([test_widget_ops](test_widget_ops.md)); the paint-policy fixture's rows
-verbatim (`RunPaintPolicyFixture()` of
-`test_widget_conformance_paint_policy.cpp`: `RunWidgetPaintPolicyCheck()`
-([test_widget_paint_policy](test_widget_paint_policy.md)) on the bytes of
-`package`'s sibling `../core/tests/fixtures/paint-policy.json`, read by its
-cleaned path, the same pin's `packages/core/tests/fixtures/paint-policy.json`;
-at `v0.6.0` 93 rows, the 92 entry rows in fixture order - constants 2,
-shadows 13, boxes 31, hidesSubtree 4, animations 14, messages 2, reports 6,
-cases 20 - and the coverage row; a `package` that is not an absolute path,
-or a fixture that cannot be opened or read, gives one failed row instead,
-`paint policy fixture: the fixture file was read`, with the path and the
-error; empty or unparsable bytes give the checker's coverage row alone,
-failed); two result-reader controls on
+([test_widget_ops](test_widget_ops.md)); two result-reader controls on
 literal readings (this run's value taken with its checks verbatim once per
 generation and serial; another run's id, text that is no JSON object and
 checks that are no array refused, and a newer host's clear leaving no
@@ -1190,15 +1248,25 @@ negatives: `SafeAreaRefusal()` gives none for an entry without `safeArea`
 with all 0, `safe-area-not-zero` for `bottom` 26 and for `cornerRight` 118
 alone, `safe-area-unmeasured` for a loaded run with no `applied` and none
 for one not loaded, and none for a `safeArea` entry with 26/118 or with
-all 0; `StopRefusal()` gives none for a stop run that died with a `Died: `
-line, `stop-reason-unmeasured` for one that died without, and none for a
+all 0; `StopRefusal()` of literal hosted runs with an own summary gives
+none for a stop run that died with its `Died: ` line's measured cause,
+`stop-reason-unmeasured` for one that died without, and none for a
 stop run that did not die or a run without `stops` that died without one;
 `WantedStatus()` at `done` is false for a `stops` entry and true for a plain
-auto entry, in a literal `ConformanceState`); a desktop stop control
-(`RunDesktopStopCheck()` of `test_widget_conformance_stop.cpp`:
-`StopRefusal()` of a stop run that died with only `Died: terminated` gives
-none with a stop the desktop decided itself and `stop-reason-unmeasured`
-without one); `RunPictureCheck()` (requested
+auto entry, in a literal `ConformanceState`); a death reading control
+(`RunDeathReadingCheck()` of `test_widget_conformance_death.cpp`, five
+`death reading self-check: ...` rows on taps of their own, every work
+played as `WidgetHostedPlay` plays it and read as the log stage, the final
+barrier, the run file and the totals read it: a spared work and its
+charged replacement printing the same raw `Died: ` text give a dead run
+whichever is sampled, measured only from the charged work's own sample;
+a run sampled healthy dies, measured, of a later refusal on a route the
+stream spared and stays alive after a valid reply; the barrier adds and
+drops `stop-reason-unmeasured` as the death then stands; a charged first
+selection evicted by 33 later ones still kills the run; and a stale or
+absent sample, or a skipped log stage, leaves a charge unmeasured, taking
+no cause from the desktop's own stop; no row reads a run whose tap
+selected no hosted work); `RunPictureCheck()` (requested
 visual, auto, unknown, unselected and no picture ids through
 `SelectPictures()` and the notes; the bands of a 544 CSS px card and the
 completeness of 336, 280 and 650 CSS px pictures, with band 1 refused,
@@ -1291,14 +1359,22 @@ the per-ID report.
 
 The [desktop stop](#preconditions-and-limits) reading of
 `test_widget_conformance_stop.{h,cpp}`, its `RecordLog()` call, the
-`StopRefusal()` argument and the two literal cases of
-`RunDesktopStopCheck()` compiled in the Windows Win32 Debug build of
+`StopRefusal()` argument and a two-case desktop stop control compiled in
+the Windows Win32 Debug build of
 `2026/10/31/stop-a-widget-on-its-last-picture-when-the-paint-bounds-refuse-its-frames`.
-`RunDesktopStopCheck()` runs in the pack's first stage, so only a launch of
-the pack runs it; that task's evidence loop runs it and a synthetic smoke
-of a paint stop, and neither has run yet. Before that build this page
-recorded no Windows build or run of the pack; the code is portable C++ and
-Qt.
+That task's evidence campaign (its `work/test.md`, Runs 5 and 8) then
+launched the pack in Win32 Debug builds with its disposable overlay, on
+a synthetic smoke package of a paint-limit and a text-limit `stops`
+entry. The control passed in the pack's first stage in Run 5 and again
+in Run 8. In Run 8, with the window in the one-column layout, both runs
+completed at width 390 with no runner refusal: the paint-limit run dead
+with the desktop's filter-work reason, which the runner then took as the
+death's measured reason, and the text-limit run with its host's
+`Text limit exceeded` reason. Before that build this page recorded no
+Windows build or run of the pack; the code is portable C++ and Qt. The
+control, whose runs died only through the in-process renderer's death
+reading, was removed with that reading by
+`2026/11/21/remove-the-unreachable-local-widget-crash-count-and-death-readings`.
 
 The right click's [menu wait](#timed-pointer-sequences) (the chat-list
 reader's `Begin`, `Poll` and `End` with the 250 ms bound) was added by
@@ -1316,6 +1392,34 @@ runs a two-entry smoke from a normal window narrowed to the first
 two-column width and again from an inactive maximized window, and records
 what ran in that task's evidence; until then this page claims no measured
 width, focus or window-state result for the sizing.
+
+The [death reading](#preconditions-and-limits) of
+`test_widget_conformance_death.{h,cpp}` and the exchange leg played apart
+came with
+`2026/11/20/count-a-widget-helpers-death-only-against-widgets-with-work-in-flight`.
+Its evidence campaign (its `work/test.md`, Attempt 1, which holds the
+measurements) ran the pack in the macOS arm64 direct-download Debug client
+and its embedded Debug helper, built with its disposable evidence overlay.
+In one launch every first-stage row passed, the 57 ops self-check rows and
+the six death reading rows among them, and a healthy run completed alive,
+sampled `Fresh` from its own work. On a run-local package of four
+text-free auto entries with no `stops`, the overlay holding the card's
+answer and stalling an unselected sibling around the pack's own log and
+removal stages, every run completed, every barrier closed with every
+hosted work final, and `run.json` read: a run sampled healthy, then
+charged `refused/spared` for Telegram's refusal of a credited frame, dead
+with that refusal's reason, measured; the same run given the real painted
+answer alive; a sample of a spared work whose replacement was then charged
+with the same raw `Died: the widget engine process ended` dead as
+`charged, reason unmeasured`; and that replacement, sampled itself, dead
+with its line's reason, measured. That launch's totals failed two rows,
+both from the runner's existing `summary-multiple-hosts` refusal of the
+bridge reading of the deliberately two-host fourth case. No Release build
+with the harness and no other platform ran it. Of those six death reading
+rows, the one pinning the in-process renderer's death reading was removed
+with that reading by
+`2026/11/21/remove-the-unreachable-local-widget-crash-count-and-death-readings`,
+which leaves the five above.
 
 ## Related guidance
 

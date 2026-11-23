@@ -24,12 +24,13 @@ the App-Sandboxed XPC service `Contents/XPCServices/TelegramWidgetHelper.xpc`,
 and the probe runs there with the differences of
 [Mac App Store](#mac-app-store). On Linux the helper is `TelegramWidgetHelper` too,
 in `TelegramHelpers/` next to the client's binary or in a package-managed
-build's `libexec/telegram-desktop/`, and its Debug build's lockdown hook
+build's `libexec/TelegramDesktop/`, and its Debug build's lockdown hook
 again runs a probe, that of
 `test/test_widget_helper_probe_lockdown_linux.cpp`: it runs its own probe
 in forked copies of the helper and around the real
 `WidgetHelper::Lockdown()` (`_other/widget_helper_linux.cpp`), writes its
-lines to stderr, and the helper goes on serving widgets ([Linux](#linux)).
+lines to stderr, and the helper goes on serving widgets, rendering them
+([Linux](#linux)).
 On Windows the helper is `TelegramWidgetHelper.exe`, in `modules\<arch>\`
 next to `Telegram.exe`, in the Windows Store build's installed package
 too ([Windows Store](#windows-store)), and its Debug build's lockdown
@@ -183,9 +184,10 @@ renderer ([Remote engines](test_widget_fixture.md#remote-engines)), the
 ordinary probe never shows the helper while it renders: it refuses the
 stream after its listing. Its serving variant takes the same listing and
 attempts in a helper that serves widgets, for the direct-download helper and
-the Mac App Store service alike, on either stream opening (the hosted one
-of the default arrangement, and the engine-only one of `helper-engines`
-that a disposable overlay combines with probe arguments as the control).
+the Mac App Store service alike. Linux and Windows, whose helpers render as
+well, need no serving variant: their probes refuse no stream their lockdown
+accepted, and right after their lines the same helper serves, hosting each
+widget ([Linux](#linux), [Windows](#windows)).
 
 - **Asking for it.** A fixture's `renderingDelayMs` appends
   `rendering:<ms>` after every other argument, the service names included,
@@ -193,7 +195,9 @@ that a disposable overlay combines with probe arguments as the control).
   `kWidgetHelperRenderingMinMs` (1) to `kWidgetHelperRenderingMaxMs`
   (60000) in decimal; any other value, a second one, or any other
   malformed argument is a defect row and keeps the ordinary probe, which
-  refuses. Windows and Linux never get it.
+  refuses. Windows and Linux never get it: their probe helpers go on
+  serving widgets after the report anyway ([Windows](#windows),
+  [Linux](#linux)).
 - **Before Ready.** The helper runs every row of the ordinary probe up to
   and including `lockdown:` and `state:` on its serve thread, the real
   lockdown included, and only then decides: a lockdown that succeeded with
@@ -226,9 +230,9 @@ that a disposable overlay combines with probe arguments as the control).
 - **What it shows.** The listing is of a serving helper: it holds a port
   per serving thread (`thread (task_threads)`) and whatever rights the
   served host and its engine took, while the widget work loads no
-  framework (the helper links none, and its litehtml is built without
-  CoreFoundation). Compare it by entry class and object against an
-  engine-only control taken the same way, not with the ordinary probe's
+  framework (the C++ helper linked none; the Rust one has not been listed
+  on a Mac yet). Compare it by entry class and object with another
+  serving listing taken the same way, not with the ordinary probe's
   pre-`Ready` counts. A widget that starts or
   ends threads during the listing can change the space between the
   firehose reading's two snapshots, which fails that reading (two
@@ -250,7 +254,9 @@ that a disposable overlay combines with probe arguments as the control).
 
 In the Mac App Store build (`OS_MAC_STORE`) `TelegramWidgetHelper` is the
 XPC service `Telegram Lite.app/Contents/XPCServices/TelegramWidgetHelper.xpc`,
-signed with the App Sandbox as its only entitlement and started by
+signed with the App Sandbox and the Enhanced Security keys of
+`Telegram/Telegram/TelegramWidgetHelper.entitlements` as its only
+entitlements, in Debug as in Release, and started by
 launchd, not by Telegram: its parent process is launchd, its `HOME` its
 own container `~/Library/Containers/<main bundle id>.WidgetHelper/Data`
 ([Remote engines](test_widget_fixture.md#remote-engines), **The Mac App
@@ -537,7 +543,10 @@ order, once per helper:
    `PrepareProbeNetwork()` binds the delay-loaded `WS2_32.dll` imports and
    starts its own Winsock and 127.0.0.1 listener, and
    `PrepareProbeTargets()` takes its other `before lowering:` controls,
-   while the helper still impersonates its startup token.
+   while the helper still impersonates its startup token. On the Windows 7
+   tier `PrepareProbeToken()` then opens the probe's own `TOKEN_QUERY`
+   handle to the helper's process token, which the native probe holds
+   until its `process token:` row ([Windows tiers](#windows-tiers)).
 2. The harness's own preparation, under the same token: its own
    `WSAStartup`, then its `before lowering:` socket, target and AFD endpoint
    controls and, with `connect-control`, the preopened sockets; without
@@ -545,9 +554,14 @@ order, once per helper:
    ([Windows harness lines](#windows-harness-lines)).
 3. The real lockdown: the `lockdown` callable, which is
    `WidgetHelper::Lockdown()`, that is
-   `Platform::WidgetHelper::LockDownHelper()` in `widget_sandbox_win.cpp`.
+   `Platform::WidgetHelper::LockDownHelper()` in `widget_sandbox_win.cpp`,
+   the lowering of the helper's own sandbox tier (**The Windows sandbox
+   tiers** in [Remote engines](test_widget_fixture.md#remote-engines)).
    A failure refuses the stream with the lockdown's own text, writes no
-   probe line and closes what both probes hold.
+   probe line and closes what both probes hold, the Windows 7 tier's token
+   handle included; `LockDownWithProbe()` returns before `FinishProbe()`,
+   so no reading of a refused helper enters the report, and a diagnostic
+   capture of one belongs to the run's own overlay.
 4. The harness's `after lowering:` attempts, then the native probe's,
    after which the native probe closes its listener and ends its own
    `WSAStartup`.
@@ -557,16 +571,58 @@ order, once per helper:
    own `WSAStartup`, and the hook returns "".
 
 The helper then serves widgets as in `helper` mode, so a probe launch is no
-helper failure. After the lockdown the hook calls only what was bound
-before it: the helper's static imports, the delay-loaded `bcrypt.dll`
-imports, which the lockdown's warm-up binds, the `WS2_32.dll` imports,
-which the native probe and then the harness's own Winsock start each bind
-(the harness uses Winsock only when its own bind and `WSAStartup`
-succeeded), and `NtCreateFile` and `RtlInitUnicodeString`, resolved from
-the already mapped ntdll. A probe helper therefore maps `WS2_32.dll` and
-`mswsock.dll`, which the ordinary helper does not load: every `WS2_32.dll`
-import of the image is the probe's. Neither probe is an inventory of what
-the helper holds. The native probe's lines, their controls and the
+helper failure. On the hosted opening it serves each whole widget, whose
+served host, validator and renderer are built only after Ready and so after
+the report ([Remote engines](test_widget_fixture.md#remote-engines)). After
+the lockdown the hook calls only import entries bound before it and
+functions looked up in modules mapped before it. The import entries are
+the helper's static imports; the delay-loaded imports that the lockdown's
+warm-up binds in this order, `ADVAPI32.dll` then `bcrypt.dll` on x86 and
+x64, and `bcrypt.dll` then `bcryptprimitives.dll` on ARM64, whose
+ADVAPI32 is a static import (on x86 and x64 the probe's
+`PrepareProbeTargets()` resolves ADVAPI32's `RegOpenKeyExW` and
+`RegCloseKey` earlier, on the same impersonating thread);
+and the `WS2_32.dll` imports, which the native probe and then the
+harness's own Winsock start each bind (the harness uses Winsock only when
+its own bind and `WSAStartup` succeeded). The probe's own lookups are
+`NtCreateFile` and `RtlInitUnicodeString`, which the harness resolves
+from the already mapped ntdll before the lowering,
+`GetCurrentPackageFullName`, which `FinishProbe()`'s `ProbePackage()`
+resolves from the already mapped kernel32 after it, when it writes the
+`package identity` row ([Windows Store](#windows-store)), from Windows 8
+on, and on the Windows 7 tier alone `GetProcessWindowStation`,
+`GetThreadDesktop` and `GetUserObjectInformationW`, which `ProbeDesktop()`
+resolves after it from the `user32.dll` that tier's lowering mapped
+([Windows tiers](#windows-tiers)). After the lowering on the other tiers
+`FinishProbe()` also calls `ProbeWin32k()` and `ProbeMitigation()` for
+its `win32k system calls:` and `mitigation <name>:` rows, and both read
+through `Platform::WidgetHelper::ReadMitigation()`, which calls the
+`GetProcessMitigationPolicy` pointer that `ResolvedPolicyFunctions()` in
+`widget_sandbox_win.cpp` looked up in the mapped kernel32 and cached
+before the reversion, at the latest in the warm-up, which refuses
+without it there. The Windows 7 tier's warm-up does not look that
+function up, and its probe calls neither it nor `ReadMitigation()`: x86
+reads its DEP through `GetProcessDEPPolicy`, a static KERNEL32 import of
+the x86 helper. Neither those reads nor the lookups bind an import
+slot or complete a delay-load entry. The warm-up's descriptors follow each
+architecture's Rust serving: x86 and x64 build it for
+`i686-win7-windows-msvc` and `x86_64-win7-windows-msvc`, whose std draws
+its random bytes through ADVAPI32's `SystemFunction036`, and the
+helper's delay-load hook answers that import with the helper's own
+adapter over `ProcessPrng`, or `BCryptGenRandom` where Windows has no
+`ProcessPrng`; ARM64 builds it for the pc target
+`aarch64-pc-windows-msvc`, whose std calls `bcryptprimitives.dll`'s
+`ProcessPrng`. **The Windows helper** in
+[Remote engines](test_widget_fixture.md#remote-engines) has each
+architecture's targets and imports in full. `WS2_32.dll` is a delay
+import of the Debug helper alone, for the probe: every `WS2_32.dll`
+import of the image is the probe's, a Debug helper started without
+`probe` leaves it unbound, and the Release helper has none, with the Nova
+engine as with QuickJS before it. A probe helper
+therefore maps `WS2_32.dll` and `mswsock.dll`, which the ordinary helpers
+did not load in the module readings taken with the QuickJS engine. Neither
+probe is an inventory of what the helper holds. The native probe's lines,
+their controls and the
 measured results are in
 [Remote engines](test_widget_fixture.md#remote-engines) (**Windows probe**
 and **What the Windows lowering leaves**), and its runs under
@@ -714,17 +770,144 @@ bytes is a denial of endpoint creation.
 
 ### What the Windows controls show
 
-The `before lowering:` lines run under the helper's startup token, a
-regular AppContainer token of the helper's own package
-([Remote engines](test_widget_fixture.md#remote-engines)), not under an
-unconfined one: they are the in-helper control for the same calls, and an
-AppContainer token may be kept from other processes' loopback listeners
-before the lowering as well. Whether a target was reachable is therefore
+The `before lowering:` lines run under the helper's startup token, on the
+lowbox tiers a regular AppContainer token of the helper's own package
+([Remote engines](test_widget_fixture.md#remote-engines)) and on the
+Windows 7 tier the restricted startup token at Low without a lowbox
+([Windows tiers](#windows-tiers)), never under an unconfined one: they
+are the in-helper control for the same calls, and an AppContainer token
+may be kept from other processes' loopback listeners before the lowering
+as well. Whether a target was reachable is therefore
 decided by the fixture's own connections and datagrams to the same
 listeners, from an ordinary process, before and after the helper; a
 helper attempt that the fixture did not receive is no denial.
 With `connect-control` the helper holds the preopened sockets across the
 lowering and the run is an instrumented one, not the ordinary helper.
+
+### Windows tiers
+
+The Windows helper is confined by one of four sandbox tiers, full, LPAC
+1703, AppContainer and Windows 7, which Telegram picks from the Windows
+version and the helper picks again from its own reading of it (**The
+Windows sandbox tiers** in
+[Remote engines](test_widget_fixture.md#remote-engines) has the tiers,
+their launches and lowerings). The probe reads the helper's own choice,
+`CurrentSandbox()` of `widget_sandbox_win.cpp`: the version the helper
+read itself (`RtlGetNtVersionNumbers`, or the version a disposable test
+overlay simulates in its place) and the tier derived from it, both
+cached once per process. Nothing the probe receives names a tier, and
+the probe selects none: its rows are readings of the tier the lowering
+already applied.
+
+- **The tier row.** Right after `job:` the native probe writes
+  `after lowering: tier: <tier>, version <major>.<minor>.<build>`, with
+  `full`, `LPAC 1703`, `AppContainer` or `Windows 7` (`none` only names a
+  helper without a tier, whose lowering refuses before any row). An
+  unforced helper on the host of the records reads `tier: full, version
+  10.0.26300`, and a forced one the version its overlay simulated. The
+  unforced full-tier report on 10.0.26300 keeps every row it had before
+  the tier row, in order and with the same text: its 53 rows with no
+  fixture and this one, so a reader compares it with the older full-tier
+  readings of that host by setting the tier row aside. That holds for the
+  26300 control alone: a full-tier report whose version is below a
+  query's floor (**Queries by version** below) reads that row `not
+  read`, as a forced 10.0.17763 reads `mitigation shadow stack: not read
+  (GetProcessMitigationPolicy(15) is documented from 10.0.19041)`.
+- **Queries by version.** The `package identity:`, `win32k system
+  calls:` and `mitigation <name>:` rows are read only when the helper's
+  version reaches the first one whose documentation has that query:
+  `GetCurrentPackageFullName`, and `GetProcessMitigationPolicy` with
+  `ProcessDEPPolicy`, `ProcessASLRPolicy`,
+  `ProcessStrictHandleCheckPolicy`, `ProcessSystemCallDisablePolicy` or
+  `ProcessExtensionPointDisablePolicy`, from 6.2.0 (Windows 8);
+  `ProcessDynamicCodePolicy` from 6.3.0 (8.1); `ProcessSignaturePolicy`,
+  `ProcessFontDisablePolicy` and `ProcessImageLoadPolicy` from 10.0.10240;
+  `ProcessChildProcessPolicy` from 10.0.16299 (1709); and
+  `ProcessUserShadowStackPolicy` from 10.0.19041 (2004). Below that
+  version the row reads `not read (<call> is documented from <version>)`
+  and nothing is called (x86's DEP on Windows 7 aside, below), such as
+  `mitigation child process: not read
+  (GetProcessMitigationPolicy(13) is documented from 10.0.16299)` on the
+  LPAC 1703 tier. A row that is read keeps its form. These are the floors
+  of each query, not of the creation flag: where a tier documents the
+  query but its creation did not set the policy (`signature` on the
+  AppContainer tier below 10.0.10586), the row reads what the process
+  has. The outside observer of a forced run reads every policy of the
+  Windows 11 host, the rows the probe leaves out included.
+- **Windows 7 rows.** The Windows 7 tier has neither the pseudo token
+  handles nor `GetProcessMitigationPolicy`, both Windows 8, and no
+  `GetCurrentPackageFullName`, so its probe calls none of them:
+  - `process token:` reads the handle that `PrepareProbeToken()` opened
+    with `TOKEN_QUERY` before the lowering, while the startup token still
+    granted it, and the native probe closes that handle right after the
+    row, or with the rest of its state when the lowering refuses. A
+    failed open reads `process token: OpenProcessToken failed: error <n>
+    before the lowering`.
+  - Right after the tier row, `desktop: <station>\<desktop> (thread
+    <tid>)` names the window station and the desktop of the serving
+    thread after the lowering, through `GetProcessWindowStation`,
+    `GetThreadDesktop` and `GetUserObjectInformationW(UOI_NAME)` looked up
+    in the `user32.dll` that the Windows 7 lowering itself mapped, and
+    read by the shared `ReadAssignedDesktop()` of `widget_sandbox_win.cpp`,
+    the reading that the lowering compares with its startup request
+    before the revert; the probe loads nothing (`desktop: not read
+    (user32.dll is not mapped)` otherwise, or the failing call with its
+    error). It is the helper's
+    own reading under its lockdown token, and that USER calls still work
+    there is itself part of what the tier leaves (**The Windows 7 tier**
+    in [Remote engines](test_widget_fixture.md#remote-engines)). The
+    evidence that the helper runs on its own desktop is the
+    outside reading of the same thread's `GetThreadDesktop` from the
+    client's window station, not this row. No lowbox tier writes it, and
+    no lowbox helper maps `user32.dll`. Telegram labels each helper's
+    desktop Low with no-write-up (`S:(ML;;NW;;;LW)`) before the helper
+    starts, so that its Low startup token can connect to it (unlabelled,
+    the desktop counts as Medium and `user32.dll` fails to initialize
+    there with error 1114); a label it cannot set fails the start with
+    `SetSecurityInfo failed: <reason>` (or `CreateWellKnownSid`,
+    `InitializeAcl` or `AddMandatoryAce` before it), before any helper
+    or row exists.
+  - `package identity:` and `win32k system calls:` read `not read (... is
+    documented from 6.2.0)`, and so does every `mitigation` row but x86's
+    DEP: `mitigation DEP: 0x<flags>, permanent <0|1> (GetProcessDEPPolicy)`,
+    with `GetProcessDEPPolicy`'s flags (1 DEP, 2 ATL thunk emulation off),
+    where the x86 Windows 7 launch requires `0x3, permanent 1`. The x64
+    helper's Windows 7 DEP row is one of the rows not read, `mitigation
+    DEP: not read (GetProcessMitigationPolicy(0) is documented from
+    6.2.0)`: 64-bit processes always run with DEP, and
+    `GetProcessDEPPolicy` serves 32-bit processes only.
+- **Controls under the startup token.** On the lowbox tiers the
+  `before lowering:` directory controls of the client's working directory
+  and `%APPDATA%` read `error 5`, as the LPAC checkpoint read them
+  (**Windows probe** in
+  [Remote engines](test_widget_fixture.md#remote-engines)), so their
+  `after lowering:` denials have their control in the client
+  ([What the Windows controls show](#what-the-windows-controls-show)).
+  The Windows 7 startup token is the restricted token at Low, restricted
+  to the user and the enabled groups, with no package, so those controls
+  read `ok` where the user may list the folder, Low integrity not
+  stopping a read: in the forced Windows 7 probes (simulations on
+  Windows 11), the client's working directory and `%APPDATA%` read `ok`
+  before the lowering and `denied (error 5)` after it
+  ([Verification](#verification)), so on this tier the denials have
+  their control in the helper itself.
+- **Denials by design.** After the lowering every tier is expected to
+  refuse `CreateProcessW` (the lockdown token, the job's one process and,
+  from 10.0.10586, the child-process attribute) and every directory and
+  registry key the probe opens (the lockdown token's deny-only groups and
+  its only restricting SID `S-1-0-0`). The lowbox tiers are expected to
+  refuse the fresh sockets and AFD endpoints of every kind the harness
+  asks for (the package has no capability): a regular AppContainer
+  lockdown token already refused `socket(AF_INET, SOCK_STREAM)` with
+  10013 after the lowering in the experiment of
+  `2026/11/14/confine-the-windows-widget-helpers-network-with-lpac-and-turn-it-on`
+  (its `work/experiment.md`, Q4, the same-binary x86 helper on Windows
+  10.0.26300), as the LPAC one did. The Windows 7 tier draws no network
+  boundary: the same experiment's restricted Low primary without a
+  lowbox read `ALLOWED ... CONNECTED`, so that tier's socket and AFD
+  lines are recorded as they read, never judged as denials. Which
+  denials each tier actually shows is left to the readings under
+  [Verification](#verification).
 
 ### Windows Store
 
@@ -767,12 +950,21 @@ rows. What differs was measured on Windows 10.0.26300.9711 x64 in a
   its own: the `job:` row reads as on x64, `in a job 1, limits 0x2408,
   active processes 1, UI 0xff, check passed`. The row reads the immediate
   job only; the package job's members were not listed.
-- **`package identity`.** Right after `job:` the native probe writes
-  `after lowering: package identity: <reading>` from
-  `GetCurrentPackageFullName()`: `none (APPMODEL_ERROR_NO_PACKAGE)` in a
+- **`package identity`.** After `job:` and the tier row the native probe
+  writes `after lowering: package identity: <reading>` from
+  `GetCurrentPackageFullName()`. Unlike the import entries the probe calls,
+  all bound before the lowering ([Windows](#windows)), that function is
+  looked up after it: `FinishProbe()`'s `ProbePackage()` resolves it from
+  the already mapped kernel32 when it writes the row. That lookup binds no
+  import slot, and the Debug helper does not import that Windows 8
+  function. The row reads `none (APPMODEL_ERROR_NO_PACKAGE)` in a
   process without package identity, as the x86 and x64 non-Store helpers
-  read it, the package full name in one with it, and
-  `GetCurrentPackageFullName failed: error <n>` for any other result.
+  read it, the package full name in one with it,
+  `GetCurrentPackageFullName failed: error <n>` for any other result, and
+  `not available (GetCurrentPackageFullName is missing)` where kernel32
+  lacks the function from Windows 8 on. The Windows 7 tier makes no lookup
+  and reads `not read (GetCurrentPackageFullName is documented from
+  6.2.0)` ([Windows tiers](#windows-tiers)).
   The Store helper read the package's full name: it inherits the identity
   of the package its client runs in. Nothing in the confinement relies on
   its absence; the hold, every token check and every denial held with it.
@@ -789,10 +981,18 @@ socket and AFD lines included, was equal after normalization:
    the caller's package: `S-1-15-2-`, the package family's seven
    sub-authorities, then the last four of the unpackaged SID
    (`...-153869053-3443934028-2520258059-2811718137`); an unpackaged
-   control derived the x64 SID and the family's own. The client's
-   `ExpectedPackage()` and the helper's re-derivation both run packaged
-   and agree, so every SID check passes, and the helper's primary stays
-   an LPAC token of that SID with no capability (`WIN://NOALLAPPPKG` 1).
+   control derived the x64 SID and the family's own. In that 26300.9711
+   run the client and helper each called userenv and obtained the same
+   SID. The helper's primary was an LPAC token of that SID with no
+   capability (`WIN://NOALLAPPPKG` 1). For the current Store derivation
+   see **The Windows lowbox** in
+   [Remote engines](test_widget_fixture.md#remote-engines).
+   On the 19045.6466 Hyper-V guest, five starts of the repaired x64 Store
+   Debug package each rendered with one helper. Its observed Low LPAC
+   primary had the same child SID as the packaged client's userenv reading
+   and the 26300.9711 package, with zero capabilities and no thread token
+   (`2026/11/22/prove-the-windows-store-widget-helper-on-windows-10`,
+   `evidence/confinement.md` and `evidence/probe.md`).
    An ACE that names the parent package did not admit the helper: with
    the inheritable full-access ACEs that the package's
    `%LOCALAPPDATA%\Packages\<family>` folders carry for the family's
@@ -836,9 +1036,10 @@ socket and AFD lines included, was equal after normalization:
    difference.
 
 To read a Store probe against the x64 references, normalize paths, pids
-and the package full name, set the `package identity` row aside on both
-sides (a reference made before the row has none, which shifts a
-line-for-line comparison by one) and compare with the x64 non-Store probe
+and the package full name, set the `package identity` and `tier` rows
+aside on both sides (a reference made before either row has none, which
+shifts a line-for-line comparison by one per row; the Store readings
+above predate the tier row) and compare with the x64 non-Store probe
 of the same Windows build: every other row must be equal but for the
 `CreateProcessW` row's `failed (error 31)`, which comes with the package
 on 26300.9711, and an outside reading differs by the package SID and the
@@ -853,9 +1054,9 @@ on both of its spawn paths, so the helper runs as `<helper path> 3 <mode>
 <cwd> <data>`. A direct clone executes the descriptor of
 `TelegramHelpers/TelegramWidgetHelper` next to the client's binary that
 the client opened and checked against its build's SHA-256, or the
-package's `libexec/telegram-desktop/TelegramWidgetHelper` by path in a
+package's `libexec/TelegramDesktop/TelegramWidgetHelper` by path in a
 package-managed build; inside Flatpak the portal's argv starts
-`/app/libexec/telegram-desktop/TelegramWidgetHelper`
+`/app/libexec/TelegramDesktop/TelegramWidgetHelper`
 ([Remote engines](test_widget_fixture.md#remote-engines) says how the
 client finds and checks that path). The hook,
 `Test::WidgetHelperProbeLockdown()` in
@@ -884,7 +1085,10 @@ place. A printable ASCII line reaches the terminal unchanged
 ([Remote engines](test_widget_fixture.md#remote-engines) describes the
 relay). Unless the helper's own lockdown refuses, the hook returns "" and
 the helper serves widgets as in `helper` mode, so a probe launch is no
-helper failure.
+helper failure. Both probe values choose the helper as `helper` does, so
+the probed helper renders each widget it serves, and its `lockdown:`,
+`after lockdown:` and `layers:` lines are those of a helper that then
+renders.
 
 With `probe` it goes through these steps:
 
@@ -1408,8 +1612,11 @@ attempt and each preopened socket right after its `after lowering:` use
 before it returns, and on a lockdown failure, it closes whatever it still
 holds and ends its own `WSAStartup`, so no harness socket survives into
 Ready. The native probe closes its listener and ends its own start after
-its `after lowering:` attempts, and on a lockdown failure too. The overlay
-owns its listeners and closes them after the helper ended.
+its `after lowering:` attempts, and on a lockdown failure too. On the
+Windows 7 tier it closes its own process token handle right after its
+`process token:` row, and on a lockdown failure with the rest of its
+state, so that handle, too, never reaches Ready. The overlay owns its
+listeners and closes them after the helper ended.
 
 On Linux the probe keeps no state either. Each forked copy sets
 `PR_SET_PDEATHSIG(SIGKILL)`, makes itself non-dumpable and ends only with
@@ -1427,7 +1634,8 @@ any other helper.
 The first two macOS campaigns probed the same-binary macOS helper, the
 client's own `Contents/MacOS/Telegram -widgethelper 3` that
 `TelegramWidgetHelper` later replaced, whose Qt and AppKit had started
-before `main`. Of the three Windows campaigns the first probed the
+before `main`. Of the three Windows campaigns, all run with the QuickJS
+engine before the Nova change, the first probed the
 same-binary Windows helper, the client's own `Telegram.exe -widgethelper
 <handle>`, the second `TelegramWidgetHelper.exe`, which replaced it, and
 the third that helper in the Windows Store build's package. The
@@ -1643,8 +1851,11 @@ campaign, and in the third in `TelegramWidgetHelper` with its plain ad hoc
 signature, without the hardened runtime or an entitlement (Run 4), and
 with the hardened runtime and Telegram's Debug entitlements that Xcode's
 `--deep` signing then gave the staged copy (Runs 5-6). The helper now has
-the hardened runtime and no entitlement, and no probe has run on it since,
-so what its unsandboxed control counts is unmeasured.
+the hardened runtime and the Enhanced Security entitlements of
+`Telegram/Telegram/TelegramWidgetHelperDirect.entitlements`, in Debug as
+in Release, and no probe campaign recorded here has run on it since it
+gained the hardened runtime, so what its unsandboxed control counts is
+unmeasured.
 
 The [Mac App Store](#mac-app-store) service was probed on macOS 27.0.1
 (26A434) arm64 in a Debug Store build, in the evidence campaign of
@@ -1876,7 +2087,8 @@ ran `probe` without a fixture through `TDESKTOP_WIDGET_ENGINES`.
   listener received all of them and no `widget-helper-probe` marker.
   After Ready the probe helpers of Run 2 held no `\Device\Afd` handle.
 
-`TelegramWidgetHelper.exe` was then probed on the same host, Windows 11
+`TelegramWidgetHelper.exe`, built with the QuickJS engine, was then
+probed on the same host, Windows 11
 build 26300 (10.0.26300.9711, 26H2) on x64 with user-mode CET available
 to x64 processes, in the Win32 (x86 on WOW64) Debug build and in an x64
 Debug build of the same commit, in the evidence campaign of
@@ -2005,6 +2217,71 @@ startup-task and protocol-activation starts, and, in the Store build,
 `probe-unsandboxed`, `connect-control` and a target other than the
 loopback port's four.
 
+The tier row, the version floors of the queries and the Windows 7 rows
+([Windows tiers](#windows-tiers)) were added by
+`2026/11/21/choose-the-windows-widget-helpers-sandbox-tier-by-windows-version`
+and compiled in the Win32 and x64 Debug helpers. They first ran in that
+task's evidence campaign (its `work/test.md`, Attempt 1 Runs 1, 2 and 4,
+Attempt 2 Runs 5 and 7; its `evidence/probe.md`) on Windows 11 build
+26300 (10.0.26300.9711), on x86 and x64, launched by Telegram with that
+task's disposable overlay (Runs 4 and 5) or by its tier driver, which
+mirrors Telegram's launch (Runs 1, 2 and 7). Each forced reading is a
+simulation that overrides only the version reading of the launching
+process and of the helper.
+
+- The tier row read `tier: AppContainer, version 6.2.9200` (and
+  `10.0.14393`), `tier: LPAC 1703, version 10.0.15063`, `tier: Windows
+  7, version 6.1.7601` and, unforced, `tier: full, version 10.0.26300`;
+  in Telegram it also read its tier and forced version at 6.3.9600,
+  10.0.10240 and 10.0.10586 (AppContainer), 10.0.17134 (LPAC 1703) and
+  10.0.17763 (full).
+- On each architecture Run 1 probed, unforced, the Debug helper built
+  before the tiers from the commit that task started on and the first
+  attempt's final clean Debug helper. With the tier row set aside, their
+  53 rows, the clean rows of the Nova helpers
+  (`2026/11/21/build-the-x64-windows-widget-helper-image-for-windows-7`
+  and `2026/11/21/build-the-x86-windows-widget-helper-image-for-windows-7`,
+  their `evidence/confinement.md`, E7/G2), were equal in order after the
+  loopback port, the own pid, the client directory, the user name and
+  the time zone bias were normalized (`53 vs 53 comparable lines, 0
+  differing`); unnormalized, the `connect to 127.0.0.1:<port>` and
+  `OpenProcess(own pid <pid>)` rows differed by their port and pid. The
+  second attempt's clean helpers are other images, relinked from the
+  same helper sources, and were not probed: its Run 9 carried this
+  reading forward on a comparison of those sources.
+- The child-process row read `not read (GetProcessMitigationPolicy(13)
+  is documented from 10.0.16299)` at 10.0.16298 and `0x1` at 10.0.16299,
+  and the shadow-stack row `not read (GetProcessMitigationPolicy(15) is
+  documented from 10.0.19041)` at 10.0.19040 and its value at 10.0.19041
+  (`0x100` on x86, `0x105` on x64).
+- After the lowering every tier denied `CreateProcessW` of `whoami.exe`
+  and `FILE_LIST_DIRECTORY` of the client's working directory and
+  `%APPDATA%` (and of Telegram's `tdata`, a row that task's overlay
+  adds), each `denied (error 5)` against a working control: the same
+  calls succeeded around each helper in an ordinary process of the same
+  architecture or, in Telegram, in the client.
+- The lowbox tiers also denied every fresh socket (`denied (error
+  10013)`) and AFD endpoint (`denied (status 0xC0000022)`) of both
+  families, and every loopback target read `socket creation was denied`.
+- On the Windows 7 tier the `before lowering:` directory controls read
+  `ok`, and the `desktop:` row named the launch's own desktop. x86 read
+  `mitigation DEP: 0x3, permanent 1 (GetProcessDEPPolicy)`, and x64
+  `mitigation DEP: not read (GetProcessMitigationPolicy(0) is documented
+  from 6.2.0)`.
+- The Windows 7 network rows, recorded as read and never judged (**The
+  Windows 7 tier** in
+  [Remote engines](test_widget_fixture.md#remote-engines)), read
+  `socket(AF_INET, SOCK_STREAM): ALLOWED, connect to 127.0.0.1:<port>:
+  CONNECTED`, the four fresh sockets `ALLOWED` and the four AFD
+  endpoints `ALLOWED (status 0x0)`. With a loopback port (Run 7) the TCP
+  targets read `connect CONNECTED, marker sent (47 bytes)` and the UDP
+  ones `sendto SENT (47 bytes)`, and the tier driver's listeners
+  received the markers over TCP and UDP on 127.0.0.1 and `::1`.
+
+Every forced reading, of any tier, is a simulation on Windows 11, and
+what a real Windows 7, 8, 8.1 or Windows 10 before 1809 shows is field
+coverage that no record here claims.
+
 On Linux the probe first ran in the same-binary helper, the client's own
 `/proc/self/exe -widgethelper 3`, in the x86_64 Debug client (the Docker
 `centos_env` build) on a WSL2 6.6 kernel with Landlock ABI 3, in the
@@ -2056,7 +2333,7 @@ every leg the probed helper went on serving widgets.
   `WidgetHelper::Adopt()`.
 - Inside Flatpak 1.14.6, an `/app` install of a package-managed build
   (Run 4): the portal's `Spawn` got the argv
-  `/app/libexec/telegram-desktop/TelegramWidgetHelper 3 probe <cwd>
+  `/app/libexec/TelegramDesktop/TelegramWidgetHelper 3 probe <cwd>
   <data>`, and the six lines were byte-equal to the first Linux
   campaign's Flatpak lines: `landlock alone: cwd=EACCES client-cwd=ENOENT
   data=ENOENT root=kept lockdown=prctl(PR_SET_SECCOMP) failed: EPERM`, the
@@ -2088,7 +2365,7 @@ helper bytes the plain recipe ships had no probe
 Each client logged `Tgw: The widget helper starts without namespaces:
 clone failed: Permission denied.`, and its helper ran under the app's
 label, `snap.telegram-desktop.telegram-desktop (enforce)`, as
-`$SNAP/usr/libexec/telegram-desktop/TelegramWidgetHelper 3 <mode> <cwd>
+`$SNAP/usr/libexec/TelegramDesktop/TelegramWidgetHelper 3 <mode> <cwd>
 <data>`, `<cwd>` the client's working directory and `<data>`
 `$SNAP_USER_DATA/.local/share`, and went on serving widgets. With
 `probe` its six lines in `app_stderr.txt` were `landlock alone:
@@ -2123,6 +2400,10 @@ one Ubuntu 24.04 VM with kernel 6.8. `TelegramWidgetHelper` was probed
 as a plain child only inside that Snap, as a Release helper whose probe
 gates an overlay opened; outside it only the same-binary helper's plain
 child was probed (`bwrap --disable-userns`). aarch64 compiled only.
+Every Linux helper probed above served engines alone; the Linux helper
+renders since
+`2026/11/14/run-widget-validators-and-renderers-in-the-linux-helper`,
+whose records hold the probe of a helper that renders.
 
 ## Related guidance
 

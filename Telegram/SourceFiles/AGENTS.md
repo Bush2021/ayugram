@@ -240,7 +240,7 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 
 ### tgw — widget messages
 - Paths: `SourceFiles/tgw/`
-- The sandboxed HTML widgets of messages that `HistoryView::HtmlWidget` shows: `Tgw::Runtime` with its starts, limits, crash counting and kept stills, the choice where each widget's engine, validator and renderer run (in Telegram, or in the widget helper through its manager and hosted client), the render work on the widget render thread with its Qt backend, checked painter, frames, input and kept pictures, scroll, touch and selection, and the bridge to bots, storage, themes and the wallet. Its Qt-free hosted renderer adapter, the wire and renderer rules both ends share and the pointer cursor query both placements run (`tgw_hosted_glue*`, `tgw_hosted_wire.h`, `tgw_renderer_rules.h`, `tgw_cursor*`) are compiled into the widget helper too, so they must not use Qt or Telegram data; the area must not own the bubble around a widget, the OS sandbox or the helper executable.
+- The sandboxed HTML widgets of messages that `HistoryView::HtmlWidget` shows: `Tgw::Runtime` with its starts, limits, crash counting and kept stills, whether each widget's engine, validator and renderer run in the widget helper, through its manager and hosted client, or nowhere where no helper can render, the render work on the widget render thread with its Qt backend, checked painter, frames, input and kept pictures, scroll, touch and selection, and the bridge to bots, storage, themes and the wallet. The hosted wire and renderer rules (`tgw_hosted_wire.h`, `tgw_renderer_rules.h`), which twidget's Rust serving in the widget helper mirrors (`rust/crates/helper`), must not use Qt or Telegram data; the area must not own the bubble around a widget, the OS sandbox or the helper executable.
 
 ### history/compose — chat compose area
 - Paths: `SourceFiles/history/view/controls/`, `SourceFiles/ui/controls/round_video_recorder*`, `SourceFiles/api/api_suggest_post*`
@@ -259,7 +259,7 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 - The peer and chat-entry menus with their handlers, send options and scheduling, mute, auto-delete, mark as read, sponsored and per-message menu items, and the delete, moderate, report and pin confirmations. It must not own generic menu widgets.
 
 ### sending — preparing outgoing content
-- Paths: `SourceFiles/boxes/send_files_box*`, `SourceFiles/boxes/send_gif_with_caption_box*`, `SourceFiles/boxes/edit_caption_box*`, `SourceFiles/boxes/music_attach_box*`, `SourceFiles/boxes/share_box*`, `SourceFiles/ui/chat/attach/`
+- Paths: `SourceFiles/boxes/send_files_box*`, `SourceFiles/boxes/send_gif_with_caption_box*`, `SourceFiles/boxes/edit_caption_box*`, `SourceFiles/boxes/message_video_edit*`, `SourceFiles/boxes/music_attach_box*`, `SourceFiles/boxes/share_box*`, `SourceFiles/ui/chat/attach/`
 - The send-files box with album, spoiler and caption options and the prepared-file model with its previews, GIF with caption, the music picker, editing a sent caption or media, and the share and forward box. It must not own the send pipeline.
 
 ### polls — composing polls and checklists
@@ -388,7 +388,7 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 
 ### platform — OS integration
 - Paths: `SourceFiles/platform/`, `SourceFiles/webauthn/`, `SourceFiles/data/data_passkey_deserialize*`, `SourceFiles/menu/menu_dock*`, `SourceFiles/_other/startup_task_win.cpp`, `SourceFiles/_other/widget_helper*`
-- Linux, macOS and Windows implementations behind `platform_*.h`: native window and title, notification backends, tray, launcher and autostart, file dialogs, overlay helpers, OCR, translation providers, wallet key protection, passkeys with caBLE and FIDO2, the Touch Bar and the Dock menu, and the Qt-free `TelegramWidgetHelper` executable under the OS sandbox: its lockdown, the Mac App Store XPC service, the detached serving thread both macOS packages start, and the thin entries that serve widget engines or, on macOS, whole widgets through `tgw`'s hosted renderer. It must not hold cross-platform feature logic. Today it also holds the shared caBLE passkey protocol, ceremony and QR box in `webauthn/`, which every OS backend calls; that belongs in a passkeys feature area, which does not exist yet.
+- Linux, macOS and Windows implementations behind `platform_*.h`: native window and title, notification backends, tray, launcher and autostart, file dialogs, overlay helpers, OCR, translation providers, wallet key protection, passkeys with caBLE and FIDO2, the Touch Bar and the Dock menu, and the Qt-free `TelegramWidgetHelper` executable under the OS sandbox: its lockdown, the Mac App Store XPC service, the detached serving thread both macOS packages start, and the thin entry that serves whole widgets through twidget's Rust serving (`_other/widget_helper_rust.cpp`). It must not hold cross-platform feature logic. Today it also holds the shared caBLE passkey protocol, ceremony and QR box in `webauthn/`, which every OS backend calls; that belongs in a passkeys feature area, which does not exist yet.
 
 ## Tooling and tests
 

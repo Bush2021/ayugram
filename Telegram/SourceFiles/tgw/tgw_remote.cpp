@@ -11,8 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/version.h"
 #include "platform/platform_widget_helper.h"
 #include "test/test_widget_helper_probe.h"
+#include "tgw/tgw_hosted_wire.h"
 #include "twidget/remote_stream.h"
 
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <variant>
@@ -20,22 +22,266 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Tgw {
 namespace {
 
+namespace Remote = twlite::remote;
+
 constexpr auto kMaxFailures = 3;
 constexpr auto kFailureRunAge = crl::time(60000);
 constexpr auto kIdleTimeout = crl::time(30000);
 constexpr auto kExitWait = crl::time(1000);
 constexpr auto kKillWait = crl::time(1000);
 constexpr auto kMaxReasonBytes = size_t(4096);
+constexpr auto kRemoteHeaderBytes = std::size_t(2);
+constexpr auto kSequenceBytes = std::size_t(8);
+constexpr auto kWidthBytes = std::size_t(8);
+constexpr auto kHeightBytes = std::size_t(4);
+constexpr auto kTickBytes = std::size_t(8);
+constexpr auto kLengthBytes = std::size_t(4);
+constexpr auto kFormHeaderBytes = std::size_t(2);
+constexpr auto kCountBytes = std::size_t(4);
+constexpr auto kCommandBytes = std::size_t(5);
+constexpr auto kRectBytes = std::size_t(16);
 
-using Channel = std::shared_ptr<twidget::SandboxRemoteChannel>;
 using HostedRoute = std::shared_ptr<twidget::SandboxHostedChannel>;
 using HostedFactory = Fn<HostedRoute(
 	std::shared_ptr<twidget::SandboxResources>)>;
 using Completion = Platform::WidgetHelper::Completion;
+using Answers = twidget::SandboxHostedAnswers;
+using Clock = std::chrono::steady_clock;
 
 struct Choice {
 	EnginePlace place = EnginePlace::Nowhere;
-	bool hosted = false;
+	QString reason;
+};
+
+struct Key {
+	std::optional<std::uint64_t> sequence;
+};
+
+struct Exchange {
+	using Reader = std::optional<Key>(*)(
+		std::string_view message,
+		const Remote::Caps &caps);
+
+	Remote::Kind request = Remote::Kind();
+	Remote::Kind answer = Remote::Kind();
+	Remote::Kind alsoAnswer = Remote::Kind();
+	Reader answered = nullptr;
+	std::size_t limit = HostedWire::kMaxMessageBytes;
+	bool sequenced = false;
+	bool whenVisible = false;
+};
+
+[[nodiscard]] std::optional<std::uint64_t> SequenceOf(
+		std::string_view message) {
+	if (message.size() < kRemoteHeaderBytes + kSequenceBytes) {
+		return std::nullopt;
+	}
+	message.remove_prefix(kRemoteHeaderBytes);
+	return HostedWire::details::TakeNumber(message, kSequenceBytes);
+}
+
+[[nodiscard]] bool Skip(std::string_view &body, std::size_t bytes) {
+	if (body.size() < bytes) {
+		return false;
+	}
+	body.remove_prefix(bytes);
+	return true;
+}
+
+[[nodiscard]] std::optional<bool> TakeFlag(std::string_view &body) {
+	if (body.empty() || (std::uint8_t(body.front()) > 1)) {
+		return std::nullopt;
+	}
+	const auto result = (body.front() != 0);
+	body.remove_prefix(1);
+	return result;
+}
+
+[[nodiscard]] bool SkipFlag(std::string_view &body) {
+	return TakeFlag(body).has_value();
+}
+
+[[nodiscard]] std::optional<std::uint64_t> TakeCount(
+		std::string_view &body) {
+	if (body.size() < kCountBytes) {
+		return std::nullopt;
+	}
+	return HostedWire::details::TakeNumber(body, kCountBytes);
+}
+
+[[nodiscard]] std::optional<std::string_view> TakeValue(
+		std::string_view &body,
+		std::size_t limit) {
+	if (body.size() < kLengthBytes) {
+		return std::nullopt;
+	}
+	const auto length = HostedWire::details::TakeNumber(body, kLengthBytes);
+	if ((length > limit) || (length > body.size())) {
+		return std::nullopt;
+	}
+	const auto result = body.substr(0, std::size_t(length));
+	body.remove_prefix(std::size_t(length));
+	return result;
+}
+
+[[nodiscard]] bool SkipForm(
+		std::string_view &value,
+		twlite::wire::Form form) {
+	return (value.size() >= kFormHeaderBytes)
+		&& (std::uint8_t(value[0]) == std::uint8_t(form))
+		&& (std::uint8_t(value[1]) == twlite::wire::VERSION)
+		&& Skip(value, kFormHeaderBytes);
+}
+
+[[nodiscard]] bool ListAdmitted(
+		std::string_view value,
+		const twlite::wire::Caps &caps) {
+	const auto count = SkipForm(value, twlite::wire::Form::List)
+		? TakeCount(value)
+		: std::nullopt;
+	return count
+		&& (*count <= caps.commands)
+		&& (*count <= value.size() / kCommandBytes)
+		&& (*count || value.empty());
+}
+
+[[nodiscard]] bool ListLengthAdmitted(std::uint32_t length) {
+	const auto empty = kFormHeaderBytes + kCountBytes;
+	return (length == empty) || (length >= empty + kCommandBytes);
+}
+
+[[nodiscard]] bool DamageComplete(
+		std::string_view value,
+		const twlite::wire::Caps &caps) {
+	const auto rects = SkipForm(value, twlite::wire::Form::Damage)
+		? TakeFlag(value)
+		: std::nullopt;
+	if (!rects) {
+		return false;
+	} else if (!*rects) {
+		return value.empty();
+	}
+	const auto count = TakeCount(value);
+	return count
+		&& (*count <= caps.rects)
+		&& (value.size() == *count * kRectBytes);
+}
+
+[[nodiscard]] bool SkipState(std::string_view &body) {
+	return Skip(body, kWidthBytes + kHeightBytes)
+		&& SkipFlag(body)
+		&& SkipFlag(body)
+		&& Skip(body, kTickBytes)
+		&& SkipFlag(body);
+}
+
+[[nodiscard]] bool SkipClaim(std::string_view &body) {
+	return SkipFlag(body) && SkipFlag(body) && SkipFlag(body);
+}
+
+[[nodiscard]] bool FrameComplete(
+		std::string_view body,
+		const Remote::Caps &caps) {
+	const auto painted = (Skip(body, kSequenceBytes) && SkipState(body))
+		? TakeFlag(body)
+		: std::nullopt;
+	if (!painted) {
+		return false;
+	} else if (!*painted) {
+		return body.empty();
+	}
+	const auto list = TakeValue(body, caps.message);
+	const auto damage = list ? TakeValue(body, caps.message) : std::nullopt;
+	return damage
+		&& body.empty()
+		&& ListAdmitted(*list, caps.values)
+		&& DamageComplete(*damage, caps.values);
+}
+
+[[nodiscard]] bool PointerComplete(
+		std::string_view body,
+		const Remote::Caps &caps) {
+	const auto claimed = TakeValue(body, caps.text)
+		? TakeFlag(body)
+		: std::nullopt;
+	return claimed.has_value()
+		&& (!*claimed || SkipClaim(body))
+		&& body.empty();
+}
+
+[[nodiscard]] std::optional<Key> DeltaKey(
+		std::string_view message,
+		const Remote::Caps &caps) {
+	auto sequence = std::uint64_t();
+	auto length = std::uint32_t();
+	auto damage = std::string_view();
+	if (!Remote::delta_scan(message, caps, sequence, length, damage)
+		|| !ListLengthAdmitted(length)
+		|| !DamageComplete(damage, caps.values)) {
+		return std::nullopt;
+	}
+	return Key{ .sequence = sequence };
+}
+
+[[nodiscard]] std::optional<Key> FrameKey(
+		std::string_view message,
+		const Remote::Caps &caps) {
+	if (Remote::kind_of(message) == Remote::Kind::FrameDelta) {
+		return DeltaKey(message, caps);
+	}
+	const auto sequence = SequenceOf(message);
+	if (!sequence
+		|| !FrameComplete(message.substr(kRemoteHeaderBytes), caps)) {
+		return std::nullopt;
+	}
+	return Key{ .sequence = sequence };
+}
+
+[[nodiscard]] std::optional<Key> PointerKey(
+		std::string_view message,
+		const Remote::Caps &caps) {
+	if (!PointerComplete(message.substr(kRemoteHeaderBytes), caps)) {
+		return std::nullopt;
+	}
+	return Key();
+}
+
+[[nodiscard]] std::optional<Key> ClaimKey(
+		std::string_view message,
+		const Remote::Caps &caps) {
+	auto claim = Remote::ClaimAnswer();
+	if (!Remote::decode(message, caps, claim)) {
+		return std::nullopt;
+	}
+	return Key{ .sequence = claim.seq };
+}
+
+constexpr auto kExchanges = std::array{
+	Exchange{
+		.request = Remote::Kind::FrameRequest,
+		.answer = Remote::Kind::Frame,
+		.alsoAnswer = Remote::Kind::FrameDelta,
+		.answered = FrameKey,
+		.limit = HostedWire::kMaxFrameBytes,
+		.sequenced = true,
+		.whenVisible = true,
+	},
+	Exchange{
+		.request = Remote::Kind::Touch,
+		.answer = Remote::Kind::Pointer,
+		.answered = PointerKey,
+	},
+	Exchange{
+		.request = Remote::Kind::Hover,
+		.answer = Remote::Kind::Pointer,
+		.answered = PointerKey,
+	},
+	Exchange{
+		.request = Remote::Kind::ClaimQuery,
+		.answer = Remote::Kind::ClaimAnswer,
+		.answered = ClaimKey,
+		.sequenced = true,
+	},
 };
 
 struct Reading {
@@ -56,22 +302,23 @@ struct Helper {
 	std::shared_ptr<Reports> reports;
 	FnMut<Completion(crl::time exitWait, crl::time killWait)> complete;
 	crl::time started = 0;
+	Clock::time_point launched;
 	crl::time handed = 0;
 	int64 pid = 0;
 	uint64 id = 0;
 	bool retiring = false;
+	bool reaping = false;
 	bool intentional = false;
 	bool launching = false;
 };
 
 class Manager final {
 public:
-	explicit Manager(bool hosting);
+	Manager();
 
-	[[nodiscard]] Channel channel(
-		std::shared_ptr<twidget::SandboxResources> resources);
 	[[nodiscard]] HostedRoute hostedChannel(
 		std::shared_ptr<twidget::SandboxResources> resources);
+	void refuse();
 	[[nodiscard]] bool stop(Fn<void()> stopped);
 
 	void reconcile(uint64 id);
@@ -93,6 +340,7 @@ private:
 	[[nodiscard]] crl::time idleDeadlineLocked() const;
 	void failedLocked(crl::time uptime);
 	void scheduleReap(uint64 id);
+	[[nodiscard]] bool claimReapLocked(uint64 id);
 	void reap(uint64 id);
 	void finished();
 	void checkIdle();
@@ -104,8 +352,8 @@ private:
 	QString _disabled;
 	uint64 _serial = 0;
 	int _failures = 0;
-	const bool _hosting = false;
 	bool _stopped = false;
+	bool _refusing = false;
 	base::Timer _idle;
 	Fn<void()> _whenStopped;
 
@@ -113,7 +361,6 @@ private:
 
 auto Instance = (Manager*)nullptr;
 auto Place = std::optional<EnginePlace>();
-auto Hosted = false;
 auto HostedRoutes = HostedFactory();
 
 [[nodiscard]] std::string BuildString() {
@@ -123,6 +370,60 @@ auto HostedRoutes = HostedFactory();
 [[nodiscard]] QString ReasonText(const std::string &reason) {
 	const auto size = std::min(reason.size(), kMaxReasonBytes);
 	return QString::fromUtf8(reason.data(), int(size));
+}
+
+[[nodiscard]] std::optional<Key> RequestKey(
+		const Exchange &exchange,
+		std::string_view message) {
+	if (!exchange.sequenced) {
+		return Key();
+	}
+	const auto sequence = SequenceOf(message);
+	if (!sequence) {
+		return std::nullopt;
+	}
+	return Key{ .sequence = sequence };
+}
+
+[[nodiscard]] std::optional<Key> AnswerKey(
+		const Exchange &exchange,
+		std::string_view message) {
+	const auto caps = HostedWire::EmbeddingCaps();
+	if (message.size() > std::min(caps.message, exchange.limit)) {
+		return std::nullopt;
+	}
+	return exchange.answered(message, caps);
+}
+
+[[nodiscard]] Answers::Reading ReadExchange(std::string_view message) {
+	using Role = Answers::Role;
+	if (HostedWire::IsControl(message)) {
+		return HostedWire::DecodeStopped(message)
+			? Answers::Reading{ .role = Role::Last }
+			: Answers::Reading();
+	}
+	const auto kind = Remote::kind_of(message);
+	for (const auto &exchange : kExchanges) {
+		const auto expects = (kind == exchange.request);
+		if (!expects
+			&& (kind != exchange.answer)
+			&& (kind != exchange.alsoAnswer)) {
+			continue;
+		}
+		const auto key = expects
+			? RequestKey(exchange, message)
+			: AnswerKey(exchange, message);
+		if (!key) {
+			break;
+		}
+		return {
+			.role = expects ? Role::Expects : Role::Answers,
+			.family = std::uint32_t(exchange.answer),
+			.sequence = key->sequence,
+			.whenVisible = expects && exchange.whenVisible,
+		};
+	}
+	return {};
 }
 
 [[nodiscard]] Reading Read(Reports &reports) {
@@ -161,20 +462,9 @@ void PublishEnd(Reports &reports, const std::string &reason) {
 	};
 }
 
-[[nodiscard]] Channel Refusing(const QString &reason) {
-	return twidget::SandboxRemoteHostEnd::refusing(reason.toStdString());
-}
-
 [[nodiscard]] HostedRoute RefusingHosted(const QString &reason) {
 	return twidget::SandboxRemoteHostEnd::refusingHosted(
 		reason.toStdString());
-}
-
-void RefuseEngines(const QString &reason) {
-	twidget::SandboxEngine::setRemoteChannelFactory([=](
-			std::shared_ptr<twidget::SandboxResources>) {
-		return Refusing(reason);
-	});
 }
 
 [[nodiscard]] QString CouldNotStart(const QString &error) {
@@ -182,62 +472,70 @@ void RefuseEngines(const QString &reason) {
 	return u"the widget helper could not start: "_q + error;
 }
 
+#ifdef DESKTOP_APP_DISABLE_PRIVATE_QT_API
+[[nodiscard]] bool HelperAvailable() {
+	return false;
+}
+
+[[nodiscard]] QString UnsupportedReason() {
+	return u"this build cannot bound the clips of widget pictures "
+		"without Qt's private API"_q;
+}
+#else // DESKTOP_APP_DISABLE_PRIVATE_QT_API
+[[nodiscard]] bool HelperAvailable() {
+	return Platform::WidgetHelper::Enabled();
+}
+
+[[nodiscard]] QString UnsupportedReason() {
+	return Platform::WidgetHelper::UnsupportedReason();
+}
+#endif // DESKTOP_APP_DISABLE_PRIVATE_QT_API
+
 [[nodiscard]] QString Unavailable() {
-	const auto reason = Platform::WidgetHelper::UnsupportedReason();
+	const auto reason = UnsupportedReason();
 	const auto text = u"no sandboxed widget helper is available here"_q;
 	return reason.isEmpty() ? text : (text + u": "_q + reason);
 }
 
-[[nodiscard]] bool HostsWidgets() {
-	return Platform::WidgetHelper::Renders();
-}
-
 [[nodiscard]] Choice Logged(Choice choice, const QString &value) {
-	const auto what = choice.hosted
-		? u"Widget engines, validators and renderers"_q
-		: u"Widget engines"_q;
 	const auto from = value.isEmpty()
 		? QString()
 		: u" (TDESKTOP_WIDGET_ENGINES=%1)"_q.arg(value);
 	switch (choice.place) {
-	case EnginePlace::InProcess:
-		LOG(("Tgw: %1 run in process%2.").arg(what, from));
-		break;
 	case EnginePlace::Helper:
-		LOG(("Tgw: %1 run in the widget helper%2.").arg(what, from));
+		LOG(("Tgw: Widget engines, validators and renderers run "
+			"in the widget helper%1.").arg(from));
 		break;
 	case EnginePlace::Nowhere:
-		LOG(("Tgw: %1 do not run, %2.").arg(what, Unavailable()));
+		LOG(("Tgw: Widget engines, validators and renderers do not run, "
+			"%1.").arg(choice.reason));
 		break;
 	}
 	return choice;
 }
 
 [[nodiscard]] Choice DefaultPlace() {
-	const auto place = Platform::WidgetHelper::Enabled()
+	const auto place = HelperAvailable()
 		? EnginePlace::Helper
 		: EnginePlace::Nowhere;
-	return Logged({ .place = place, .hosted = HostsWidgets() }, QString());
+	return Logged({
+		.place = place,
+		.reason = ((place == EnginePlace::Nowhere)
+			? Unavailable()
+			: QString()),
+	}, QString());
 }
 
 // Engine switches and probes bypass or inspect the sandbox: never shipped.
-#ifdef _DEBUG
+#if defined _DEBUG && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 [[nodiscard]] QString EnginesSwitch() {
 	return qEnvironmentVariable("TDESKTOP_WIDGET_ENGINES");
 }
 
 [[nodiscard]] Choice ChoosePlace() {
 	const auto value = EnginesSwitch();
-	if (value == u"in-process"_q) {
-		return Logged({ .place = EnginePlace::InProcess }, value);
-	} else if (value == u"helper-engines"_q) {
+	if (value == u"helper"_q || Test::IsWidgetHelperProbeMode(value)) {
 		return Logged({ .place = EnginePlace::Helper }, value);
-	} else if (value == u"helper"_q
-		|| Test::IsWidgetHelperProbeMode(value)) {
-		return Logged({
-			.place = EnginePlace::Helper,
-			.hosted = HostsWidgets(),
-		}, value);
 	}
 	return DefaultPlace();
 }
@@ -245,7 +543,7 @@ void RefuseEngines(const QString &reason) {
 [[nodiscard]] QStringList HelperArguments() {
 	return Test::WidgetHelperProbeArguments(EnginesSwitch());
 }
-#else // _DEBUG
+#else // _DEBUG && !DESKTOP_APP_DISABLE_PRIVATE_QT_API
 [[nodiscard]] Choice ChoosePlace() {
 	return DefaultPlace();
 }
@@ -253,25 +551,10 @@ void RefuseEngines(const QString &reason) {
 [[nodiscard]] QStringList HelperArguments() {
 	return {};
 }
-#endif // _DEBUG
+#endif // _DEBUG && !DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
-Manager::Manager(bool hosting)
-: _hosting(hosting)
-, _idle([=] { checkIdle(); }) {
-}
-
-Channel Manager::channel(
-		std::shared_ptr<twidget::SandboxResources> resources) {
-	Expects(resources != nullptr);
-
-	auto lock = Lock(_mutex);
-	return v::match(endFor(lock, *resources), [&](const QString &reason) {
-		return Refusing(reason);
-	}, [&](not_null<End*> end) {
-		auto result = end->channel();
-		handOut(lock);
-		return result;
-	});
+Manager::Manager()
+: _idle([=] { checkIdle(); }) {
 }
 
 HostedRoute Manager::hostedChannel(
@@ -286,6 +569,12 @@ HostedRoute Manager::hostedChannel(
 		handOut(lock);
 		return result;
 	});
+}
+
+void Manager::refuse() {
+	auto lock = Lock(_mutex);
+	_refusing = true;
+	_reaped.notify_all();
 }
 
 bool Manager::stop(Fn<void()> stopped) {
@@ -333,12 +622,17 @@ Manager::Selected Manager::endFor(
 		Lock &lock,
 		const twidget::SandboxResources &resources) {
 	while (true) {
-		if (_stopped) {
+		if (_stopped || _refusing) {
 			return u"the widget helper was stopped"_q;
 		} else if (!_disabled.isEmpty()) {
 			return _disabled;
 		} else if (!_helper) {
 			return launch(lock, resources);
+		} else if (claimReapLocked(_helper->id)) {
+			const auto id = _helper->id;
+			lock.unlock();
+			reap(id);
+			lock.lock();
 		} else if (_helper->retiring || _helper->launching) {
 			_reaped.wait(lock);
 		} else if (!Read(*_helper->reports).ended) {
@@ -374,6 +668,15 @@ Manager::Selected Manager::launch(
 	lock.lock();
 	if (!launched.error.isEmpty()) {
 		const auto reason = CouldNotStart(launched.error);
+		if (launched.complete) {
+			_helper->complete = std::move(launched.complete);
+			_helper->pid = launched.pid;
+			_helper->launching = false;
+			const auto retired = retireLocked(false);
+			lock.unlock();
+			scheduleReap(retired);
+			return reason;
+		}
 		_helper = std::nullopt;
 		_reaped.notify_all();
 		failedLocked(0);
@@ -387,6 +690,7 @@ Manager::Selected Manager::launch(
 	_helper->stream = std::move(launched.stream);
 	_helper->complete = std::move(launched.complete);
 	_helper->started = crl::now();
+	_helper->launched = Clock::now();
 	_helper->pid = launched.pid;
 	_helper->launching = false;
 	_reaped.notify_all();
@@ -396,14 +700,14 @@ Manager::Selected Manager::launch(
 		scheduleReap(retired);
 		return u"the widget helper was stopped"_q;
 	}
-	const auto start = _hosting ? &End::startHosting : &End::start;
 	try {
-		_helper->end = start(
+		_helper->end = End::startHosting(
 			_helper->stream,
 			resources,
 			BuildString(),
 			std::move(events),
-			{});
+			{},
+			HostedAnswers());
 	} catch (const std::exception &e) {
 		const auto reason = CouldNotStart(QString::fromUtf8(e.what()));
 		const auto retired = retireLocked(false);
@@ -429,15 +733,22 @@ uint64 Manager::retireLocked(bool intentional) {
 	Expects(_helper && !_helper->retiring);
 
 	_helper->retiring = true;
-	_helper->intentional = intentional && !Read(*_helper->reports).ended;
-	if (!_helper->intentional) {
-		failedLocked(crl::now() - _helper->started);
+	_helper->intentional = intentional;
+	if (!intentional && !_helper->end) {
+		failedLocked(_helper->started
+			? (crl::now() - _helper->started)
+			: crl::time(0));
 	}
+	_reaped.notify_all();
 	return _helper->id;
 }
 
 crl::time Manager::idleDeadlineLocked() const {
-	if (_stopped || !_helper || _helper->retiring || _helper->launching) {
+	if (_stopped
+		|| _refusing
+		|| !_helper
+		|| _helper->retiring
+		|| _helper->launching) {
 		return 0;
 	}
 	const auto reading = Read(*_helper->reports);
@@ -458,13 +769,31 @@ void Manager::failedLocked(crl::time uptime) {
 
 void Manager::scheduleReap(uint64 id) {
 	crl::async([=] {
-		reap(id);
+		auto lock = Lock(_mutex);
+		if (claimReapLocked(id)) {
+			lock.unlock();
+			reap(id);
+		}
 	});
+}
+
+bool Manager::claimReapLocked(uint64 id) {
+	if (!_helper
+		|| (_helper->id != id)
+		|| !_helper->retiring
+		|| _helper->reaping) {
+		return false;
+	}
+	_helper->reaping = true;
+	return true;
 }
 
 void Manager::reap(uint64 id) {
 	auto lock = Lock(_mutex);
-	Assert(_helper && _helper->retiring && (_helper->id == id));
+	Assert(_helper
+		&& _helper->retiring
+		&& _helper->reaping
+		&& (_helper->id == id));
 	const auto end = base::take(_helper->end);
 	const auto stream = base::take(_helper->stream);
 	auto complete = base::take(_helper->complete);
@@ -472,8 +801,9 @@ void Manager::reap(uint64 id) {
 	const auto pid = _helper->pid;
 	lock.unlock();
 
+	auto endedAt = std::optional<Clock::time_point>();
 	if (end) {
-		end->stop();
+		endedAt = end->stop();
 		LOG(("Tgw: Widget helper %1 stream ended: %2."
 			).arg(pid
 			).arg(ReasonText(Read(*reports).reason)));
@@ -485,9 +815,13 @@ void Manager::reap(uint64 id) {
 
 	lock.lock();
 	const auto record = base::take(_helper);
+	if (endedAt) {
+		failedLocked(std::chrono::duration_cast<std::chrono::milliseconds>(
+			*endedAt - record->launched).count());
+	}
 	if (!result.reaped && _disabled.isEmpty()) {
 		_disabled = u"the widget helper was not reaped"_q;
-	} else if (result.reaped && record->intentional) {
+	} else if (result.reaped && record->intentional && !endedAt) {
 		_failures = 0;
 	}
 	_reaped.notify_all();
@@ -546,33 +880,18 @@ void PrepareRemoteEngines() {
 	}
 	const auto choice = ChoosePlace();
 	Place = choice.place;
-	Hosted = choice.hosted;
-	if (choice.place == EnginePlace::InProcess) {
-		return;
-	} else if (choice.place == EnginePlace::Nowhere) {
-		const auto reason = Unavailable();
-		RefuseEngines(reason);
-		if (choice.hosted) {
-			HostedRoutes = [=](std::shared_ptr<twidget::SandboxResources>) {
-				return RefusingHosted(reason);
-			};
-		}
-		return;
-	}
-	Instance = new Manager(choice.hosted);
-	if (!choice.hosted) {
-		twidget::SandboxEngine::setRemoteChannelFactory([manager = Instance](
+	if (choice.place == EnginePlace::Helper) {
+		Instance = new Manager();
+		HostedRoutes = [manager = Instance](
 				std::shared_ptr<twidget::SandboxResources> resources) {
-			return manager->channel(std::move(resources));
-		});
-		return;
+			return manager->hostedChannel(std::move(resources));
+		};
+	} else {
+		HostedRoutes = [reason = choice.reason](
+				std::shared_ptr<twidget::SandboxResources>) {
+			return RefusingHosted(reason);
+		};
 	}
-	RefuseEngines(u"widget engines run only beside their renderers "
-		"in the widget helper"_q);
-	HostedRoutes = [manager = Instance](
-			std::shared_ptr<twidget::SandboxResources> resources) {
-		return manager->hostedChannel(std::move(resources));
-	};
 }
 
 EnginePlace ChosenEnginePlace() {
@@ -581,17 +900,21 @@ EnginePlace ChosenEnginePlace() {
 	return *Place;
 }
 
-bool WidgetsHosted() {
-	Expects(Place.has_value());
-
-	return Hosted;
-}
-
 HostedRoute HostedChannel(
 		std::shared_ptr<twidget::SandboxResources> resources) {
 	Expects(HostedRoutes != nullptr);
 
 	return HostedRoutes(std::move(resources));
+}
+
+Answers HostedAnswers() {
+	return { .read = ReadExchange };
+}
+
+void RefuseRemoteEngines() {
+	if (Instance) {
+		Instance->refuse();
+	}
 }
 
 bool StopRemoteEngines(Fn<void()> stopped) {

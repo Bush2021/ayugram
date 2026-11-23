@@ -155,7 +155,9 @@ private:
 		not_null<Chat*> chat) const;
 
 	[[nodiscard]] bool hasStoryRepost() const {
-		return _hasStoryRepost && _filter.isEmpty();
+		return _hasStoryRepost
+			&& _chatsIndexed.get() == _defaultChatsIndexed.get()
+			&& _filter.isEmpty();
 	}
 	[[nodiscard]] QRect storyRepostRect() const;
 	void paintStoryRepost(Painter &p);
@@ -1818,6 +1820,7 @@ rpl::producer<> ShareBox::Inner::searchRequests() const {
 }
 
 void ShareBox::Inner::applyChatFilter(FilterId id) {
+	setActive(-1);
 	if (!id) {
 		_chatsIndexed = _defaultChatsIndexed.get();
 	} else {
@@ -1847,10 +1850,8 @@ void ShareBox::Inner::applyChatFilter(FilterId id) {
 		// Global results are deduplicated against the list, refill them.
 		_byUsernameFiltered.clear();
 		d_byUsernameFiltered.clear();
-		setActive(-1);
-		refresh();
 	}
-	update();
+	refresh();
 }
 
 void ShareBox::Inner::peopleReceived(

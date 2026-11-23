@@ -12,10 +12,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/weak_ptr.h"
 #include "tgw/tgw_kept_budget.h"
 #include "twidget/gesture_policy.h"
-#include "twidget/renderer.h"
 #include "ui/image/image_prepare.h"
 
 namespace twidget {
+class SandboxHostedChannel;
 class SandboxHostedWait;
 class WidgetHost;
 struct WalletCall;
@@ -66,6 +66,37 @@ struct RendererCut {
 
 [[nodiscard]] int DomModifiers(Qt::KeyboardModifiers modifiers);
 [[nodiscard]] int LogicalHeight(double css, int scale);
+void DropChannel(std::shared_ptr<twidget::SandboxHostedChannel> channel);
+
+enum class HostedOutcome : uchar {
+	None,
+	Spared,
+	Ordinary,
+	Stalled,
+	Refused,
+};
+
+[[nodiscard]] bool ChargesCrash(HostedOutcome outcome);
+
+struct HostedDecision {
+	QString reason;
+	HostedOutcome outcome = HostedOutcome::None;
+	HostedOutcome transport = HostedOutcome::None;
+};
+
+struct HostedWithdrawal {
+	HostedOutcome settled = HostedOutcome::None;
+	bool ended = false;
+	bool awaits = false;
+	bool decided = false;
+	bool claimed = false;
+};
+
+struct HostedRunHooks {
+	Fn<void(HostedDecision decision)> decided;
+	Fn<void(HostedOutcome transport)> settled;
+	Fn<void(HostedWithdrawal withdrawal)> gone;
+};
 
 class RendererCore final : public base::has_weak_ptr {
 public:
@@ -109,9 +140,11 @@ public:
 			const std::string &message,
 			Fn<void(std::string answer)> respond)> request;
 		Fn<void(const std::string &reason)> death;
+		Fn<bool(
+			std::shared_ptr<twidget::SandboxHostedChannel> channel)> channel;
 	};
 
-	RendererCore(double width, double dpr, bool hosted = false);
+	RendererCore(double width, double dpr);
 	~RendererCore();
 
 	[[nodiscard]] uint64 workId() const;
@@ -119,18 +152,25 @@ public:
 	[[nodiscard]] HostedHandlers hostedHandlers(QString stoppedLabel) const;
 	[[nodiscard]] Fn<void(twidget::WidgetHost &host)> keepRoute();
 	void releaseRoute(Fn<void()> done = nullptr);
+	void setHostedRun(HostedRunHooks hooks);
+	[[nodiscard]] HostedWithdrawal withdrawRoute(bool keepOwnDeath = false);
+	[[nodiscard]] bool holdRoute(std::shared_ptr<twidget::WidgetHost> host);
+	[[nodiscard]] bool deciding() const;
+	[[nodiscard]] bool observedDeciding() const;
+	void forget();
 	[[nodiscard]] bool routeChecked() const;
 	[[nodiscard]] bool documentGone() const;
 	[[nodiscard]] rpl::producer<> keptUpdates() const;
 
-	[[nodiscard]] twidget::RendererFactory hostFactory() const;
 	[[nodiscard]] auto hostActionHandler() const
 	-> Fn<void(const twidget::WidgetAction &action)>;
 	[[nodiscard]] RequestHandler hostRequestHandler() const;
 	[[nodiscard]] WalletHandler hostWalletHandler() const;
 	[[nodiscard]] CopyHandler hostCopyHandler() const;
 	[[nodiscard]] WatchHandler hostWatchHandler() const;
-	[[nodiscard]] bool bindHost(std::weak_ptr<twidget::WidgetHost> host);
+	[[nodiscard]] bool bindHost(
+		std::weak_ptr<twidget::WidgetHost> host,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel);
 
 	void detach();
 	[[nodiscard]] bool attached() const;

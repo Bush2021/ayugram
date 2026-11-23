@@ -16,14 +16,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <mutex>
 
 namespace twidget {
-class Json;
 class SandboxHostedWait;
 } // namespace twidget
 
 namespace twlite {
-class Renderer;
 struct Command;
-struct Rect;
 } // namespace twlite
 
 namespace twlite::remote {
@@ -33,7 +30,6 @@ struct State;
 
 namespace Tgw {
 
-class CursorStyles;
 class HostedTraffic;
 class QtBackend;
 class ReportPost;
@@ -55,6 +51,7 @@ struct FontPosition {
 void AdoptFontPositions(
 	const QFont &font,
 	const std::vector<FontPosition> &positions);
+[[nodiscard]] QString StalledReason();
 
 struct RendererValues {
 	QString regularFamily;
@@ -108,11 +105,8 @@ struct RendererClaim {
 };
 
 struct RendererAnswer {
-	std::optional<RendererLayout> layout;
 	RendererState state;
 	std::optional<RendererStop> stop;
-	std::optional<RendererCursor> cursor;
-	std::optional<RendererSelection> selection;
 	std::optional<RendererMenu> menu;
 	std::optional<RendererClaim> claim;
 	uint64 post = 0;
@@ -204,33 +198,31 @@ public:
 	using Changes = RendererCore::Changes;
 
 	struct Host {
-		Fn<void(const std::string &json)> send;
 		Fn<void(const std::string &kind, const std::string &detail)> diag;
 		Fn<std::optional<bool>()> bottom;
 		Fn<bool()> gone;
 		Fn<void(std::string message)> platform;
 		Fn<bool(std::string message)> press;
 		Fn<void()> released;
+		Fn<bool(QString reason)> localStop;
 	};
 
 	RendererWork(
 		uint64 id,
 		base::weak_ptr<RendererCore> chat,
-		double width,
 		double dpr,
 		const RendererValues &values,
 		Host host,
-		std::optional<RendererHosted> hosted = std::nullopt);
+		RendererHosted hosted);
 	~RendererWork();
 
 	static void Create(
 		uint64 id,
 		base::weak_ptr<RendererCore> chat,
-		double width,
 		double dpr,
 		const RendererValues &values,
 		Host host,
-		std::optional<RendererHosted> hosted = std::nullopt);
+		RendererHosted hosted);
 	[[nodiscard]] static RendererWork *Find(uint64 id);
 	static void Destroy(uint64 id);
 	static void DestroyAll();
@@ -238,10 +230,8 @@ public:
 
 	[[nodiscard]] WidgetMeter::Operation operation();
 
-	void hostLoaded();
-	void hostMessage(const twidget::Json &message);
-	void hostTheme(bool dark);
 	void freeze(QString reason, bool fatal);
+	void hostDied(Fn<void()> reached);
 
 	void detach();
 	void setOnScreen(bool onScreen, uint64 visibility);
@@ -282,45 +272,6 @@ public:
 
 private:
 	struct Hosted;
-	struct Pointer {
-		QPointF position;
-		QPointF origin;
-		std::vector<twidget::Json> held;
-		int64 hit = 0;
-		int64 hover = 0;
-		int64 press = 0;
-		uint64 menu = 0;
-		int parsed = 0;
-		bool over = false;
-		bool hovering = false;
-		bool pressed = false;
-		bool moved = false;
-		bool active = false;
-		bool secondary = false;
-	};
-	struct Finger {
-		QPointF position;
-		std::vector<twidget::Json> held;
-		bool pressed = false;
-	};
-	struct Held {
-		crl::time since = 0;
-		int builds = 0;
-	};
-	struct Reports {
-		std::optional<RendererMenu> menu;
-		std::optional<RendererClaim> claim;
-		QString text;
-		uint64 pointer = 0;
-		uint64 selection = 0;
-		uint64 cursorSent = 0;
-		uint64 textSent = 0;
-		int cursorBuilds = -1;
-		int textBuilds = -1;
-		bool hand = false;
-		bool has = false;
-		bool touched = false;
-	};
 	struct ListPaint {
 		KeptBudget::Backing backing;
 		std::optional<RendererLayout> layout;
@@ -336,19 +287,7 @@ private:
 	[[nodiscard]] bool routeAlive() const;
 
 	[[nodiscard]] bool acceptsInput() const;
-	[[nodiscard]] int64 elementAt(QPointF point);
-	[[nodiscard]] CursorStyles &cursorStyles();
-	void flushBuilt(int builds);
-	void holdPointer(QPointF point, int64 hit, bool secondary);
-	void releasePointer(QPointF point, int modifiers, bool cancel);
-	[[nodiscard]] bool selected() const;
-	[[nodiscard]] bool handAt(QPointF point);
 	void reportInput(RendererAnswer &answer);
-	[[nodiscard]] std::optional<RendererCursor> reportCursor();
-	[[nodiscard]] std::optional<RendererSelection> reportSelection();
-	void trackHover();
-	[[nodiscard]] std::vector<twidget::Json> leaveHover();
-	void inputDone(const std::vector<twidget::Json> &out, bool wasDirty);
 	void cancelInput();
 	void releaseInput();
 	void finishDetach();
@@ -356,8 +295,6 @@ private:
 	void stop(QString reason, bool fatal);
 	void refuse(QString limit);
 	void backendRefused();
-	[[nodiscard]] std::vector<twidget::Json> takeSettled();
-	void flushQueued();
 
 	[[nodiscard]] bool canTick() const;
 	[[nodiscard]] bool clockWanted() const;
@@ -366,9 +303,7 @@ private:
 	void stopClock();
 	void clockStep();
 	void scheduleWake();
-	void dropHeld();
-	void releaseHeld();
-	[[nodiscard]] bool step(crl::time now);
+	[[nodiscard]] bool step();
 	void wake();
 	void tick();
 
@@ -381,18 +316,11 @@ private:
 	[[nodiscard]] QSize layoutArea() const;
 	[[nodiscard]] std::optional<QSize> frameSize() const;
 	[[nodiscard]] bool framed(const RendererCut &cut, QSize cardArea) const;
-	[[nodiscard]] std::optional<RendererLayout> raster();
+	void raster();
 	[[nodiscard]] ListPaint paintList(
 		const std::vector<twlite::Command> &list,
-		const std::optional<std::vector<twlite::Rect>> &damage,
 		QSize size);
 	[[nodiscard]] std::optional<RendererLayout> completed(QSize cardArea);
-	[[nodiscard]] std::optional<QString> repaintFrame(
-		const std::vector<twlite::Command> &list,
-		QRect area,
-		Images::CornersMaskRef corners,
-		QSize card,
-		crl::time started);
 	void releaseCanvas();
 	void dropCanvas();
 	void deliver(RendererAnswer &&answer);
@@ -420,12 +348,8 @@ private:
 	void closeRoute(bool checked);
 	void refuseRoute(QString limit, const char *detail = nullptr);
 
-	void finish(const std::vector<twidget::Json> &out, Changes changes);
-	[[nodiscard]] Changes forwardAll(const std::vector<twidget::Json> &out);
-	[[nodiscard]] Changes applySize(const twidget::Json &message);
 	[[nodiscard]] Changes applyHeight(double height);
 	void bindHeightAnchor();
-	void forward(const twidget::Json &message);
 	void post(Changes changes);
 
 	const uint64 _id = 0;
@@ -433,44 +357,30 @@ private:
 	const Host _host;
 	const double _dpr = 0.;
 	std::unique_ptr<QtBackend> _backend;
-	std::unique_ptr<twlite::Renderer> _renderer;
 	std::unique_ptr<Hosted> _hosted;
 	base::Timer _clock;
 	base::Timer _wake;
-	base::Timer _heldTimer;
-	std::optional<Held> _held;
-	crl::time _recentReplyUntil = 0;
 	RendererSize _size;
 	std::optional<RendererCut> _cut;
 	QImage _frame;
 	RendererGeometry _painted;
 	RendererReflow _reflow;
 	std::optional<double> _height;
-	std::string _pendingSize;
 	QString _stopReason;
-	std::unique_ptr<CursorStyles> _cursor;
-	Pointer _pointer;
-	Finger _finger;
-	Reports _reports;
 	EmojiWaits _emojiWaits;
 	EmojiWaits _emojiPainted;
 	Changes _postedChanges;
 	uint64 _sizeSerial = 0;
 	uint64 _epoch = 0;
 	uint64 _visibility = 0;
-	bool _ready = false;
 	bool _detached = false;
 	bool _detaching = false;
 	bool _hasContent = false;
-	bool _acked = false;
 	bool _loaded = false;
 	bool _heightBottom = false;
 	bool _stopped = false;
 	bool _stopFatal = false;
 	bool _onScreen = false;
-	bool _frameRequested = false;
-	bool _frameRepaintable = false;
-	bool _idleRequest = false;
 	bool _stepBusy = false;
 	bool _clockOn = false;
 	bool _scheduled = false;
