@@ -48,6 +48,18 @@ jobs:
 
           sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
 
+      - name: Clean up preinstalled software.
+        run: |
+          df -h /
+          SELECTED_XCODE=$(cd "$(xcode-select -p)/../.." && pwd -P)
+          for app in /Applications/Xcode*.app; do
+            if [ ! -L "$app" ] && [ "$(cd "$app" && pwd -P)" != "$SELECTED_XCODE" ]; then
+              sudo rm -rf "$app"
+            fi
+          done
+          rm -rf ~/Library/Android/sdk ~/.dotnet
+          df -h /
+
       - name: Libraries cache.
         id: cache-libs
         uses: actions/cache/restore@v6
