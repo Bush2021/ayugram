@@ -7,11 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/image/image_location_factory.h"
 
-#include "ui/image/image.h"
 #include "main/main_session.h"
-#include "ayu/secret/secret_media.h"
+#include "ui/image/image.h"
 
 #include <QtCore/QBuffer>
+
+// AyuGram includes
+#include "ayu/secret/secret_media.h"
+
 
 namespace Images {
 namespace {

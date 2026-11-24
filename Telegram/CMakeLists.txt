@@ -1899,6 +1899,8 @@ PRIVATE
     media/stories/media_stories_delegate.h
     media/stories/media_stories_header.cpp
     media/stories/media_stories_header.h
+    media/stories/media_stories_music.cpp
+    media/stories/media_stories_music.h
     media/stories/media_stories_post.cpp
     media/stories/media_stories_post.h
     media/stories/media_stories_reactions.cpp
@@ -1950,6 +1952,7 @@ PRIVATE
     media/media_video_frames.h
     media/view/media_view_group_thumbs.cpp
     media/view/media_view_group_thumbs.h
+    media/view/media_view_story_caption.cpp
     media/view/media_view_open_common.cpp
     media/view/media_view_open_common.h
     media/view/media_view_overlay_opengl.cpp
@@ -2394,6 +2397,8 @@ PRIVATE
     test/test_agent.h
     test/test_animation_clock.cpp
     test/test_animation_clock.h
+    test/test_application_state.cpp
+    test/test_application_state.h
     test/test_box_button.cpp
     test/test_box_button.h
     test/test_capture.cpp
@@ -2471,6 +2476,8 @@ PRIVATE
     test/test_palette.h
     test/test_panel.cpp
     test/test_panel.h
+    test/test_popup_hold.cpp
+    test/test_popup_hold.h
     test/test_post_paint.cpp
     test/test_post_paint.h
     test/test_press_origin.cpp
