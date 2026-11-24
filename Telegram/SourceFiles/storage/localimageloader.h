@@ -300,6 +300,7 @@ public:
 
 	struct ProcessArgs {
 		bool generateGoodThumbnail = true;
+		bool allowVideoTranscode = true;
 	};
 	void process(ProcessArgs &&args);
 

@@ -3040,6 +3040,9 @@ void ChatWidget::sendBotStartCommand() {
 	session().api().sendBotStart(controller()->uiShow(), _peer->asUser());
 	updateControlsVisibility();
 	updateControlsGeometry();
+	if (Ui::InFocusChain(this)) {
+		_composeControls->focus();
+	}
 }
 
 bool ChatWidget::clearMaybeSendStart() {

@@ -1032,7 +1032,8 @@ void FileLoadTask::process(ProcessArgs &&args) {
 					|| convertForGif)
 				&& !video->isWebmSticker
 				&& (filesize < Media::Encode::MaxTranscodeSourceSize());
-			if (!_forceFile
+			if (args.allowVideoTranscode
+				&& !_forceFile
 				&& !video->thumbnail.isNull()
 				&& (convert
 					|| Editor::VideoEdited(
