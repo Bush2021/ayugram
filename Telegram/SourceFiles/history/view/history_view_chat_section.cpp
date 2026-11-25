@@ -1484,6 +1484,22 @@ Data::ForumTopic *ChatWidget::resolvedTopic() {
 	return forum->enforceTopicFor(rootId);
 }
 
+bool ChatWidget::monoforumReplyMissing() const {
+	const auto channel = _peer->asChannel();
+	if (mode() != Mode::History
+		|| !channel
+		|| !channel->amMonoforumAdmin()
+		|| channel->monoforumDisabled()) {
+		return false;
+	}
+	const auto reply = _composeControls->replyingToMessage();
+	return !reply.messageId || (reply.messageId.peer != _peer->id);
+}
+
+bool ChatWidget::monoforumReplyRequired() const {
+	return !_composeControls->isEditingMessage() && monoforumReplyMissing();
+}
+
 void ChatWidget::refreshCanSendMessages() {
 	_canSendMessagesLifetime.destroy();
 	const auto apply = [=](bool can) {
@@ -1650,11 +1666,12 @@ void ChatWidget::setupComposeControls() {
 		listCancelRequest();
 	}, lifetime());
 
+	// Ends in ~ListWidget, before a child popup's close refocuses the field.
 	_composeControls->focusedValue(
 	) | rpl::skip(1) | rpl::filter(rpl::mappers::_1) | rpl::on_next([=] {
 		_inner->clearTextSelection();
 		_inner->hideElementOverlay();
-	}, lifetime());
+	}, _inner->lifetime());
 
 	_composeControls->replyingToMessageValue(
 	) | rpl::skip(1) | rpl::on_next([=](FullReplyTo) {
