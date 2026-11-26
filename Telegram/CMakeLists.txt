@@ -81,8 +81,11 @@ if (DESKTOP_APP_TEST_APPS OR TDESKTOP_BUILD_UPDATE_TESTS)
         endif()
     endif()
 endif()
+include(cmake/test_core_settings.cmake)
+include(cmake/test_export_formats.cmake)
 include(cmake/test_iv_editor_state.cmake)
 include(cmake/test_iv_editor_table_grid.cmake)
+include(cmake/test_text_contracts.cmake)
 include(cmake/test_wallet_card_tint.cmake)
 include(cmake/test_wallet_phrase_shares.cmake)
 
@@ -863,6 +866,7 @@ PRIVATE
     core/crash_report_window.h
     core/crash_reports.cpp
     core/crash_reports.h
+    core/credits_amount.cpp
     core/credits_amount.h
     core/deadlock_detector.h
     core/deep_links/deep_links_chats.cpp
@@ -1958,6 +1962,7 @@ PRIVATE
     media/view/media_view_overlay_opengl.h
     media/view/media_view_overlay_raster.cpp
     media/view/media_view_overlay_raster.h
+    media/view/media_view_overlay_restart.cpp
     media/view/media_view_overlay_rhi.cpp
     media/view/media_view_overlay_rhi.h
     media/view/media_view_metal_texture.h

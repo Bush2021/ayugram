@@ -1917,7 +1917,18 @@ void HistoryWidget::supportShareContact(Support::Contact contact) {
 	if (!_history) {
 		return;
 	}
-	supportInsertText(contact.comment);
+	const auto undoOnClose = !contact.comment.isEmpty()
+		|| _field->textCursor().hasSelection();
+	if (contact.comment.isEmpty()) {
+		supportInsertText(contact.comment);
+	} else {
+		_field->setFocus();
+		auto cursor = _field->textCursor();
+		cursor.beginEditBlock();
+		cursor.insertText(contact.comment);
+		cursor.endEditBlock();
+		_field->ensureCursorVisible();
+	}
 	contact.comment = _field->getLastText();
 
 	const auto submit = [=](Qt::KeyboardModifiers modifiers) {
@@ -1943,10 +1954,12 @@ void HistoryWidget::supportShareContact(Support::Contact contact) {
 		_history,
 		contact,
 		crl::guard(this, submit)));
-	box->boxClosing(
-	) | rpl::on_next([=] {
-		_field->document()->undo();
-	}, lifetime());
+	if (undoOnClose) {
+		box->boxClosing(
+		) | rpl::on_next([=] {
+			_field->document()->undo();
+		}, lifetime());
+	}
 }
 
 void HistoryWidget::scrollToCurrentVoiceMessage(
@@ -2097,6 +2110,26 @@ void HistoryWidget::enqueueMessageHighlight(
 Ui::ChatPaintHighlight HistoryWidget::itemHighlight(
 		not_null<const HistoryItem*> item) const {
 	return _highlighter.state(item);
+}
+
+HistoryView::Element *HistoryWidget::closestLoadedView(MsgId id) const {
+	const auto migrated = _migrated && (id < 0) && (-id < ServerMaxMsgId);
+	const auto history = migrated ? _migrated : _history;
+	const auto target = migrated ? MsgId(-id) : id;
+	auto result = (HistoryView::Element*)nullptr;
+	for (const auto &block : history->blocks) {
+		for (const auto &view : block->messages) {
+			if (!view->data()->isRegular()
+				|| (_list->itemTop(view.get()) < 0)) {
+				continue;
+			}
+			result = view.get();
+			if (view->data()->id >= target) {
+				return result;
+			}
+		}
+	}
+	return result;
 }
 
 int HistoryWidget::itemTopForHighlight(
@@ -8776,8 +8809,16 @@ int HistoryWidget::countInitialScrollTop() {
 		const auto item = getItemFromHistoryOrMigrated(_showAtMsgId);
 		const auto itemTop = _list->itemTop(item);
 		if (itemTop < 0) {
+			if (_showAtMsgParams.silentMissingMessage) {
+				const auto id = _showAtMsgId;
+				if (const auto view = closestLoadedView(id)) {
+					return itemTopForHighlight(view);
+				}
+			} else {
+				controller()->showToast(
+					tr::lng_message_not_found(tr::now));
+			}
 			setMsgId(ShowAtUnreadMsgId);
-			controller()->showToast(tr::lng_message_not_found(tr::now));
 			return countInitialScrollTop();
 		} else {
 			const auto view = item->mainView();

@@ -1111,6 +1111,8 @@ HistoryServiceDependentData *HistoryItem::GetServiceDependentData() {
 		return append;
 	} else if (const auto poll = Get<HistoryServicePollAppendAnswer>()) {
 		return poll;
+	} else if (const auto pollDelete = Get<HistoryServicePollDeleteAnswer>()) {
+		return pollDelete;
 	} else if (const auto decision = Get<HistoryServiceSuggestDecision>()) {
 		return decision;
 	} else if (const auto finish = Get<HistoryServiceSuggestFinish>()) {
@@ -2676,6 +2678,7 @@ void HistoryItem::applyEdition(const MTPDmessageService &message) {
 	const auto wasActionTaken = wasNfr && wasNfr->actionTaken;
 	const auto wasSublist = savedSublist();
 	const auto wasTopic = topic();
+	const auto wasNotificationThread = maybeNotificationThread();
 	if (message.vaction().type() == mtpc_messageActionHistoryClear) {
 		const auto wasGrouped = history()->owner().groups().isGrouped(this);
 		setReplyMarkup({}, true);
@@ -2768,6 +2771,10 @@ void HistoryItem::applyEdition(const MTPDmessageService &message) {
 		if (nowTopic) {
 			nowTopic->applyMaybeLast(this);
 		}
+	}
+	if (wasNotificationThread
+		&& maybeNotificationThread() != wasNotificationThread) {
+		wasNotificationThread->removeNotification(this);
 	}
 }
 

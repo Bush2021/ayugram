@@ -143,6 +143,16 @@ void WrapInvokeAfter(
 	return different;
 }
 
+void WakeKeyWaiters(not_null<Instance*> instance, ShiftedDcId shiftedDcId) {
+	const auto bareDcId = BareDcId(shiftedDcId);
+	const auto dcId = isTemporaryDcId(bareDcId)
+		? getRealIdFromTemporaryDcId(bareDcId)
+		: bareDcId;
+	InvokeQueued(instance, [instance, dcId] {
+		instance->dcTemporaryKeyChanged(dcId);
+	});
+}
+
 base::options::toggle OptionPreferIPv6({
 	.id = kOptionPreferIPv6,
 	.name = "Prefer IPv6",
@@ -174,7 +184,8 @@ SessionPrivate::SessionPrivate(
 , _pingSender(thread, [=] { sendPingByTimer(); })
 , _checkSentRequestsTimer(thread, [=] { checkSentRequests(); })
 , _clearOldContainersTimer(thread, [=] { clearOldContainers(); })
-, _sessionData(std::move(data)) {
+, _sessionData(std::move(data))
+, _reInitGeneration(_sessionData->reInitGeneration()) {
 	Expects(_shiftedDcId != 0);
 
 	moveToThread(thread);
@@ -194,13 +205,7 @@ SessionPrivate::~SessionPrivate() {
 	Expects(_testConnections.empty());
 
 	if (hadKeyCreator) {
-		const auto bareDcId = BareDcId(_shiftedDcId);
-		const auto dcId = isTemporaryDcId(bareDcId)
-			? getRealIdFromTemporaryDcId(bareDcId)
-			: bareDcId;
-		InvokeQueued(_instance, [instance = _instance, dcId] {
-			instance->dcTemporaryKeyChanged(dcId);
-		});
+		WakeKeyWaiters(_instance, _shiftedDcId);
 	}
 }
 
@@ -1035,10 +1040,11 @@ void SessionPrivate::retryByTimer() {
 	connectToServer();
 }
 
-void SessionPrivate::restartNow() {
+void SessionPrivate::restartNow(uint64 reInitGeneration) {
 	_retryTimeout = 1;
 	_retryTimer.cancel();
 	restart();
+	_reInitGeneration = reInitGeneration;
 }
 
 void SessionPrivate::connectToServer(bool afterConfig) {
@@ -1461,11 +1467,11 @@ void SessionPrivate::handleReceived() {
 		}
 
 		auto lock = QReadLocker(_sessionData->haveReceivedMutex());
-		const auto tryToReceive = !_sessionData->haveReceivedMessages().empty();
+		const auto receivedCount = _sessionData->haveReceivedMessages().size();
 		lock.unlock();
 
-		if (tryToReceive) {
-			DEBUG_LOG(("MTP Info: queueTryToReceive() - need to parse in another thread, %1 messages.").arg(_sessionData->haveReceivedMessages().size()));
+		if (receivedCount) {
+			DEBUG_LOG(("MTP Info: queueTryToReceive() - need to parse in another thread, %1 messages.").arg(receivedCount));
 			_sessionData->queueTryToReceive();
 		}
 
@@ -1938,7 +1944,9 @@ SessionPrivate::HandleResult SessionPrivate::handleOneReceived(
 			// the initConnection, so we're not sure yet that it was inited.
 			// Wait till a good response is received.
 		} else {
-			_sessionData->notifyConnectionInited(*_options);
+			_sessionData->notifyConnectionInited(
+				*_options,
+				_reInitGeneration);
 		}
 		requestsAcked(ids, true);
 
@@ -2623,6 +2631,7 @@ DcType SessionPrivate::tryAcquireKeyCreation() {
 				}
 				LOG(("AuthKey Error: could not choose public RSA key"));
 			}
+			WakeKeyWaiters(_instance, _shiftedDcId);
 			restart();
 			return;
 		}
@@ -2647,6 +2656,7 @@ DcType SessionPrivate::tryAcquireKeyCreation() {
 				: _sessionData->getPersistentKey();
 			if (!key) {
 				releaseKeyCreationOnFail();
+				WakeKeyWaiters(_instance, _shiftedDcId);
 				restart();
 				return;
 			}
@@ -2734,11 +2744,15 @@ void SessionPrivate::destroyTemporaryKey() {
 		return;
 	}
 	LOG(("MTP Info: -404 error received in %1 with temporary key, assuming it was destroyed.").arg(_shiftedDcId));
+	const auto hadKeyCreator = (_keyCreator != nullptr);
 	releaseKeyCreationOnFail();
 	if (_encryptionKey) {
 		_sessionData->destroyTemporaryKey(_encryptionKey->keyId());
 	}
 	applyAuthKey(nullptr);
+	if (hadKeyCreator) {
+		WakeKeyWaiters(_instance, _shiftedDcId);
+	}
 	restart();
 }
 
